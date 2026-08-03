@@ -1,0 +1,25 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+
+# ---- Node / front-end ----
+web/node_modules/
+web/dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# ---- Env / secrets ----
+# Local overrides that may hold connection strings / passwords.
+web/.env.local
+web/.env.*.local
+*.env.local
+appsettings.*.local.json
+
+# ---- OS ----
+Thumbs.db
+.DS_Store
