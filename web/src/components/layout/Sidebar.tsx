@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, Typography } from '@mui/material'
 import {
@@ -78,9 +79,15 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const visibleGroups = NAV_GROUPS.filter(
-    (group) => !group.adminOnly || userRole === 'Admin'
-  )
+  const visibleGroups = useMemo(() => {
+    const filtered = NAV_GROUPS.filter((group) => !group.adminOnly || userRole === 'Admin')
+    if (userRole === 'Staff') {
+      const vanHanh = filtered.find((g) => g.title === 'VẬN HÀNH')
+      const rest = filtered.filter((g) => g.title !== 'VẬN HÀNH')
+      return vanHanh ? [vanHanh, ...rest] : filtered
+    }
+    return filtered
+  }, [userRole])
 
   return (
     <Box
