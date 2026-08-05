@@ -27,3 +27,11 @@ export async function apiSend<T>(method: string, path: string, body?: unknown): 
   if (!res.ok) throw new Error(await parseError(res))
   return (await res.json()) as T
 }
+
+export function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  return apiSend<T>('POST', path, body)
+}
+
+export function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  return apiSend<T>('PUT', path, body)
+}
