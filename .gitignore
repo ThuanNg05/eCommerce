@@ -20,6 +20,11 @@ web/.env.*.local
 *.env.local
 appsettings.*.local.json
 
+# ---- Diagram tool backups ----
+# Visual Paradigm (.vpp) and draw.io autosave/backup files under documents/.
+*.vpp.bak_*
+*.drawio.bkp
+
 # ---- OS ----
 Thumbs.db
 .DS_Store
