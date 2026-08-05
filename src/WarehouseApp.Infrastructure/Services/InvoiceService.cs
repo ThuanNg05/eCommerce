@@ -3,7 +3,6 @@ using WarehouseApp.Core;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Dtos;
 using WarehouseApp.Core.Entities;
-using WarehouseApp.Core.Enums;
 using WarehouseApp.Infrastructure.Data;
 
 namespace WarehouseApp.Infrastructure.Services;
@@ -19,14 +18,14 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
             .OrderByDescending(i => i.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(i => new InvoiceSummaryDto(i.Id, i.Number, i.CustomerName, i.Status, i.CreatedAt, i.Total))
+            .Select(i => new InvoiceSummaryDto(i.Id, i.CustomerId, i.Total, i.CreatedAt))
             .ToListAsync(ct);
     }
 
-    public async Task<InvoiceDto?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<InvoiceDto?> GetAsync(string id, CancellationToken ct = default)
     {
         var inv = await db.Invoices.AsNoTracking()
-            .Include(i => i.Lines)
+            .Include(i => i.Details)
             .FirstOrDefaultAsync(i => i.Id == id, ct);
         return inv is null ? null : ToDto(inv);
     }
@@ -35,15 +34,13 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
     {
         if (r.Lines is null || r.Lines.Count == 0)
             throw new DomainValidationException("An invoice must contain at least one line.");
-        if (r.TaxRate is < 0 or > 1)
-            throw new DomainValidationException("Tax rate must be between 0 and 1 (e.g. 0.10 for 10%).");
+
+        if (!await db.Customers.AnyAsync(c => c.Id == r.CustomerId, ct))
+            throw new DomainValidationException($"Customer {r.CustomerId} does not exist.");
 
         // A single transaction covers stock decrement + invoice insert so a failure
-        // leaves neither applied.
-        // NOTE: retry-on-failure is intentionally NOT enabled on the DbContext. If you
-        // turn on EnableRetryOnFailure, wrap this whole block in
-        // db.Database.CreateExecutionStrategy().ExecuteAsync(...) and keep it idempotent —
-        // otherwise EF throws because the execution strategy can't span a user transaction.
+        // leaves neither applied. Retry-on-failure is intentionally NOT enabled on the
+        // DbContext; if it is turned on, wrap this block in an execution strategy.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var ids = r.Lines.Select(l => l.ProductId).Distinct().ToList();
@@ -51,42 +48,43 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
 
         var invoice = new Invoice
         {
-            CustomerName = r.CustomerName.Trim(),
-            TaxRate = r.TaxRate,
-            Status = InvoiceStatus.Draft,
-            Number = await NextNumberAsync(ct)
+            Id = await NextIdAsync(ct),
+            CustomerId = r.CustomerId
         };
 
-        decimal subtotal = 0m;
-        foreach (var line in r.Lines)
+        decimal total = 0m;
+        // Consolidate duplicate product lines: the invoice_detail PK is (invoice_id, product_id).
+        foreach (var group in r.Lines.GroupBy(l => l.ProductId))
         {
-            if (!products.TryGetValue(line.ProductId, out var p))
-                throw new DomainValidationException($"Product {line.ProductId} does not exist.");
-            if (line.Quantity <= 0)
-                throw new DomainValidationException($"Quantity for '{p.Sku}' must be positive.");
-            if (p.QuantityOnHand < line.Quantity)
-                throw new DomainValidationException($"Insufficient stock for '{p.Sku}': on hand {p.QuantityOnHand}, requested {line.Quantity}.");
+            var productId = group.Key;
+            var quantity = group.Sum(l => l.Quantity);
 
-            p.QuantityOnHand -= line.Quantity;
+            if (!products.TryGetValue(productId, out var p))
+                throw new DomainValidationException($"Product {productId} does not exist.");
+            if (quantity <= 0)
+                throw new DomainValidationException($"Quantity for '{p.Sku}' must be positive.");
+            if (p.InStock < quantity)
+                throw new DomainValidationException($"Insufficient stock for '{p.Sku}': in stock {p.InStock}, requested {quantity}.");
+
+            p.InStock -= quantity;
             p.UpdatedAt = DateTimeOffset.UtcNow;
 
-            var lineTotal = p.UnitPrice * line.Quantity;
-            subtotal += lineTotal;
+            // Snapshot the customer-facing price (retail, falling back to base cost).
+            var unitPrice = p.PriceRetail ?? p.BasePrice;
+            var subtotal = unitPrice * quantity;
+            total += subtotal;
 
-            invoice.Lines.Add(new InvoiceLine
+            invoice.Details.Add(new InvoiceDetail
             {
                 ProductId = p.Id,
-                Sku = p.Sku,
-                Description = p.Name,
-                Quantity = line.Quantity,
-                UnitPrice = p.UnitPrice,
-                LineTotal = lineTotal
+                ProductName = p.Name,
+                UnitPrice = unitPrice,
+                Quantity = quantity,
+                Subtotal = subtotal
             });
         }
 
-        invoice.Subtotal = subtotal;
-        invoice.TaxAmount = Math.Round(subtotal * r.TaxRate, 2, MidpointRounding.AwayFromZero);
-        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
+        invoice.Total = total;
 
         db.Invoices.Add(invoice);
         try
@@ -103,28 +101,15 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         return ToDto(invoice);
     }
 
-    public async Task<InvoiceDto?> IssueAsync(Guid id, CancellationToken ct = default)
-    {
-        var inv = await db.Invoices.Include(i => i.Lines).FirstOrDefaultAsync(i => i.Id == id, ct);
-        if (inv is null) return null;
-        if (inv.Status != InvoiceStatus.Draft)
-            throw new DomainValidationException($"Only draft invoices can be issued (current status: {inv.Status}).");
-
-        inv.Status = InvoiceStatus.Issued;
-        inv.IssuedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        return ToDto(inv);
-    }
-
-    private async Task<string> NextNumberAsync(CancellationToken ct)
+    /// <summary>Generates a business code like <c>INV-20260805-0001</c> (≤ 20 chars).</summary>
+    private async Task<string> NextIdAsync(CancellationToken ct)
     {
         var prefix = $"INV-{DateTime.UtcNow:yyyyMMdd}-";
-        var todayCount = await db.Invoices.CountAsync(i => i.Number.StartsWith(prefix), ct);
+        var todayCount = await db.Invoices.CountAsync(i => i.Id.StartsWith(prefix), ct);
         return $"{prefix}{todayCount + 1:D4}";
     }
 
     private static InvoiceDto ToDto(Invoice i) => new(
-        i.Id, i.Number, i.CustomerName, i.Status, i.CreatedAt, i.IssuedAt,
-        i.Subtotal, i.TaxRate, i.TaxAmount, i.Total,
-        i.Lines.Select(l => new InvoiceLineDto(l.Id, l.ProductId, l.Sku, l.Description, l.Quantity, l.UnitPrice, l.LineTotal)).ToList());
+        i.Id, i.CustomerId, i.Total, i.CreatedAt, i.UpdatedAt,
+        i.Details.Select(d => new InvoiceLineDto(d.ProductId, d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal, d.Description)).ToList());
 }

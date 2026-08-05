@@ -12,7 +12,7 @@ public static class InventoryEndpoints
         g.MapGet("/", async (IInventoryService svc, int? page, int? pageSize, string? search, CancellationToken ct) =>
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
-        g.MapGet("/{id:guid}", async (Guid id, IInventoryService svc, CancellationToken ct) =>
+        g.MapGet("/{id:long}", async (long id, IInventoryService svc, CancellationToken ct) =>
             await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
         g.MapPost("/", async (CreateProductRequest req, IInventoryService svc, CancellationToken ct) =>
@@ -21,10 +21,10 @@ public static class InventoryEndpoints
             return Results.Created($"/api/inventory/{dto.Id}", dto);
         });
 
-        g.MapPut("/{id:guid}", async (Guid id, UpdateProductRequest req, IInventoryService svc, CancellationToken ct) =>
+        g.MapPut("/{id:long}", async (long id, UpdateProductRequest req, IInventoryService svc, CancellationToken ct) =>
             await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
-        g.MapPost("/{id:guid}/adjust", async (Guid id, StockAdjustmentRequest req, IInventoryService svc, CancellationToken ct) =>
+        g.MapPost("/{id:long}/adjust", async (long id, StockAdjustmentRequest req, IInventoryService svc, CancellationToken ct) =>
             await svc.AdjustStockAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
         return api;

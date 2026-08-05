@@ -1,40 +1,29 @@
-using WarehouseApp.Core.Enums;
-
 namespace WarehouseApp.Core.Dtos;
 
 public record InvoiceLineDto(
-    Guid Id,
-    Guid ProductId,
-    string Sku,
-    string Description,
+    long ProductId,
+    string ProductName,
     int Quantity,
     decimal UnitPrice,
-    decimal LineTotal);
+    decimal Subtotal,
+    string? Description);
 
 public record InvoiceDto(
-    Guid Id,
-    string Number,
-    string CustomerName,
-    InvoiceStatus Status,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? IssuedAt,
-    decimal Subtotal,
-    decimal TaxRate,
-    decimal TaxAmount,
+    string Id,
+    long CustomerId,
     decimal Total,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
     IReadOnlyList<InvoiceLineDto> Lines);
 
 public record InvoiceSummaryDto(
-    Guid Id,
-    string Number,
-    string CustomerName,
-    InvoiceStatus Status,
-    DateTimeOffset CreatedAt,
-    decimal Total);
+    string Id,
+    long CustomerId,
+    decimal Total,
+    DateTimeOffset CreatedAt);
 
-public record CreateInvoiceLineRequest(Guid ProductId, int Quantity);
+public record CreateInvoiceLineRequest(long ProductId, int Quantity);
 
 public record CreateInvoiceRequest(
-    string CustomerName,
-    decimal TaxRate,
+    long CustomerId,
     IReadOnlyList<CreateInvoiceLineRequest> Lines);

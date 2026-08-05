@@ -1,11 +1,10 @@
 namespace WarehouseApp.Core.Dtos;
 
 public record LowStockItemDto(
-    Guid ProductId,
+    long ProductId,
     string Sku,
     string Name,
-    int QuantityOnHand,
-    int ReorderLevel);
+    int InStock);
 
 public record SalesSummaryRowDto(
     DateOnly Date,

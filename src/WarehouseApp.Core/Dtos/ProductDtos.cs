@@ -1,30 +1,36 @@
 namespace WarehouseApp.Core.Dtos;
 
 public record ProductDto(
-    Guid Id,
+    long Id,
     string Sku,
     string Name,
     string? Description,
-    decimal UnitPrice,
-    int QuantityOnHand,
-    int ReorderLevel,
-    bool IsActive,
+    decimal BasePrice,
+    decimal? PriceRetail,
+    decimal? PriceWholesale,
+    long? SubBackboardId,
+    int InStock,
+    short Status,
     DateTimeOffset UpdatedAt);
 
 public record CreateProductRequest(
     string Sku,
     string Name,
     string? Description,
-    decimal UnitPrice,
-    int QuantityOnHand,
-    int ReorderLevel);
+    decimal BasePrice,
+    decimal? PriceRetail,
+    decimal? PriceWholesale,
+    long? SubBackboardId,
+    int InStock);
 
 public record UpdateProductRequest(
     string Name,
     string? Description,
-    decimal UnitPrice,
-    int ReorderLevel,
-    bool IsActive);
+    decimal BasePrice,
+    decimal? PriceRetail,
+    decimal? PriceWholesale,
+    long? SubBackboardId,
+    short Status);
 
 /// <summary>Relative stock change: positive to receive, negative to consume/correct.</summary>
 public record StockAdjustmentRequest(int Delta, string? Reason);
