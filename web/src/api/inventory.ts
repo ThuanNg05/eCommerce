@@ -1,14 +1,16 @@
 import { apiGet } from './client'
 
 export interface ProductDto {
-  id: string
+  id: number
   sku: string
   name: string
   description?: string | null
-  unitPrice: number
-  quantityOnHand: number
-  reorderLevel: number
-  isActive: boolean
+  basePrice: number
+  priceRetail?: number | null
+  priceWholesale?: number | null
+  subBackboardId?: number | null
+  inStock: number
+  status: number
   updatedAt: string
 }
 
