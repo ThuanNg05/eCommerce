@@ -45,6 +45,8 @@ public static class ApiBootstrap
         var api = app.MapGroup("/api");
         api.MapInventoryEndpoints();
         api.MapInvoiceEndpoints();
+        api.MapCustomerEndpoints();
+        api.MapCategoryEndpoints();
         api.MapReportEndpoints();
     }
 }

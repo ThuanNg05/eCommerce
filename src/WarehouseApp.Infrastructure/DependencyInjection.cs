@@ -40,6 +40,8 @@ public static class DependencyInjection
 
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IInvoiceService, InvoiceService>();
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IReportQueries, DapperReportQueries>();
 
         return services;
