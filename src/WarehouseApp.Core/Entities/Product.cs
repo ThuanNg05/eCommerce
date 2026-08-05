@@ -17,6 +17,8 @@ public class Product
     public decimal? PriceWholesale { get; set; }
     public long? SubBackboardId { get; set; }
     public int InStock { get; set; }
+    /// <summary>Minimum-stock threshold for reorder alerts: low when InStock &lt;= WarningStock.</summary>
+    public int WarningStock { get; set; }
     public short Status { get; set; } = 1;
     public string? Description { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

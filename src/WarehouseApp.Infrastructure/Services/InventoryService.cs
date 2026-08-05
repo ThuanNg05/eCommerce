@@ -28,7 +28,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
             .Take(pageSize)
             .Select(p => new ProductDto(
                 p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-                p.SubBackboardId, p.InStock, p.Status, p.UpdatedAt))
+                p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt))
             .ToListAsync(ct);
 
         return new PagedResult<ProductDto>(items, page, pageSize, total);
@@ -55,6 +55,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
             PriceWholesale = r.PriceWholesale,
             SubBackboardId = r.SubBackboardId,
             InStock = r.InStock,
+            WarningStock = r.WarningStock,
             Status = 1
         };
 
@@ -74,6 +75,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
         p.PriceRetail = r.PriceRetail;
         p.PriceWholesale = r.PriceWholesale;
         p.SubBackboardId = r.SubBackboardId;
+        p.WarningStock = r.WarningStock;
         p.Status = r.Status;
         p.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -109,5 +111,5 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
     private static ProductDto ToDto(Product p) =>
         new(p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-            p.SubBackboardId, p.InStock, p.Status, p.UpdatedAt);
+            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt);
 }

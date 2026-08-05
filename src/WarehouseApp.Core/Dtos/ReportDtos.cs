@@ -4,7 +4,8 @@ public record LowStockItemDto(
     long ProductId,
     string Sku,
     string Name,
-    int InStock);
+    int InStock,
+    int WarningStock);
 
 public record SalesSummaryRowDto(
     DateOnly Date,

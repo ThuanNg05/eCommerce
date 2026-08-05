@@ -10,6 +10,7 @@ public record ProductDto(
     decimal? PriceWholesale,
     long? SubBackboardId,
     int InStock,
+    int WarningStock,
     short Status,
     DateTimeOffset UpdatedAt);
 
@@ -21,7 +22,8 @@ public record CreateProductRequest(
     decimal? PriceRetail,
     decimal? PriceWholesale,
     long? SubBackboardId,
-    int InStock);
+    int InStock,
+    int WarningStock);
 
 public record UpdateProductRequest(
     string Name,
@@ -30,6 +32,7 @@ public record UpdateProductRequest(
     decimal? PriceRetail,
     decimal? PriceWholesale,
     long? SubBackboardId,
+    int WarningStock,
     short Status);
 
 /// <summary>Relative stock change: positive to receive, negative to consume/correct.</summary>

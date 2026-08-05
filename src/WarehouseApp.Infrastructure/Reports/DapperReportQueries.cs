@@ -12,26 +12,24 @@ namespace WarehouseApp.Infrastructure.Reports;
 /// </summary>
 public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
 {
-    /// <summary>The schema has no per-product reorder level, so "low stock" is a fixed
-    /// house threshold. Adjust here (or promote to a parameter/column) if needed.</summary>
-    private const int LowStockThreshold = 5;
-
     public async Task<IReadOnlyList<LowStockItemDto>> GetLowStockAsync(CancellationToken ct = default)
     {
+        // Low stock is now per-product: flag active products at or below their own
+        // warning_stock threshold, most-urgent (largest shortfall) first.
         const string sql = """
-            select id       as product_id,
+            select id            as product_id,
                    sku,
                    name,
-                   in_stock
+                   in_stock,
+                   warning_stock
             from product
             where status = 1
-              and in_stock <= @threshold
-            order by in_stock asc, sku asc;
+              and in_stock <= warning_stock
+            order by (warning_stock - in_stock) desc, sku asc;
             """;
 
         using var conn = factory.Create();
-        var rows = await conn.QueryAsync<LowStockItemDto>(new CommandDefinition(
-            sql, new { threshold = LowStockThreshold }, cancellationToken: ct));
+        var rows = await conn.QueryAsync<LowStockItemDto>(new CommandDefinition(sql, cancellationToken: ct));
         return rows.AsList();
     }
 
