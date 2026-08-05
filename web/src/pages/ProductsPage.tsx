@@ -59,6 +59,7 @@ export default function ProductsPage() {
     priceWholesale: 0,
     subBackboardId: null,
     inStock: 0,
+    warningStock: 0,
   })
 
   const [editForm, setEditForm] = useState<UpdateProductRequest>({
@@ -68,6 +69,7 @@ export default function ProductsPage() {
     priceRetail: 0,
     priceWholesale: 0,
     subBackboardId: null,
+    warningStock: 0,
     status: 1,
   })
 
@@ -124,6 +126,7 @@ export default function ProductsPage() {
       priceWholesale: 0,
       subBackboardId: null,
       inStock: 0,
+      warningStock: 0,
     })
     setActionError(null)
   }
@@ -137,6 +140,7 @@ export default function ProductsPage() {
       priceRetail: p.priceRetail || 0,
       priceWholesale: p.priceWholesale || 0,
       subBackboardId: p.subBackboardId,
+      warningStock: p.warningStock || 0,
       status: p.status,
     })
     setActionError(null)
@@ -193,7 +197,38 @@ export default function ProductsPage() {
         field: 'inStock',
         headerName: 'TỒN KHO',
         type: 'rightAligned',
-        width: 110,
+        width: 130,
+        sortable: true,
+        cellRenderer: (p: { data?: ProductDto; value: number }) => {
+          if (!p.data) return p.value
+          const isLowStock = p.data.inStock <= (p.data.warningStock ?? 0)
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, height: '100%' }}>
+              <span>{p.value}</span>
+              {isLowStock && (
+                <Chip
+                  label="Cần nhập"
+                  size="small"
+                  sx={{
+                    bgcolor: '#fffbeb',
+                    color: '#b45309',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: '4px',
+                    height: 20,
+                    px: 0.5,
+                  }}
+                />
+              )}
+            </Box>
+          )
+        },
+      },
+      {
+        field: 'warningStock',
+        headerName: 'TỒN CẢNH BÁO',
+        type: 'rightAligned',
+        width: 130,
         sortable: true,
       },
       {
@@ -269,7 +304,7 @@ export default function ProductsPage() {
             Danh sách Sản phẩm
           </Typography>
           <Typography variant="body2" sx={{ color: '#737373' }}>
-            Quản lý tồn kho, định giá bán lẻ &amp; bán sỉ sản phẩm khung tranh.
+            Quản lý tồn kho, ngưỡng cảnh báo &amp; định giá bán lẻ / bán sỉ sản phẩm khung tranh.
           </Typography>
         </Box>
 
@@ -452,6 +487,20 @@ export default function ProductsPage() {
               />
             </Grid>
 
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                TỒN CẢNH BÁO
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0 }}
+                value={createForm.warningStock}
+                onChange={(e) => setCreateForm({ ...createForm, warningStock: Math.max(0, Number(e.target.value)) })}
+                placeholder="Mặc định: 0"
+              />
+            </Grid>
+
             <Grid item xs={12}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 MÔ TẢ
@@ -550,6 +599,19 @@ export default function ProductsPage() {
 
             <Grid item xs={6}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                TỒN CẢNH BÁO
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0 }}
+                value={editForm.warningStock}
+                onChange={(e) => setEditForm({ ...editForm, warningStock: Math.max(0, Number(e.target.value)) })}
+              />
+            </Grid>
+
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 TRẠNG THÁI
               </Typography>
               <TextField
@@ -611,7 +673,7 @@ export default function ProductsPage() {
           )}
 
           <Typography variant="body2" sx={{ mb: 2, color: '#404040' }}>
-            Tồn hiện tại: <strong>{adjustProductTarget?.inStock}</strong> sản phẩm.
+            Tồn hiện tại: <strong>{adjustProductTarget?.inStock}</strong> sản phẩm (Ngưỡng cảnh báo: {adjustProductTarget?.warningStock ?? 0}).
           </Typography>
 
           <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>

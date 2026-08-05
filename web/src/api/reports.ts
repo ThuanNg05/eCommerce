@@ -5,6 +5,7 @@ export interface LowStockItemDto {
   sku: string
   name: string
   inStock: number
+  warningStock: number
 }
 
 export interface SalesSummaryRowDto {

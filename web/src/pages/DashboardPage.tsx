@@ -163,6 +163,9 @@ export default function DashboardPage() {
                   <TableCell align="right" sx={{ fontWeight: 600 }}>
                     TỒN KHO
                   </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    NGƯỠNG
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -178,11 +181,14 @@ export default function DashboardPage() {
                           sx={{ bgcolor: '#fffbeb', color: '#b45309', fontWeight: 600, borderRadius: '4px' }}
                         />
                       </TableCell>
+                      <TableCell align="right" sx={{ color: '#737373', fontSize: 13 }}>
+                        {row.warningStock ?? 0}
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
                       {isLowStockLoading ? 'Đang tải dữ liệu...' : 'Không có sản phẩm nào bị cảnh báo tồn thấp.'}
                     </TableCell>
                   </TableRow>

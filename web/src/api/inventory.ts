@@ -10,6 +10,7 @@ export interface ProductDto {
   priceWholesale?: number | null
   subBackboardId?: number | null
   inStock: number
+  warningStock: number
   status: number
   updatedAt: string
 }
@@ -23,6 +24,7 @@ export interface CreateProductRequest {
   priceWholesale?: number | null
   subBackboardId?: number | null
   inStock: number
+  warningStock: number
 }
 
 export interface UpdateProductRequest {
@@ -32,6 +34,7 @@ export interface UpdateProductRequest {
   priceRetail?: number | null
   priceWholesale?: number | null
   subBackboardId?: number | null
+  warningStock: number
   status: number
 }
 
