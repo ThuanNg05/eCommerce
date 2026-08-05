@@ -5,7 +5,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 
 export default function AppShell() {
-  const [userRole, setUserRole] = useState<'Admin' | 'Staff'>('Admin')
+  const [userRole, setUserRole] = useState<'Admin' | 'Staff'>('Staff')
 
   const handleToggleRole = () => {
     setUserRole((prev) => (prev === 'Admin' ? 'Staff' : 'Admin'))
@@ -13,7 +13,7 @@ export default function AppShell() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-      {/* 240px Sidebar */}
+      {/* 240px Sidebar - Gated by userRole */}
       <Sidebar userRole={userRole} />
 
       {/* Main Layout Area */}

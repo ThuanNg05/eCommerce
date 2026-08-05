@@ -7,6 +7,14 @@ import AppShell from './components/layout/AppShell'
 import LoginPage from './components/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
+import InvoicesPage from './pages/InvoicesPage'
+import CustomersPage from './pages/CustomersPage'
+import CategoriesPage from './pages/CategoriesPage'
+import MaterialsPage from './pages/MaterialsPage'
+import BackboardsPage from './pages/BackboardsPage'
+import SubBackboardsPage from './pages/SubBackboardsPage'
+import FramesPage from './pages/FramesPage'
+import InventoryTransactionsPage from './pages/InventoryTransactionsPage'
 import StubPage from './pages/StubPage'
 
 export default function App() {
@@ -19,19 +27,25 @@ export default function App() {
             {/* Entry Screen */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Admin App Shell & Protected Routes */}
+            {/* Admin/Staff App Shell & Protected Routes */}
             <Route element={<AppShell />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              
+              {/* Category Group */}
               <Route path="/products" element={<ProductsPage />} />
-              <Route path="/categories" element={<StubPage title="Quản lý Danh mục" subtitle="Danh sách danh mục sản phẩm khung tranh" />} />
-              <Route path="/frames" element={<StubPage title="Quản lý Khung tranh" subtitle="Danh mục các mẫu khung gỗ, nhôm, nhựa" />} />
-              <Route path="/backboards" element={<StubPage title="Quản lý Tấm lưng" subtitle="Quản lý thông số tấm ván MDF/Alu lưng khung" />} />
-              <Route path="/sub-backboards" element={<StubPage title="Quản lý Tấm lưng phụ" subtitle="Quản lý vật liệu nẹp & lót phụ" />} />
-              <Route path="/materials" element={<StubPage title="Quản lý Vật liệu" subtitle="Vật tư kính, bo, keo, phụ kiện làm khung" />} />
-              <Route path="/inventory" element={<StubPage title="Kho (Nhập / Xuất)" subtitle="Phiếu nhập kho, xuất kho và kiểm kê" />} />
-              <Route path="/customers" element={<StubPage title="Quản lý Khách hàng" subtitle="Danh sách khách hàng bán lẻ và đại lý" />} />
-              <Route path="/invoices" element={<StubPage title="Quản lý Hóa đơn" subtitle="Danh sách hóa đơn đơn hàng khung tranh" />} />
+              <Route path="/categories" element={<CategoriesPage />} />
+              <Route path="/frames" element={<FramesPage />} />
+              <Route path="/backboards" element={<BackboardsPage />} />
+              <Route path="/sub-backboards" element={<SubBackboardsPage />} />
+              <Route path="/materials" element={<MaterialsPage />} />
+
+              {/* Operations Group */}
+              <Route path="/inventory" element={<InventoryTransactionsPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/invoices" element={<InvoicesPage />} />
+
+              {/* Administration Group (Admin Only) */}
               <Route path="/pricing" element={<StubPage title="Định giá & Công thức" subtitle="Cấu hình công thức tính giá tự động" />} />
               <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
               <Route path="/accounts" element={<StubPage title="Quản lý Tài khoản" subtitle="Danh sách tài khoản nhân viên & phân quyền" />} />
