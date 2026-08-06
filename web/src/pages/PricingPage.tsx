@@ -28,7 +28,7 @@ import {
   type UpdateRateCardRequest,
   type UpsertProductComponentRequest,
 } from '../api/pricing'
-import { fetchInventory } from '../api/inventory'
+import { fetchInventory, type ProductDto } from '../api/inventory'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -162,18 +162,21 @@ export default function PricingPage() {
   })
 
   // ==================== TAB 2: PRODUCT COMPONENT FORMULA STATES ====================
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<ProductDto | null>(null)
+  const selectedProductId = selectedProduct?.id ?? null
+
   const [productSearchInput, setProductSearchInput] = useState<string>('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('')
 
   const [componentForm, setComponentForm] = useState<UpsertProductComponentRequest>(DEFAULT_COMPONENT_FORM)
   const [componentActionMsg, setComponentActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const resetPricingInputs = () => {
-    setSelectedProductId(null)
-    setComponentForm(DEFAULT_COMPONENT_FORM)
-    setComponentActionMsg(null)
-  }
+  // Auto reset form when no product selected
+  useEffect(() => {
+    if (!selectedProductId) {
+      setComponentForm(DEFAULT_COMPONENT_FORM)
+    }
+  }, [selectedProductId])
 
   // Debounce product search query by ~300ms
   useEffect(() => {
@@ -242,8 +245,6 @@ export default function PricingPage() {
       })
     },
   })
-
-  const selectedProduct = productsData?.items.find((p) => p.id === selectedProductId)
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
@@ -434,22 +435,23 @@ export default function PricingPage() {
                 <Autocomplete
                   options={productsData?.items ?? []}
                   loading={isProductsLoading}
-                  value={selectedProduct || null}
-                  getOptionLabel={(p) => `${p.sku} — ${p.name}`}
+                  value={selectedProduct}
+                  getOptionLabel={(p) => (typeof p === 'string' ? p : `${p.sku} — ${p.name}`)}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
                   filterOptions={(x) => x}
-                  onInputChange={(_, v) => {
-                    setProductSearchInput(v)
-                    if (v === '' && !selectedProductId) {
-                      resetPricingInputs()
+                  onInputChange={(_, v, reason) => {
+                    if (reason === 'input') setProductSearchInput(v)
+                    else if (reason === 'clear') {
+                      setSelectedProduct(null)
+                      setProductSearchInput('')
                     }
                   }}
                   onChange={(_, p) => {
-                    if (!p) {
-                      resetPricingInputs()
-                      setProductSearchInput('')
+                    if (p) {
+                      setSelectedProduct(p)
                     } else {
-                      setSelectedProductId(p.id)
+                      setSelectedProduct(null)
+                      setProductSearchInput('')
                     }
                   }}
                   noOptionsText="Không tìm thấy sản phẩm"
@@ -458,12 +460,6 @@ export default function PricingPage() {
                       {...params}
                       placeholder="Tìm theo SKU hoặc tên sản phẩm..."
                       size="small"
-                      onBlur={() => {
-                        if (!selectedProductId || !productSearchInput.trim()) {
-                          resetPricingInputs()
-                          setProductSearchInput('')
-                        }
-                      }}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
