@@ -1,5 +1,10 @@
 import { apiGet, apiPost, apiPut } from './client'
 
+export interface CategoryCategoryDto {
+  id: number
+  name: string
+}
+
 export interface ProductDto {
   id: number
   sku: string
@@ -13,6 +18,7 @@ export interface ProductDto {
   warningStock: number
   status: number
   updatedAt: string
+  categories?: CategoryCategoryDto[]
 }
 
 export interface CreateProductRequest {
@@ -25,6 +31,7 @@ export interface CreateProductRequest {
   subBackboardId?: number | null
   inStock: number
   warningStock: number
+  categoryIds?: number[]
 }
 
 export interface UpdateProductRequest {
@@ -36,6 +43,7 @@ export interface UpdateProductRequest {
   subBackboardId?: number | null
   warningStock: number
   status: number
+  categoryIds?: number[]
 }
 
 export interface StockAdjustmentRequest {

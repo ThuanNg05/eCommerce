@@ -18,6 +18,7 @@ import {
   MenuItem,
   IconButton,
   Tooltip,
+  Autocomplete,
 } from '@mui/material'
 import { Plus, RefreshCw, SlidersHorizontal, Edit3 } from 'lucide-react'
 import SearchField from '../components/SearchField'
@@ -30,6 +31,7 @@ import {
   type CreateProductRequest,
   type UpdateProductRequest,
 } from '../api/inventory'
+import { fetchCategories, type CategoryDto } from '../api/categories'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -60,6 +62,7 @@ export default function ProductsPage() {
     subBackboardId: null,
     inStock: 0,
     warningStock: 0,
+    categoryIds: [],
   })
 
   const [editForm, setEditForm] = useState<UpdateProductRequest>({
@@ -71,6 +74,7 @@ export default function ProductsPage() {
     subBackboardId: null,
     warningStock: 0,
     status: 1,
+    categoryIds: [],
   })
 
   const [adjustForm, setAdjustForm] = useState({
@@ -85,6 +89,13 @@ export default function ProductsPage() {
     queryKey: ['inventory', search],
     queryFn: () => fetchInventory(search),
   })
+
+  // Query Categories List for Multi-Select
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => fetchCategories('', 1, 500),
+  })
+  const allCategories = categoriesData?.items ?? []
 
   // Mutations
   const createMutation = useMutation({
@@ -127,6 +138,7 @@ export default function ProductsPage() {
       subBackboardId: null,
       inStock: 0,
       warningStock: 0,
+      categoryIds: [],
     })
     setActionError(null)
   }
@@ -142,6 +154,7 @@ export default function ProductsPage() {
       subBackboardId: p.subBackboardId,
       warningStock: p.warningStock || 0,
       status: p.status,
+      categoryIds: p.categories ? p.categories.map((c) => c.id) : [],
     })
     setActionError(null)
   }
@@ -165,15 +178,38 @@ export default function ProductsPage() {
         field: 'name',
         headerName: 'TÊN SẢN PHẨM',
         flex: 1,
-        minWidth: 220,
+        minWidth: 200,
         filter: true,
         sortable: true,
+      },
+      {
+        field: 'categories',
+        headerName: 'DANH MỤC',
+        width: 180,
+        sortable: false,
+        cellRenderer: (p: { data?: ProductDto }) => {
+          if (!p.data?.categories || p.data.categories.length === 0) {
+            return <span style={{ color: '#a3a3a3', fontSize: 13 }}>—</span>
+          }
+          return (
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
+              {p.data.categories.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.name}
+                  size="small"
+                  sx={{ bgcolor: '#f5f5f5', color: '#404040', fontSize: 11, height: 22 }}
+                />
+              ))}
+            </Box>
+          )
+        },
       },
       {
         field: 'basePrice',
         headerName: 'GIÁ GỐC',
         type: 'rightAligned',
-        width: 130,
+        width: 120,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<ProductDto, number>) => formatVND(p.value),
       },
@@ -181,7 +217,7 @@ export default function ProductsPage() {
         field: 'priceRetail',
         headerName: 'BÁN LẺ',
         type: 'rightAligned',
-        width: 130,
+        width: 120,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<ProductDto, number | null>) => formatVND(p.value),
       },
@@ -189,7 +225,7 @@ export default function ProductsPage() {
         field: 'priceWholesale',
         headerName: 'BÁN SỈ',
         type: 'rightAligned',
-        width: 130,
+        width: 120,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<ProductDto, number | null>) => formatVND(p.value),
       },
@@ -197,7 +233,7 @@ export default function ProductsPage() {
         field: 'inStock',
         headerName: 'TỒN KHO',
         type: 'rightAligned',
-        width: 130,
+        width: 120,
         sortable: true,
         cellRenderer: (p: { data?: ProductDto; value: number }) => {
           if (!p.data) return p.value
@@ -228,7 +264,7 @@ export default function ProductsPage() {
         field: 'warningStock',
         headerName: 'TỒN CẢNH BÁO',
         type: 'rightAligned',
-        width: 130,
+        width: 125,
         sortable: true,
       },
       {
@@ -256,7 +292,7 @@ export default function ProductsPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 150,
+        width: 140,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: ProductDto }) => {
@@ -431,6 +467,45 @@ export default function ProductsPage() {
               />
             </Grid>
 
+            <Grid item xs={12}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+                DANH MỤC SẢN PHẨM
+              </Typography>
+              <Autocomplete<CategoryDto, true>
+                multiple
+                options={allCategories}
+                getOptionLabel={(option) => option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                value={allCategories.filter((c) => createForm.categoryIds?.includes(c.id))}
+                onChange={(_, newValue) => {
+                  setCreateForm({
+                    ...createForm,
+                    categoryIds: newValue.map((c) => c.id),
+                  })
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Chọn danh mục..."
+                    size="small"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const tagProps = getTagProps({ index })
+                    return (
+                      <Chip
+                        label={option.name}
+                        size="small"
+                        {...tagProps}
+                        key={option.id}
+                      />
+                    )
+                  })
+                }
+              />
+            </Grid>
+
             <Grid item xs={4}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 GIÁ GỐC (VND)
@@ -550,6 +625,45 @@ export default function ProductsPage() {
                 fullWidth
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+                DANH MỤC SẢN PHẨM
+              </Typography>
+              <Autocomplete<CategoryDto, true>
+                multiple
+                options={allCategories}
+                getOptionLabel={(option) => option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                value={allCategories.filter((c) => editForm.categoryIds?.includes(c.id))}
+                onChange={(_, newValue) => {
+                  setEditForm({
+                    ...editForm,
+                    categoryIds: newValue.map((c) => c.id),
+                  })
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Chọn danh mục..."
+                    size="small"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const tagProps = getTagProps({ index })
+                    return (
+                      <Chip
+                        label={option.name}
+                        size="small"
+                        {...tagProps}
+                        key={option.id}
+                      />
+                    )
+                  })
+                }
               />
             </Grid>
 
