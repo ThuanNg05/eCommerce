@@ -15,6 +15,7 @@ import BackboardsPage from './pages/BackboardsPage'
 import SubBackboardsPage from './pages/SubBackboardsPage'
 import FramesPage from './pages/FramesPage'
 import InventoryTransactionsPage from './pages/InventoryTransactionsPage'
+import PricingPage from './pages/PricingPage'
 import StubPage from './pages/StubPage'
 
 export default function App() {
@@ -46,7 +47,7 @@ export default function App() {
               <Route path="/invoices" element={<InvoicesPage />} />
 
               {/* Administration Group (Admin Only) */}
-              <Route path="/pricing" element={<StubPage title="Định giá & Công thức" subtitle="Cấu hình công thức tính giá tự động" />} />
+              <Route path="/pricing" element={<PricingPage />} />
               <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
               <Route path="/accounts" element={<StubPage title="Quản lý Tài khoản" subtitle="Danh sách tài khoản nhân viên & phân quyền" />} />
               <Route path="/settings" element={<StubPage title="Cấu hình Hệ thống" subtitle="Cấu hình Email thông báo & tham số chung" />} />
