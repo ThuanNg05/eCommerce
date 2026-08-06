@@ -55,6 +55,8 @@ public static class ApiBootstrap
         api.MapPricingEndpoints();
         api.MapSettingsEndpoints();
         api.MapAuditLogEndpoints();
+        api.MapAccountEndpoints();
+        api.MapAuthEndpoints();
         api.MapReportEndpoints();
     }
 }
