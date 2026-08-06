@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<ISubBackboardService, SubBackboardService>();
         services.AddScoped<IFrameService, FrameService>();
         services.AddScoped<IInventoryTransactionService, InventoryTransactionService>();
+        services.AddScoped<IPricingService, PricingService>();
         services.AddScoped<IReportQueries, DapperReportQueries>();
 
         return services;

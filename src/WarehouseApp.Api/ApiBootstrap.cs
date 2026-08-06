@@ -52,6 +52,7 @@ public static class ApiBootstrap
         api.MapSubBackboardEndpoints();
         api.MapFrameEndpoints();
         api.MapInventoryTransactionEndpoints();
+        api.MapPricingEndpoints();
         api.MapReportEndpoints();
     }
 }
