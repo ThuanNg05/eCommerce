@@ -22,14 +22,16 @@ public class InventoryService(AppDbContext db) : IInventoryService
         }
 
         var total = await query.LongCountAsync(ct);
-        var items = await query
+        var products = await query
             .OrderBy(p => p.Sku)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(p => new ProductDto(
-                p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-                p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt))
             .ToListAsync(ct);
+
+        var cats = await LoadCategoriesAsync(products.Select(p => p.Id).ToList(), ct);
+        var items = products
+            .Select(p => ToDto(p, cats.TryGetValue(p.Id, out var c) ? c : new List<CategoryRefDto>()))
+            .ToList();
 
         return new PagedResult<ProductDto>(items, page, pageSize, total);
     }
@@ -37,13 +39,17 @@ public class InventoryService(AppDbContext db) : IInventoryService
     public async Task<ProductDto?> GetAsync(long id, CancellationToken ct = default)
     {
         var p = await db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        return p is null ? null : ToDto(p);
+        return p is null ? null : ToDto(p, await CategoriesOfAsync(id, ct));
     }
 
     public async Task<ProductDto> CreateAsync(CreateProductRequest r, CancellationToken ct = default)
     {
         if (await db.Products.AnyAsync(p => p.Sku == r.Sku, ct))
             throw new DomainValidationException($"A product with SKU '{r.Sku}' already exists.");
+
+        var categories = await ResolveCategoriesAsync(r.CategoryIds, ct);
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var p = new Product
         {
@@ -60,14 +66,24 @@ public class InventoryService(AppDbContext db) : IInventoryService
         };
 
         db.Products.Add(p);
+        await db.SaveChangesAsync(ct); // assigns p.Id
+
+        AddCategories(p.Id, categories);
         await db.SaveChangesAsync(ct);
-        return ToDto(p);
+        await tx.CommitAsync(ct);
+
+        return ToDto(p, categories);
     }
 
     public async Task<ProductDto?> UpdateAsync(long id, UpdateProductRequest r, CancellationToken ct = default)
     {
         var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (p is null) return null;
+
+        // Null CategoryIds => leave categories untouched; a list (even empty) => replace the set.
+        var categories = r.CategoryIds is null ? null : await ResolveCategoriesAsync(r.CategoryIds, ct);
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         p.Name = r.Name.Trim();
         p.Description = r.Description;
@@ -79,13 +95,25 @@ public class InventoryService(AppDbContext db) : IInventoryService
         p.Status = r.Status;
         p.UpdatedAt = DateTimeOffset.UtcNow;
 
-        try { await db.SaveChangesAsync(ct); }
+        if (categories is not null)
+        {
+            var existing = await db.ProductCategories.Where(pc => pc.ProductId == id).ToListAsync(ct);
+            db.ProductCategories.RemoveRange(existing);
+            AddCategories(id, categories);
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         catch (DbUpdateConcurrencyException)
         {
+            await tx.RollbackAsync(ct);
             throw new ConcurrencyConflictException("This product was modified on another station. Reload and try again.");
         }
 
-        return ToDto(p);
+        return ToDto(p, categories ?? await CategoriesOfAsync(id, ct));
     }
 
     public async Task<ProductDto?> AdjustStockAsync(long id, StockAdjustmentRequest r, CancellationToken ct = default)
@@ -106,10 +134,56 @@ public class InventoryService(AppDbContext db) : IInventoryService
             throw new ConcurrencyConflictException("Stock for this product changed on another station. Reload and try again.");
         }
 
-        return ToDto(p);
+        return ToDto(p, await CategoriesOfAsync(id, ct));
     }
 
-    private static ProductDto ToDto(Product p) =>
+    // ----- product <-> category helpers -----
+
+    /// <summary>Validates that every requested category id exists and returns their {id,name}.
+    /// Null/empty input yields an empty list.</summary>
+    private async Task<List<CategoryRefDto>> ResolveCategoriesAsync(IReadOnlyList<long>? categoryIds, CancellationToken ct)
+    {
+        var ids = (categoryIds ?? Array.Empty<long>()).Where(i => i > 0).Distinct().ToList();
+        if (ids.Count == 0) return new();
+
+        var found = await db.Categories.AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .Select(c => new CategoryRefDto(c.Id, c.Name))
+            .ToListAsync(ct);
+
+        var missing = ids.Except(found.Select(c => c.Id)).ToList();
+        if (missing.Count > 0)
+            throw new DomainValidationException($"Category(ies) not found: {string.Join(", ", missing)}.");
+
+        return found;
+    }
+
+    private void AddCategories(long productId, IEnumerable<CategoryRefDto> categories)
+    {
+        foreach (var c in categories)
+            db.ProductCategories.Add(new ProductCategory { ProductId = productId, CategoryId = c.Id });
+    }
+
+    private async Task<List<CategoryRefDto>> CategoriesOfAsync(long productId, CancellationToken ct) =>
+        (await LoadCategoriesAsync(new[] { productId }, ct)).TryGetValue(productId, out var c) ? c : new();
+
+    private async Task<Dictionary<long, List<CategoryRefDto>>> LoadCategoriesAsync(IReadOnlyCollection<long> productIds, CancellationToken ct)
+    {
+        if (productIds.Count == 0) return new();
+
+        var rows = await (
+            from pc in db.ProductCategories.AsNoTracking()
+            join c in db.Categories.AsNoTracking() on pc.CategoryId equals c.Id
+            where productIds.Contains(pc.ProductId)
+            select new { pc.ProductId, c.Id, c.Name }
+        ).ToListAsync(ct);
+
+        return rows
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(g => g.Key, g => g.Select(x => new CategoryRefDto(x.Id, x.Name)).ToList());
+    }
+
+    private static ProductDto ToDto(Product p, IReadOnlyList<CategoryRefDto> categories) =>
         new(p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt);
+            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt, categories);
 }

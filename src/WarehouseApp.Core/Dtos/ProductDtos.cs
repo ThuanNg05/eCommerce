@@ -1,5 +1,8 @@
 namespace WarehouseApp.Core.Dtos;
 
+/// <summary>A category a product belongs to (id + name only).</summary>
+public record CategoryRefDto(long Id, string Name);
+
 public record ProductDto(
     long Id,
     string Sku,
@@ -12,7 +15,8 @@ public record ProductDto(
     int InStock,
     int WarningStock,
     short Status,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<CategoryRefDto> Categories);
 
 public record CreateProductRequest(
     string Sku,
@@ -23,8 +27,11 @@ public record CreateProductRequest(
     decimal? PriceWholesale,
     long? SubBackboardId,
     int InStock,
-    int WarningStock);
+    int WarningStock,
+    IReadOnlyList<long>? CategoryIds);
 
+/// <summary><see cref="CategoryIds"/> null = leave the product's categories unchanged;
+/// a list (including empty) = replace the whole set.</summary>
 public record UpdateProductRequest(
     string Name,
     string? Description,
@@ -33,7 +40,8 @@ public record UpdateProductRequest(
     decimal? PriceWholesale,
     long? SubBackboardId,
     int WarningStock,
-    short Status);
+    short Status,
+    IReadOnlyList<long>? CategoryIds);
 
 /// <summary>Relative stock change: positive to receive, negative to consume/correct.</summary>
 public record StockAdjustmentRequest(int Delta, string? Reason);
