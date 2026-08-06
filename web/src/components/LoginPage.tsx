@@ -8,35 +8,41 @@ import {
   Button,
   Link,
   Alert,
+  CircularProgress,
 } from '@mui/material'
+import { useAuth } from '../auth/AuthContext'
 
-interface LoginPageProps {
-  onLoginSuccess?: (userRole: string, username: string) => void
-}
+export default function LoginPage() {
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
-export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const navigate = useNavigate()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
 
     if (!username.trim()) {
-      setErrorMsg('Please enter your Username.')
+      setErrorMsg('Vui lòng nhập Username.')
       return
     }
     if (!password.trim()) {
-      setErrorMsg('Please enter your Password.')
+      setErrorMsg('Vui lòng nhập Password.')
       return
     }
 
-    if (onLoginSuccess) {
-      onLoginSuccess('User', username.trim())
+    setIsSubmitting(true)
+    try {
+      await login(username.trim(), password.trim())
+      navigate('/dashboard')
+    } catch (err: unknown) {
+      setErrorMsg((err as Error).message || 'Sai tên đăng nhập hoặc mật khẩu')
+    } finally {
+      setIsSubmitting(false)
     }
-    navigate('/dashboard')
   }
 
   return (
@@ -47,7 +53,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: '#f9f9f9', // Page background
+        bgcolor: '#f9f9f9',
         p: 2,
       }}
     >
@@ -58,12 +64,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           maxWidth: 420,
           px: { xs: 4, sm: 5 },
           py: { xs: 5, sm: 6 },
-          bgcolor: '#ffffff', // Frame background
+          bgcolor: '#ffffff',
           border: '1px solid #e5e7eb',
-          borderRadius: 0, // Sharp corners
+          borderRadius: 0,
         }}
       >
-        {/* Main Heading: 'Sign In' */}
         <Typography
           variant="h4"
           sx={{
@@ -89,7 +94,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         )}
 
         <Box component="form" onSubmit={handleSubmit} noValidate>
-          {/* Label 1: Username */}
           <Typography
             variant="caption"
             sx={{
@@ -110,10 +114,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter your username"
             variant="outlined"
+            disabled={isSubmitting}
             sx={{
               mb: 3,
               '& .MuiOutlinedInput-root': {
-                borderRadius: 0, // Sharp corners
+                borderRadius: 0,
                 bgcolor: '#ffffff',
                 '& fieldset': { borderColor: '#d1d5db', borderRadius: 0 },
                 '&:hover fieldset': { borderColor: '#9ca3af' },
@@ -123,7 +128,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             }}
           />
 
-          {/* Label 2: Password */}
           <Typography
             variant="caption"
             sx={{
@@ -145,10 +149,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
             variant="outlined"
+            disabled={isSubmitting}
             sx={{
               mb: 1.5,
               '& .MuiOutlinedInput-root': {
-                borderRadius: 0, // Sharp corners
+                borderRadius: 0,
                 bgcolor: '#ffffff',
                 '& fieldset': { borderColor: '#d1d5db', borderRadius: 0 },
                 '&:hover fieldset': { borderColor: '#9ca3af' },
@@ -158,11 +163,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             }}
           />
 
-          {/* Right-aligned Forgot Password Link */}
           <Box
             sx={{
               display: 'flex',
-              justifyContent: 'flex-end',
+              justify: 'flex-end',
               mb: 4,
             }}
           >
@@ -185,28 +189,28 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </Link>
           </Box>
 
-          {/* Solid Dark LOGIN Button */}
           <Button
             type="submit"
             fullWidth
             size="large"
             variant="contained"
             disableElevation
+            disabled={isSubmitting}
             sx={{
               py: 1.5,
-              borderRadius: 0, // Sharp corners
+              borderRadius: 0,
               fontWeight: 700,
               letterSpacing: '0.08em',
               fontSize: '0.875rem',
               textTransform: 'uppercase',
-              bgcolor: '#18181b', // Solid dark black
+              bgcolor: '#18181b',
               color: '#ffffff',
               '&:hover': {
                 bgcolor: '#000000',
               },
             }}
           >
-            LOGIN
+            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'LOGIN'}
           </Button>
         </Box>
       </Paper>

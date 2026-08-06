@@ -9,12 +9,7 @@ import {
   Tooltip,
 } from '@mui/material'
 import { Search, LogOut, Shield, User } from 'lucide-react'
-
-interface TopBarProps {
-  userRole: 'Admin' | 'Staff'
-  onToggleRole: () => void
-  userName?: string
-}
+import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Bảng điều khiển',
@@ -34,11 +29,17 @@ const PAGE_TITLES: Record<string, string> = {
   '/audit': 'Nhật ký Thay đổi (Audit Log)',
 }
 
-export default function TopBar({ userRole, onToggleRole, userName = 'Admin User' }: TopBarProps) {
+export default function TopBar() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
   const title = PAGE_TITLES[location.pathname] || 'Trang quản trị'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <Box
@@ -87,12 +88,11 @@ export default function TopBar({ userRole, onToggleRole, userName = 'Admin User'
           }}
         />
 
-        {/* Role Toggle Chip (For testing Admin vs Staff nav visibility) */}
-        <Tooltip title="Nhấn để chuyển Vai trò (Admin / Staff)">
+        {/* Role Badge */}
+        {user?.role && (
           <Chip
             icon={<Shield size={14} color="#7299ED" />}
-            label={`Role: ${userRole}`}
-            onClick={onToggleRole}
+            label={user.role}
             variant="outlined"
             size="small"
             sx={{
@@ -100,16 +100,14 @@ export default function TopBar({ userRole, onToggleRole, userName = 'Admin User'
               bgcolor: '#ffffff',
               fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer',
-              '&:hover': { bgcolor: '#f2f2f2' },
             }}
           />
-        </Tooltip>
+        )}
 
         {/* User Chip */}
         <Chip
           icon={<User size={14} color="#737373" />}
-          label={userName}
+          label={user?.username || 'User'}
           variant="outlined"
           size="small"
           sx={{
@@ -124,13 +122,13 @@ export default function TopBar({ userRole, onToggleRole, userName = 'Admin User'
         <Tooltip title="Đăng xuất">
           <IconButton
             size="small"
-            onClick={() => navigate('/login')}
+            onClick={handleLogout}
             sx={{
               color: '#737373',
               borderRadius: '6px',
               border: '1px solid #e0e0e0',
               p: '6px',
-              '&:hover': { bgcolor: '#f2f2f2', color: '#171717' },
+              '&:hover': { bgcolor: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' },
             }}
           >
             <LogOut size={16} />

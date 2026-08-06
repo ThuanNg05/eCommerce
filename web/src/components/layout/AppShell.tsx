@@ -1,20 +1,16 @@
-import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Box } from '@mui/material'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import { useAuth } from '../../auth/AuthContext'
 
 export default function AppShell() {
-  const [userRole, setUserRole] = useState<'Admin' | 'Staff'>('Staff')
-
-  const handleToggleRole = () => {
-    setUserRole((prev) => (prev === 'Admin' ? 'Staff' : 'Admin'))
-  }
+  const { user } = useAuth()
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-      {/* 240px Sidebar - Gated by userRole */}
-      <Sidebar userRole={userRole} />
+      {/* 240px Sidebar - Gated by user.role */}
+      <Sidebar userRole={user?.role || 'Staff'} />
 
       {/* Main Layout Area */}
       <Box
@@ -27,7 +23,7 @@ export default function AppShell() {
         }}
       >
         {/* TopBar Header */}
-        <TopBar userRole={userRole} onToggleRole={handleToggleRole} />
+        <TopBar />
 
         {/* Content Outlet with 24px padding */}
         <Box component="main" sx={{ p: 3, flex: 1, bgcolor: '#f9f9f9' }}>

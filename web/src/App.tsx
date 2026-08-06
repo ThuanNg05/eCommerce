@@ -3,6 +3,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider, CssBaseline } from '@mui/material'
 import { queryClient } from './queryClient'
 import { theme } from './theme'
+import { AuthProvider } from './auth/AuthContext'
+import ProtectedRoute from './auth/ProtectedRoute'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './components/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -25,41 +27,49 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BrowserRouter>
-          <Routes>
-            {/* Entry Screen */}
-            <Route path="/login" element={<LoginPage />} />
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Entry Screen */}
+              <Route path="/login" element={<LoginPage />} />
 
-            {/* Admin/Staff App Shell & Protected Routes */}
-            <Route element={<AppShell />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              
-              {/* Category Group */}
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/categories" element={<CategoriesPage />} />
-              <Route path="/frames" element={<FramesPage />} />
-              <Route path="/backboards" element={<BackboardsPage />} />
-              <Route path="/sub-backboards" element={<SubBackboardsPage />} />
-              <Route path="/materials" element={<MaterialsPage />} />
+              {/* Protected App Shell & Nav Routes */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
 
-              {/* Operations Group */}
-              <Route path="/inventory" element={<InventoryTransactionsPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/invoices" element={<InvoicesPage />} />
+                {/* Category Group */}
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/frames" element={<FramesPage />} />
+                <Route path="/backboards" element={<BackboardsPage />} />
+                <Route path="/sub-backboards" element={<SubBackboardsPage />} />
+                <Route path="/materials" element={<MaterialsPage />} />
 
-              {/* Administration Group (Admin Only) */}
-              <Route path="/pricing" element={<PricingPage />} />
-              <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
-              <Route path="/accounts" element={<StubPage title="Quản lý Tài khoản" subtitle="Danh sách tài khoản nhân viên & phân quyền" />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/audit" element={<AuditLogsPage />} />
-            </Route>
+                {/* Operations Group */}
+                <Route path="/inventory" element={<InventoryTransactionsPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/invoices" element={<InvoicesPage />} />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
+                {/* Administration Group (Admin Only) */}
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
+                <Route path="/accounts" element={<StubPage title="Quản lý Tài khoản" subtitle="Danh sách tài khoản nhân viên & phân quyền" />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/audit" element={<AuditLogsPage />} />
+              </Route>
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )
