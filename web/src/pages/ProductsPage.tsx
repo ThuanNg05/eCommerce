@@ -6,7 +6,6 @@ import {
   Box,
   Typography,
   TextField,
-  InputAdornment,
   Button,
   Chip,
   Paper,
@@ -20,7 +19,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material'
-import { Search, Plus, RefreshCw, SlidersHorizontal, Edit3 } from 'lucide-react'
+import { Plus, RefreshCw, SlidersHorizontal, Edit3 } from 'lucide-react'
+import SearchField from '../components/SearchField'
 import {
   fetchInventory,
   createProduct,
@@ -345,19 +345,11 @@ export default function ProductsPage() {
       {/* Filter / Search Bar */}
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <TextField
+          <SearchField
             placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} color="#a3a3a3" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: 320 }}
+            width={320}
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>

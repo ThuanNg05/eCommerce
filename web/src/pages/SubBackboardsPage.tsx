@@ -6,7 +6,6 @@ import {
   Box,
   Typography,
   TextField,
-  InputAdornment,
   Button,
   Paper,
   Alert,
@@ -20,7 +19,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material'
-import { Search, Plus, RefreshCw, Edit3 } from 'lucide-react'
+import { Plus, RefreshCw, Edit3 } from 'lucide-react'
+import SearchField from '../components/SearchField'
 import {
   fetchSubBackboards,
   createSubBackboard,
@@ -228,19 +228,11 @@ export default function SubBackboardsPage() {
       {/* Filter / Search Bar */}
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <TextField
+          <SearchField
             placeholder="Tìm theo kích thước nẹp (vd: 30x40)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} color="#a3a3a3" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: 320 }}
+            width={320}
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>

@@ -9,6 +9,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  TableContainer,
   Chip,
 } from '@mui/material'
 import { Box as BoxIcon, FileText, AlertTriangle, TrendingUp } from 'lucide-react'
@@ -155,46 +156,48 @@ export default function DashboardPage() {
               Danh sách Sản phẩm Cảnh báo Tồn thấp
             </Typography>
 
-            <Table size="small" sx={{ border: '1px solid #ededed' }}>
-              <TableHead sx={{ bgcolor: '#f9f9f9' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>SKU</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>TÊN SẢN PHẨM</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    TỒN KHO
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    NGƯỠNG
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {lowStockData && lowStockData.length > 0 ? (
-                  lowStockData.map((row) => (
-                    <TableRow key={row.productId}>
-                      <TableCell sx={{ fontFamily: 'monospace' }}>{row.sku}</TableCell>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          label={row.inStock}
-                          size="small"
-                          sx={{ bgcolor: '#fffbeb', color: '#b45309', fontWeight: 600, borderRadius: '4px' }}
-                        />
-                      </TableCell>
-                      <TableCell align="right" sx={{ color: '#737373', fontSize: 13 }}>
-                        {row.warningStock ?? 0}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+            <TableContainer sx={{ maxHeight: 360 }}>
+              <Table stickyHeader size="small" sx={{ border: '1px solid #ededed' }}>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
-                      {isLowStockLoading ? 'Đang tải dữ liệu...' : 'Không có sản phẩm nào bị cảnh báo tồn thấp.'}
+                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>SKU</TableCell>
+                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>TÊN SẢN PHẨM</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>
+                      TỒN KHO
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>
+                      NGƯỠNG
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {lowStockData && lowStockData.length > 0 ? (
+                    lowStockData.map((row) => (
+                      <TableRow key={row.productId}>
+                        <TableCell sx={{ fontFamily: 'monospace' }}>{row.sku}</TableCell>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell align="right">
+                          <Chip
+                            label={row.inStock}
+                            size="small"
+                            sx={{ bgcolor: '#fffbeb', color: '#b45309', fontWeight: 600, borderRadius: '4px' }}
+                          />
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: '#737373', fontSize: 13 }}>
+                          {row.warningStock ?? 0}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
+                        {isLowStockLoading ? 'Đang tải dữ liệu...' : 'Không có sản phẩm nào bị cảnh báo tồn thấp.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
         </Grid>
 
@@ -205,38 +208,40 @@ export default function DashboardPage() {
               Doanh số Theo Ngày
             </Typography>
 
-            <Table size="small" sx={{ border: '1px solid #ededed' }}>
-              <TableHead sx={{ bgcolor: '#f9f9f9' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>NGÀY</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    SỐ HÓA ĐƠN
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    DOANH THU
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {salesData && salesData.length > 0 ? (
-                  salesData.map((row, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{row.date}</TableCell>
-                      <TableCell align="right">{row.invoiceCount}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {formatVND(row.total)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+            <TableContainer sx={{ maxHeight: 360 }}>
+              <Table stickyHeader size="small" sx={{ border: '1px solid #ededed' }}>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={3} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
-                      {isSalesLoading ? 'Đang tải dữ liệu...' : 'Chưa có báo cáo doanh số gần đây.'}
+                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>NGÀY</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>
+                      SỐ HÓA ĐƠN
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>
+                      DOANH THU
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {salesData && salesData.length > 0 ? (
+                    salesData.map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{row.date}</TableCell>
+                        <TableCell align="right">{row.invoiceCount}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {formatVND(row.total)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ py: 3, color: '#a3a3a3' }}>
+                        {isSalesLoading ? 'Đang tải dữ liệu...' : 'Chưa có báo cáo doanh số gần đây.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
         </Grid>
       </Grid>

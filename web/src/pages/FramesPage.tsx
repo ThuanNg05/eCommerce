@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
-import { Box, Typography, TextField, InputAdornment, Button, Paper, Alert, Chip } from '@mui/material'
-import { Search, Plus, RefreshCw } from 'lucide-react'
+import { Box, Typography, Button, Paper, Alert, Chip } from '@mui/material'
+import { Plus, RefreshCw } from 'lucide-react'
+import SearchField from '../components/SearchField'
 import { fetchFrames, type FrameDto } from '../api/frames'
 
 export default function FramesPage() {
@@ -54,13 +55,11 @@ export default function FramesPage() {
       </Box>
 
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
-        <TextField
+        <SearchField
           placeholder="Tìm theo mã khung..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          size="small"
-          InputProps={{ startAdornment: (<InputAdornment position="start"><Search size={16} color="#a3a3a3" /></InputAdornment>) }}
-          sx={{ width: 320 }}
+          width={320}
         />
       </Paper>
 

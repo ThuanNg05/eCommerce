@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, IconButton, Tooltip } from '@mui/material'
 import {
   LayoutDashboard,
   Box as BoxIcon,
@@ -17,6 +17,8 @@ import {
   UserCog,
   Settings,
   History,
+  PanelLeftClose,
+  PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -35,9 +37,7 @@ export interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: 'TỔNG QUAN',
-    items: [
-      { label: 'Bảng điều khiển', path: '/dashboard', icon: LayoutDashboard },
-    ],
+    items: [{ label: 'Bảng điều khiển', path: '/dashboard', icon: LayoutDashboard }],
   },
   {
     title: 'DANH MỤC',
@@ -73,9 +73,11 @@ const NAV_GROUPS: NavGroup[] = [
 
 interface SidebarProps {
   userRole?: 'Admin' | 'Staff'
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
-export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
+export default function Sidebar({ userRole = 'Admin', collapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -89,12 +91,14 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
     return filtered
   }, [userRole])
 
+  const sidebarWidth = collapsed ? 64 : 240
+
   return (
     <Box
       component="aside"
       sx={{
-        width: 240,
-        minWidth: 240,
+        width: sidebarWidth,
+        minWidth: sidebarWidth,
         height: '100vh',
         bgcolor: '#ffffff',
         borderRight: '1px solid #ededed',
@@ -105,6 +109,7 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
         left: 0,
         zIndex: 1200,
         overflowY: 'auto',
+        transition: 'width 0.2s ease-in-out, min-width 0.2s ease-in-out',
       }}
     >
       {/* App / Logo Block */}
@@ -112,60 +117,79 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
         sx={{
           height: 56,
           minHeight: 56,
-          px: 2,
+          px: collapsed ? 1 : 2,
           display: 'flex',
           alignItems: 'center',
-          gap: 1.5,
+          justifyContent: collapsed ? 'center' : 'space-between',
           borderBottom: '1px solid #ededed',
         }}
       >
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            borderRadius: '6px',
-            bgcolor: '#1a1a1a',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
-          F
-        </Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717', fontSize: 15 }}>
-          Framing Admin
-        </Typography>
+        {!collapsed && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: '6px',
+                bgcolor: '#1a1a1a',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              F
+            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717', fontSize: 15 }}>
+              Framing Admin
+            </Typography>
+          </Box>
+        )}
+
+        {onToggleCollapse && (
+          <Tooltip title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'} placement="right">
+            <IconButton
+              size="small"
+              onClick={onToggleCollapse}
+              aria-label="Toggle Sidebar"
+              sx={{ color: '#737373', p: 0.5 }}
+            >
+              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* Nav Groups */}
       <Box sx={{ py: 1.5, flex: 1 }}>
         {visibleGroups.map((group) => (
           <Box key={group.title} sx={{ mb: 2 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                display: 'block',
-                px: 2,
-                pt: 1.5,
-                pb: 0.5,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                color: '#a3a3a3',
-                textTransform: 'uppercase',
-              }}
-            >
-              {group.title}
-            </Typography>
+            {!collapsed && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  px: 2,
+                  pt: 1.5,
+                  pb: 0.5,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  color: '#a3a3a3',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {group.title}
+              </Typography>
+            )}
 
             {group.items.map((item) => {
               const isActive = location.pathname === item.path
               const IconComp = item.icon
 
-              return (
+              const itemContent = (
                 <Box
                   key={item.path}
                   onClick={() => navigate(item.path)}
@@ -173,10 +197,11 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
                     height: 40,
                     mx: 1,
                     my: '2px',
-                    px: 1.5,
+                    px: collapsed ? 0 : 1.5,
                     borderRadius: '8px',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
                     gap: '10px',
                     cursor: 'pointer',
                     bgcolor: isActive ? '#EEF3FD' : 'transparent',
@@ -206,10 +231,20 @@ export default function Sidebar({ userRole = 'Admin' }: SidebarProps) {
                     color={isActive ? '#7299ED' : '#737373'}
                     strokeWidth={isActive ? 2.2 : 1.8}
                   />
-                  <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {item.label}
-                  </Typography>
+                  {!collapsed && (
+                    <Typography variant="body2" sx={{ fontSize: 14 }}>
+                      {item.label}
+                    </Typography>
+                  )}
                 </Box>
+              )
+
+              return collapsed ? (
+                <Tooltip key={item.path} title={item.label} placement="right" arrow>
+                  {itemContent}
+                </Tooltip>
+              ) : (
+                itemContent
               )
             })}
           </Box>

@@ -20,7 +20,8 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material'
-import { Search, Plus, RefreshCw, Edit3, Eye, EyeOff } from 'lucide-react'
+import { Plus, RefreshCw, Edit3, Eye, EyeOff } from 'lucide-react'
+import SearchField from '../components/SearchField'
 import {
   fetchAccounts,
   createAccount,
@@ -226,19 +227,11 @@ export default function AccountsPage() {
       {/* Filter / Search Bar */}
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <TextField
+          <SearchField
             placeholder="Tìm theo tên đăng nhập..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} color="#a3a3a3" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: 320 }}
+            width={320}
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>

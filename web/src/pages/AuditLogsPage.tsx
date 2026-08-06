@@ -6,10 +6,9 @@ import {
   Box,
   Typography,
   TextField,
-  InputAdornment,
   Button,
-  Chip,
   Paper,
+  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -17,7 +16,8 @@ import {
   Grid,
   MenuItem,
 } from '@mui/material'
-import { Search, RefreshCw, Eye, FileText } from 'lucide-react'
+import { RefreshCw, Eye, FileText } from 'lucide-react'
+import SearchField from '../components/SearchField'
 import { fetchAuditLogs, type AuditLogDto } from '../api/audit'
 
 function formatJsonString(raw?: string | null) {
@@ -176,19 +176,11 @@ export default function AuditLogsPage() {
       {/* Filter / Search Bar */}
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
+          <SearchField
             placeholder="Tìm theo từ khóa..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} color="#a3a3a3" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: 260 }}
+            width={260}
           />
 
           <TextField
