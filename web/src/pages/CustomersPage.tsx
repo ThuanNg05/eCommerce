@@ -63,10 +63,10 @@ export default function CustomersPage() {
     description: '',
   })
 
-  // Query Data
+  // Fetch up to 500 records so AG Grid sorts, filters, and paginates on the full dataset without truncation
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['customers', search],
-    queryFn: () => fetchCustomers(search),
+    queryFn: () => fetchCustomers(search, 1, 500),
   })
 
   // Mutations
@@ -230,7 +230,7 @@ export default function CustomersPage() {
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>
-            Tổng số: <strong>{data?.totalCount ?? 0}</strong> khách hàng
+            Hiển thị: <strong>{data?.items.length ?? 0}</strong> / Tổng số: <strong>{data?.totalCount ?? 0}</strong> khách hàng
           </Typography>
         </Box>
       </Paper>
@@ -259,10 +259,12 @@ export default function CustomersPage() {
             rowData={data?.items ?? []}
             columnDefs={columns}
             loading={isLoading}
+            quickFilterText={search}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu khách hàng</span>'
             animateRows
             pagination
             paginationPageSize={50}
+            paginationPageSizeSelector={[25, 50, 100, 200, 500]}
           />
         </div>
       </Paper>
