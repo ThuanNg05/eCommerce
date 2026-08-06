@@ -15,9 +15,9 @@ import {
   DialogContent,
   DialogActions,
   Chip,
-  MenuItem,
   CircularProgress,
   Divider,
+  Autocomplete,
 } from '@mui/material'
 import { RefreshCw, Save, Calculator, AlertCircle, Info } from 'lucide-react'
 import {
@@ -145,6 +145,9 @@ export default function PricingPage() {
 
   // ==================== TAB 2: PRODUCT COMPONENT FORMULA STATES ====================
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
+  const [productSearchInput, setProductSearchInput] = useState<string>('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('')
+
   const [componentForm, setComponentForm] = useState<UpsertProductComponentRequest>({
     wage: 0,
     valKieng: null,
@@ -164,9 +167,18 @@ export default function PricingPage() {
   })
   const [componentActionMsg, setComponentActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Debounce product search query by ~300ms
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(productSearchInput)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [productSearchInput])
+
+  // Server-side Product Autocomplete Search
   const { data: productsData, isLoading: isProductsLoading } = useQuery({
-    queryKey: ['inventory'],
-    queryFn: () => fetchInventory('', 1, 200),
+    queryKey: ['pricing-products', debouncedSearchQuery],
+    queryFn: () => fetchInventory(debouncedSearchQuery, 1, 50),
   })
 
   const {
@@ -179,12 +191,6 @@ export default function PricingPage() {
     enabled: Boolean(selectedProductId),
     retry: false,
   })
-
-  useEffect(() => {
-    if (productsData?.items && productsData.items.length > 0 && !selectedProductId) {
-      setSelectedProductId(productsData.items[0].id)
-    }
-  }, [productsData, selectedProductId])
 
   useEffect(() => {
     if (componentData) {
@@ -433,25 +439,37 @@ export default function PricingPage() {
             </Typography>
 
             <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Chọn sản phẩm"
-                  value={selectedProductId || ''}
-                  onChange={(e) => setSelectedProductId(Number(e.target.value))}
-                  disabled={isProductsLoading}
-                >
-                  {productsData?.items.map((p) => (
-                    <MenuItem key={p.id} value={p.id}>
-                      {p.sku} - {p.name} (Giá gốc hiện tại: {formatVND(p.basePrice)})
-                    </MenuItem>
-                  ))}
-                </TextField>
+              <Grid item xs={12} sm={7}>
+                <Autocomplete
+                  options={productsData?.items ?? []}
+                  loading={isProductsLoading}
+                  getOptionLabel={(p) => `${p.sku} — ${p.name}`}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  filterOptions={(x) => x}
+                  onInputChange={(_, v) => setProductSearchInput(v)}
+                  onChange={(_, p) => setSelectedProductId(p ? p.id : null)}
+                  noOptionsText="Không tìm thấy sản phẩm"
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Tìm theo SKU hoặc tên sản phẩm..."
+                      size="small"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {isProductsLoading ? <CircularProgress color="inherit" size={18} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                />
               </Grid>
 
               {selectedProduct && (
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={5}>
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f9f9f9', borderRadius: '6px' }}>
                     <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
                       SẢN PHẨM ĐANG CHỌN
