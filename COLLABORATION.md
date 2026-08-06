@@ -33,7 +33,8 @@ message and the UI updates its types.
 1. **Never edit across the boundary.** Backend agent does not touch `web/**`; UI agent
    does not touch `src/**` or `supabase/**`.
 2. **Commit before hand-off; pull before starting.** Git is the communication channel.
-   Optional branches: `feat/api-*` (backend), `feat/ui-*` (UI); merge on `main`.
+   Use short-lived branches `feat/api-*` (backend) / `feat/ui-*` (UI) and **merge them
+   back into `main` as soon as the task is done** — see **Branch workflow** below.
 3. **No concurrent edits to the same file.** With the boundary above this only happens if
    someone crosses it.
 4. **CORS** already allows the Vite dev server (`http://localhost:5173`) and the packaged
@@ -41,6 +42,32 @@ message and the UI updates its types.
    develop live against the running API with no backend change.
 5. **Build hand-off:** the UI is built with `npm run build` → `web/dist`, which the WPF
    host packages/serves. UI produces it; the host consumes it.
+
+## Branch workflow (mandatory)
+
+`main` is the **single integration branch** and the only branch anyone runs, demos, or
+reviews from. Feature branches are short-lived and **must be merged back into `main` the
+moment the task is done** — a finished branch left unmerged is treated as **not delivered**:
+the other agent and the running app never see it, and it silently "reverts" features
+whenever a different branch is checked out.
+
+1. **Branch from the latest `main`** — never from another feature branch:
+   `git checkout main && git pull --ff-only && git checkout -b feat/ui-<task>`
+2. **Finish = merge back immediately**, then delete the branch:
+   ```
+   git checkout main
+   git merge --no-ff feat/ui-<task>
+   git branch -d feat/ui-<task>
+   ```
+3. **One unmerged branch per agent at a time.** Do not stack several open `feat/*`
+   branches — each becomes invisible work. Merge (or discard) the current one before
+   starting the next.
+4. **Run / demo / screenshot only from `main`.** If a feature seems to "disappear" in the
+   UI, suspect an unmerged branch first: check `git branch` and `git log --oneline --all`.
+5. **Heads-up on gitignored local files.** `src/WarehouseApp.Api/appsettings.Development.json`
+   (the dev DB connection string) is gitignored and lives only in your working tree; a
+   merge that removes it from tracking can delete it on checkout. Keep that connection
+   string backed up outside the repo and re-add it if it goes missing.
 
 ## Design
 
