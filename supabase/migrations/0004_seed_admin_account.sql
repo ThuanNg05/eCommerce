@@ -16,5 +16,5 @@
 create extension if not exists pgcrypto;
 
 insert into account (username, password, role_id, status)
-values ('admin', crypt('ChangeMe!123', gen_salt('bf', 10)), 1, 1)
+values ('admin', crypt('Admin123', gen_salt('bf', 10)), 1, 1)
 on conflict (username) do nothing;
