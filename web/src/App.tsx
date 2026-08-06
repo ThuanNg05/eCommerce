@@ -16,6 +16,8 @@ import SubBackboardsPage from './pages/SubBackboardsPage'
 import FramesPage from './pages/FramesPage'
 import InventoryTransactionsPage from './pages/InventoryTransactionsPage'
 import PricingPage from './pages/PricingPage'
+import SettingsPage from './pages/SettingsPage'
+import AuditLogsPage from './pages/AuditLogsPage'
 import StubPage from './pages/StubPage'
 
 export default function App() {
@@ -50,8 +52,8 @@ export default function App() {
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
               <Route path="/accounts" element={<StubPage title="Quản lý Tài khoản" subtitle="Danh sách tài khoản nhân viên & phân quyền" />} />
-              <Route path="/settings" element={<StubPage title="Cấu hình Hệ thống" subtitle="Cấu hình Email thông báo & tham số chung" />} />
-              <Route path="/audit" element={<StubPage title="Nhật ký Thay đổi" subtitle="Lịch sử thao tác & nhật ký hoạt động" />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/audit" element={<AuditLogsPage />} />
             </Route>
 
             {/* Fallback */}
