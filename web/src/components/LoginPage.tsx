@@ -9,7 +9,10 @@ import {
   Link,
   Alert,
   CircularProgress,
+  InputAdornment,
+  IconButton,
 } from '@mui/material'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 
 export default function LoginPage() {
@@ -18,6 +21,7 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -144,12 +148,25 @@ export default function LoginPage() {
           <TextField
             fullWidth
             size="medium"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
             variant="outlined"
             disabled={isSubmitting}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    sx={{ color: '#6b7280', borderRadius: 0 }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
             sx={{
               mb: 1.5,
               '& .MuiOutlinedInput-root': {
