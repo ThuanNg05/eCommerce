@@ -24,7 +24,11 @@ appsettings.*.local.json
 # Visual Paradigm (.vpp) and draw.io autosave/backup files under documents/.
 *.vpp.bak_*
 *.drawio.bkp
+*.bkp
 
 # ---- OS ----
 Thumbs.db
 .DS_Store
+
+# Local dev config holding the DB connection string (never commit secrets)
+appsettings.Development.json
