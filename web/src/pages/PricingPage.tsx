@@ -73,6 +73,24 @@ const COMPONENT_FIELDS: { key: keyof UpsertProductComponentRequest; label: strin
   { key: 'valDecal', label: 'Hệ số Decal (valDecal)' },
 ]
 
+const DEFAULT_COMPONENT_FORM: UpsertProductComponentRequest = {
+  wage: 0,
+  valKieng: null,
+  valNhL: null,
+  valNhN: null,
+  valGL: null,
+  valGN: null,
+  valDL: null,
+  valBack: null,
+  valLua: null,
+  valKT: null,
+  valOc: null,
+  valNhom: null,
+  val7F: null,
+  val2D: null,
+  valDecal: null,
+}
+
 export default function PricingPage() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<number>(0)
@@ -148,24 +166,14 @@ export default function PricingPage() {
   const [productSearchInput, setProductSearchInput] = useState<string>('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('')
 
-  const [componentForm, setComponentForm] = useState<UpsertProductComponentRequest>({
-    wage: 0,
-    valKieng: null,
-    valNhL: null,
-    valNhN: null,
-    valGL: null,
-    valGN: null,
-    valDL: null,
-    valBack: null,
-    valLua: null,
-    valKT: null,
-    valOc: null,
-    valNhom: null,
-    val7F: null,
-    val2D: null,
-    valDecal: null,
-  })
+  const [componentForm, setComponentForm] = useState<UpsertProductComponentRequest>(DEFAULT_COMPONENT_FORM)
   const [componentActionMsg, setComponentActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const resetPricingInputs = () => {
+    setSelectedProductId(null)
+    setComponentForm(DEFAULT_COMPONENT_FORM)
+    setComponentActionMsg(null)
+  }
 
   // Debounce product search query by ~300ms
   useEffect(() => {
@@ -212,24 +220,7 @@ export default function PricingPage() {
         valDecal: componentData.valDecal ?? null,
       })
     } else if (isComponentNotFound) {
-      // Reset to null/empty if no component formula exists yet for this product
-      setComponentForm({
-        wage: 0,
-        valKieng: null,
-        valNhL: null,
-        valNhN: null,
-        valGL: null,
-        valGN: null,
-        valDL: null,
-        valBack: null,
-        valLua: null,
-        valKT: null,
-        valOc: null,
-        valNhom: null,
-        val7F: null,
-        val2D: null,
-        valDecal: null,
-      })
+      setComponentForm(DEFAULT_COMPONENT_FORM)
     }
   }, [componentData, isComponentNotFound])
 
@@ -443,17 +434,36 @@ export default function PricingPage() {
                 <Autocomplete
                   options={productsData?.items ?? []}
                   loading={isProductsLoading}
+                  value={selectedProduct || null}
                   getOptionLabel={(p) => `${p.sku} — ${p.name}`}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
                   filterOptions={(x) => x}
-                  onInputChange={(_, v) => setProductSearchInput(v)}
-                  onChange={(_, p) => setSelectedProductId(p ? p.id : null)}
+                  onInputChange={(_, v) => {
+                    setProductSearchInput(v)
+                    if (v === '' && !selectedProductId) {
+                      resetPricingInputs()
+                    }
+                  }}
+                  onChange={(_, p) => {
+                    if (!p) {
+                      resetPricingInputs()
+                      setProductSearchInput('')
+                    } else {
+                      setSelectedProductId(p.id)
+                    }
+                  }}
                   noOptionsText="Không tìm thấy sản phẩm"
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       placeholder="Tìm theo SKU hoặc tên sản phẩm..."
                       size="small"
+                      onBlur={() => {
+                        if (!selectedProductId || !productSearchInput.trim()) {
+                          resetPricingInputs()
+                          setProductSearchInput('')
+                        }
+                      }}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
@@ -485,35 +495,37 @@ export default function PricingPage() {
             <Divider sx={{ mb: 3 }} />
 
             {/* Server-Computed Result Banner */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2.5,
-                mb: 4,
-                bgcolor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Box>
-                <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600, letterSpacing: '0.04em' }}>
-                  GIÁ GỐC TÍNH TỪ SERVER (BASE PRICE)
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#15803d', mt: 0.5 }}>
-                  {isComponentLoading ? '...' : formatVND(componentData?.basePrice ?? selectedProduct?.basePrice)}
-                </Typography>
-              </Box>
+            {selectedProductId && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  mb: 4,
+                  bgcolor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600, letterSpacing: '0.04em' }}>
+                    GIÁ GỐC TÍNH TỪ SERVER (BASE PRICE)
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#15803d', mt: 0.5 }}>
+                    {isComponentLoading ? '...' : formatVND(componentData?.basePrice ?? selectedProduct?.basePrice)}
+                  </Typography>
+                </Box>
 
-              <Chip
-                icon={<Calculator size={14} color="#15803d" />}
-                label="Server Compute (Chỉ đọc)"
-                variant="outlined"
-                sx={{ bgcolor: '#ffffff', borderColor: '#86efac', color: '#15803d', fontWeight: 500 }}
-              />
-            </Paper>
+                <Chip
+                  icon={<Calculator size={14} color="#15803d" />}
+                  label="Server Compute (Chỉ đọc)"
+                  variant="outlined"
+                  sx={{ bgcolor: '#ffffff', borderColor: '#86efac', color: '#15803d', fontWeight: 500 }}
+                />
+              </Paper>
+            )}
 
             {/* Component Formula Form */}
             <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717', mb: 2 }}>
@@ -529,7 +541,7 @@ export default function PricingPage() {
                 <TextField
                   fullWidth
                   type="number"
-                  value={componentForm.wage}
+                  value={componentForm.wage || ''}
                   onChange={(e) => setComponentForm({ ...componentForm, wage: Number(e.target.value) })}
                   InputProps={{
                     endAdornment: (
