@@ -29,6 +29,7 @@ import {
   type CreateMaterialRequest,
   type UpdateMaterialRequest,
 } from '../api/materials'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 const formatVND = (v?: number | null) =>
   v == null
@@ -311,6 +312,7 @@ export default function MaterialsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu vật liệu</span>'
             animateRows
             pagination

@@ -18,12 +18,8 @@ import {
 } from '@mui/material'
 import { Plus, RefreshCw, Edit3 } from 'lucide-react'
 import SearchField from '../components/SearchField'
-import {
-  fetchCategories,
-  createCategory,
-  updateCategory,
-  type CategoryDto,
-} from '../api/categories'
+import { fetchCategories, createCategory, updateCategory, type CategoryDto } from '../api/categories'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient()
@@ -200,6 +196,7 @@ export default function CategoriesPage() {
             rowData={data?.items ?? []}
             columnDefs={columns}
             loading={isLoading}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu</span>'
             pagination
           />

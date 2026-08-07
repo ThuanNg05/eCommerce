@@ -32,6 +32,7 @@ import {
   type UpdateProductRequest,
 } from '../api/inventory'
 import { fetchCategories, type CategoryDto } from '../api/categories'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -418,6 +419,8 @@ export default function ProductsPage() {
             rowData={data?.items ?? []}
             columnDefs={columns}
             loading={isLoading}
+            localeText={AG_GRID_LOCALE_VI}
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu sản phẩm</span>'
             animateRows
             pagination
             paginationPageSize={50}

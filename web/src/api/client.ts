@@ -1,14 +1,11 @@
-// In dev, VITE_API_BASE is unset and requests go to '/api' (proxied by Vite to the
-// standalone host). In the packaged app, VITE_API_BASE points at the in-process
-// HTTPS host (see web/.env.production).
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 
 async function parseError(res: Response): Promise<string> {
   try {
     const problem = await res.json()
-    return problem?.title ?? `${res.status} ${res.statusText}`
+    return problem?.detail ?? problem?.title ?? `Lỗi hệ thống (${res.status}: ${res.statusText})`
   } catch {
-    return `${res.status} ${res.statusText}`
+    return `Lỗi hệ thống (${res.status}: ${res.statusText})`
   }
 }
 

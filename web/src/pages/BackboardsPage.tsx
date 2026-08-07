@@ -29,6 +29,7 @@ import {
   type CreateBackboardRequest,
   type UpdateBackboardRequest,
 } from '../api/backboards'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 const formatVND = (v?: number | null) =>
   v == null
@@ -292,6 +293,7 @@ export default function BackboardsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu ván hậu</span>'
             animateRows
             pagination

@@ -29,6 +29,7 @@ import {
   type CreateSubBackboardRequest,
   type UpdateSubBackboardRequest,
 } from '../api/subBackboards'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 export default function SubBackboardsPage() {
   const queryClient = useQueryClient()
@@ -266,7 +267,8 @@ export default function SubBackboardsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
-            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu ván hậu</span>'
+            localeText={AG_GRID_LOCALE_VI}
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu ván hậu phụ</span>'
             animateRows
             pagination
             paginationPageSize={50}

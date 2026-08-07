@@ -19,6 +19,7 @@ import {
 import { RefreshCw, Eye, FileText } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import { fetchAuditLogs, type AuditLogDto } from '../api/audit'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 function formatJsonString(raw?: string | null) {
   if (!raw) return '— (Không có dữ liệu)'
@@ -109,7 +110,7 @@ export default function AuditLogsPage() {
         headerName: 'NGƯỜI THAY ĐỔI',
         width: 150,
         sortable: true,
-        valueFormatter: (p) => (p.value ? `User #${p.value}` : 'Hệ thống'),
+        valueFormatter: (p) => (p.value ? `Tài khoản #${p.value}` : 'Hệ thống'),
       },
       {
         field: 'changedAt',
@@ -242,6 +243,8 @@ export default function AuditLogsPage() {
             rowData={data?.items ?? []}
             columnDefs={columns}
             loading={isLoading}
+            localeText={AG_GRID_LOCALE_VI}
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu nhật ký audit</span>'
             animateRows
             pagination
             paginationPageSize={50}

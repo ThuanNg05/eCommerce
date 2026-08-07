@@ -107,7 +107,7 @@ export default function TopBar() {
         {/* User Chip */}
         <Chip
           icon={<User size={14} color="#737373" />}
-          label={user?.username || 'User'}
+          label={user?.username || 'Người dùng'}
           variant="outlined"
           size="small"
           sx={{

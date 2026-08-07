@@ -30,6 +30,7 @@ import {
   type UpdateFrameRequest,
 } from '../api/frames'
 import { fetchSubBackboards } from '../api/subBackboards'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 interface FrameLineFormItem {
   subBackboardId: number | ''
@@ -382,6 +383,7 @@ export default function FramesPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu rập</span>'
             animateRows
             pagination

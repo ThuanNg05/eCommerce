@@ -36,6 +36,7 @@ import {
   type TransactionLineDto,
   type CreateInventoryTransactionRequest,
 } from '../api/inventoryTransactions'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchMaterials, type MaterialDto } from '../api/materials'
 import { fetchBackboards, type BackboardDto } from '../api/backboards'
@@ -434,6 +435,7 @@ export default function InventoryTransactionsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có phiếu giao dịch kho</span>'
             animateRows
             pagination
