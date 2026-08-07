@@ -23,6 +23,7 @@ import {
   TableCell,
   Divider,
   Autocomplete,
+  Snackbar,
 } from '@mui/material'
 import { Plus, RefreshCw, Printer, Eye, Trash2 } from 'lucide-react'
 import SearchField from '../components/SearchField'
@@ -44,6 +45,7 @@ interface CreateInvoiceLineState {
   quantity: number
   unitPrice: number
   description: string
+  isPriceManuallyEdited: boolean
 }
 
 const createEmptyInvoiceLine = (): CreateInvoiceLineState => ({
@@ -53,6 +55,7 @@ const createEmptyInvoiceLine = (): CreateInvoiceLineState => ({
   quantity: 1,
   unitPrice: 0,
   description: '',
+  isPriceManuallyEdited: false,
 })
 
 const formatVND = (value?: number | null) => {
@@ -62,6 +65,17 @@ const formatVND = (value?: number | null) => {
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+const isWholesaleGroup = (customer: CustomerDto | null): boolean => {
+  return customer?.groupPrice?.trim().toUpperCase() === 'S'
+}
+
+const calculateDefaultUnitPrice = (product: ProductDto, customer: CustomerDto | null): number => {
+  if (isWholesaleGroup(customer)) {
+    return product.priceWholesale ?? product.priceRetail ?? product.basePrice
+  }
+  return product.priceRetail ?? product.basePrice
 }
 
 function useDebounce<T>(value: T, delay = 300): T {
@@ -106,23 +120,20 @@ function ProductLineItem({
     return exists ? searchResults : [line.selectedProduct, ...searchResults]
   }, [searchResults, line.selectedProduct])
 
-  const calculateDefaultUnitPrice = (product: ProductDto, customer: CustomerDto | null): number => {
-    const isGroupS = customer?.groupPrice?.trim().toUpperCase() === 'S'
-    if (isGroupS) {
-      return product.priceWholesale ?? product.priceRetail ?? product.basePrice
-    }
-    return product.priceRetail ?? product.basePrice
-  }
-
   const handleProductSelect = (product: ProductDto | null) => {
     if (!product) {
-      onUpdateLine(line.id, { selectedProduct: null, unitPrice: 0 })
+      onUpdateLine(line.id, {
+        selectedProduct: null,
+        unitPrice: 0,
+        isPriceManuallyEdited: false,
+      })
       return
     }
     const defaultPrice = calculateDefaultUnitPrice(product, selectedCustomer)
     onUpdateLine(line.id, {
       selectedProduct: product,
       unitPrice: defaultPrice,
+      isPriceManuallyEdited: false,
     })
   }
 
@@ -189,9 +200,16 @@ function ProductLineItem({
 
         {/* Editable Unit Price */}
         <Grid item xs={6} md={2.5}>
-          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-            ĐƠN GIÁ (VND) *
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block' }}>
+              ĐƠN GIÁ (VND) *
+            </Typography>
+            {line.isPriceManuallyEdited && (
+              <Typography variant="caption" sx={{ color: '#d97706', fontSize: 10, fontWeight: 600 }}>
+                (Đã chỉnh tay)
+              </Typography>
+            )}
+          </Box>
           <TextField
             fullWidth
             size="small"
@@ -200,7 +218,10 @@ function ProductLineItem({
             value={line.unitPrice}
             onChange={(e) => {
               const val = Number(e.target.value)
-              onUpdateLine(line.id, { unitPrice: isNaN(val) ? 0 : Math.max(0, val) })
+              onUpdateLine(line.id, {
+                unitPrice: isNaN(val) ? 0 : Math.max(0, val),
+                isPriceManuallyEdited: true,
+              })
             }}
           />
         </Grid>
@@ -259,10 +280,20 @@ export default function InvoicesPage() {
   const [viewInvoiceId, setViewInvoiceId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  // Toast Feedback State
+  const [toastState, setToastState] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: '',
+  })
+
   // Customer Autocomplete Server-Side Search State
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDto | null>(null)
   const [customerSearchTerm, setCustomerSearchTerm] = useState('')
   const debouncedCustomerSearch = useDebounce(customerSearchTerm, 300)
+
+  // Confirm Manual Price Reset Dialog State
+  const [pendingCustomer, setPendingCustomer] = useState<CustomerDto | null>(null)
+  const [isConfirmPriceUpdateOpen, setIsConfirmPriceUpdateOpen] = useState(false)
 
   const { data: customersData, isLoading: isCustomersLoading } = useQuery({
     queryKey: ['customersSearch', debouncedCustomerSearch],
@@ -316,6 +347,77 @@ export default function InvoicesPage() {
     setCustomerSearchTerm('')
     setCreateLines([createEmptyInvoiceLine()])
     setActionError(null)
+    setPendingCustomer(null)
+    setIsConfirmPriceUpdateOpen(false)
+  }
+
+  // Helper to apply customer price updates to product lines
+  const applyCustomerPriceUpdates = (newCust: CustomerDto | null, overrideManualPrices: boolean) => {
+    const oldIsS = isWholesaleGroup(selectedCustomer)
+    const newIsS = isWholesaleGroup(newCust)
+    const isGroupChanged = oldIsS !== newIsS
+
+    setSelectedCustomer(newCust)
+
+    const validLinesCount = createLines.filter((l) => l.selectedProduct !== null).length
+
+    // Update unit prices for lines
+    setCreateLines((prevLines) =>
+      prevLines.map((line) => {
+        if (!line.selectedProduct) return line
+
+        // If line price was edited manually and we choose to KEEP manual prices
+        if (!overrideManualPrices && line.isPriceManuallyEdited) {
+          return line
+        }
+
+        // Recalculate price based on new customer group
+        const newPrice = calculateDefaultUnitPrice(line.selectedProduct, newCust)
+        return {
+          ...line,
+          unitPrice: newPrice,
+          isPriceManuallyEdited: overrideManualPrices ? false : line.isPriceManuallyEdited,
+        }
+      }),
+    )
+
+    // Show Toast if price group changed AND there are valid product lines
+    if (isGroupChanged && validLinesCount > 0) {
+      const toastMsg = newIsS
+        ? 'Đã áp dụng giá sỉ cho các sản phẩm trong hóa đơn.'
+        : 'Đã áp dụng giá lẻ cho các sản phẩm trong hóa đơn.'
+      setToastState({ open: true, message: toastMsg })
+    }
+  }
+
+  // Handle Customer Selection Change in Autocomplete
+  const handleCustomerSelect = (newCust: CustomerDto | null) => {
+    if (newCust?.id === selectedCustomer?.id) return
+
+    const validLines = createLines.filter((l) => l.selectedProduct !== null)
+    const hasManualPrices = validLines.some((l) => l.isPriceManuallyEdited)
+
+    if (hasManualPrices) {
+      // Show confirmation dialog if manual prices exist
+      setPendingCustomer(newCust)
+      setIsConfirmPriceUpdateOpen(true)
+    } else {
+      // Automatically update prices without dialog
+      applyCustomerPriceUpdates(newCust, true)
+    }
+  }
+
+  // Confirm manual price dialog choices
+  const handleKeepManualPrices = () => {
+    applyCustomerPriceUpdates(pendingCustomer, false)
+    setIsConfirmPriceUpdateOpen(false)
+    setPendingCustomer(null)
+  }
+
+  const handleApplyNewPricesToAll = () => {
+    applyCustomerPriceUpdates(pendingCustomer, true)
+    setIsConfirmPriceUpdateOpen(false)
+    setPendingCustomer(null)
   }
 
   // Prepend line to top and scroll to top mượt
@@ -596,10 +698,12 @@ export default function InvoicesPage() {
                 size="small"
                 options={customerOptions}
                 loading={isCustomersLoading}
-                getOptionLabel={(c) => `${c.name}${c.phone ? ' — ' + c.phone : ''}`}
+                getOptionLabel={(c) =>
+                  `${c.name}${c.phone ? ' — ' + c.phone : ''}${isWholesaleGroup(c) ? ' (Giá sỉ)' : ''}`
+                }
                 isOptionEqualToValue={(opt, val) => opt.id === val.id}
                 value={selectedCustomer}
-                onChange={(_, val) => setSelectedCustomer(val)}
+                onChange={(_, val) => handleCustomerSelect(val)}
                 onInputChange={(_, newInputValue) => setCustomerSearchTerm(newInputValue)}
                 renderInput={(params) => (
                   <TextField {...params} placeholder="Tìm khách hàng theo tên hoặc SĐT..." />
@@ -706,6 +810,54 @@ export default function InvoicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* CONFIRMATION DIALOG FOR MANUALLY EDITED PRICES WHEN SWITCHING CUSTOMER */}
+      <Dialog
+        open={isConfirmPriceUpdateOpen}
+        onClose={() => {
+          setIsConfirmPriceUpdateOpen(false)
+          setPendingCustomer(null)
+        }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>Xác nhận cập nhật đơn giá</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#404040', mt: 1 }}>
+            Một số đơn giá đã được chỉnh thủ công. Bạn có muốn áp dụng lại giá theo nhóm khách hàng mới cho tất cả sản phẩm không?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button onClick={handleKeepManualPrices} variant="outlined" color="inherit" size="small">
+            Giữ giá đã nhập
+          </Button>
+          <Button
+            onClick={handleApplyNewPricesToAll}
+            variant="contained"
+            size="small"
+            sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
+          >
+            Áp dụng giá mới
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* TOAST SNACKBAR NOTIFICATION FOR PRICE GROUP CHANGE */}
+      <Snackbar
+        open={toastState.open}
+        autoHideDuration={4000}
+        onClose={() => setToastState({ ...toastState, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToastState({ ...toastState, open: false })}
+          severity="info"
+          sx={{ width: '100%', borderRadius: '6px', boxShadow: 3 }}
+        >
+          {toastState.message}
+        </Alert>
+      </Snackbar>
 
       {/* PRINTABLE INVOICE DETAIL MODAL */}
       <Dialog
