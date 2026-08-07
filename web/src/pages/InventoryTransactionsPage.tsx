@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
@@ -44,11 +44,20 @@ import { fetchSubBackboards, type SubBackboardDto } from '../api/subBackboards'
 type ItemType = 'product' | 'material' | 'backboard' | 'subBackboard'
 
 interface CreateLineState {
+  id: string
   itemType: ItemType
   selectedItem: ProductDto | MaterialDto | BackboardDto | SubBackboardDto | null
   quantity: number | ''
   unitPrice: number | ''
 }
+
+const createEmptyLine = (): CreateLineState => ({
+  id: `line-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+  itemType: 'product',
+  selectedItem: null,
+  quantity: 1,
+  unitPrice: 0,
+})
 
 const formatVND = (v: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v)
@@ -66,6 +75,7 @@ const formatDate = (dateStr: string) => {
 export default function InventoryTransactionsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const linesContainerRef = useRef<HTMLDivElement>(null)
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -75,9 +85,7 @@ export default function InventoryTransactionsPage() {
   // Form States for Create Transaction
   const [txType, setTxType] = useState<1 | 2>(1) // 1 = Nhập kho, 2 = Xuất kho
   const [txNote, setTxNote] = useState<string>('')
-  const [createLines, setCreateLines] = useState<CreateLineState[]>([
-    { itemType: 'product', selectedItem: null, quantity: 1, unitPrice: 0 },
-  ])
+  const [createLines, setCreateLines] = useState<CreateLineState[]>([createEmptyLine()])
 
   // Queries for Inventory & Item Options
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -134,78 +142,80 @@ export default function InventoryTransactionsPage() {
   const resetCreateForm = () => {
     setTxType(1)
     setTxNote('')
-    setCreateLines([{ itemType: 'product', selectedItem: null, quantity: 1, unitPrice: 0 }])
+    setCreateLines([createEmptyLine()])
     setActionError(null)
   }
 
-  // Add/Remove lines helper
+  // Prepend line to top and scroll list container to top
   const handleAddLine = () => {
-    setCreateLines((prev) => [
-      ...prev,
-      { itemType: 'product', selectedItem: null, quantity: 1, unitPrice: 0 },
-    ])
+    const newLine = createEmptyLine()
+    setCreateLines((prev) => [newLine, ...prev])
+    setTimeout(() => {
+      linesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 50)
   }
 
-  const handleRemoveLine = (index: number) => {
-    setCreateLines((prev) => prev.filter((_, i) => i !== index))
+  const handleRemoveLine = (id: string) => {
+    setCreateLines((prev) => prev.filter((l) => l.id !== id))
   }
 
-  const handleItemTypeChange = (index: number, newType: ItemType) => {
-    setCreateLines((prev) => {
-      const updated = [...prev]
-      updated[index] = {
-        itemType: newType,
-        selectedItem: null,
-        quantity: 1,
-        unitPrice: 0,
-      }
-      return updated
-    })
+  const handleItemTypeChange = (id: string, newType: ItemType) => {
+    setCreateLines((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              itemType: newType,
+              selectedItem: null,
+              quantity: 1,
+              unitPrice: 0,
+            }
+          : l,
+      ),
+    )
   }
 
   const handleItemSelect = (
-    index: number,
+    id: string,
     item: ProductDto | MaterialDto | BackboardDto | SubBackboardDto | null,
   ) => {
-    setCreateLines((prev) => {
-      const updated = [...prev]
-      const current = updated[index]
-      let defaultPrice = 0
+    setCreateLines((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l
+        let defaultPrice = 0
 
-      if (item) {
-        if (current.itemType === 'product') {
-          const p = item as ProductDto
-          defaultPrice = txType === 1 ? p.basePrice : p.priceRetail || p.basePrice
-        } else if (current.itemType === 'material') {
-          const m = item as MaterialDto
-          defaultPrice = txType === 1 ? m.importPrice : m.salePrice || m.importPrice
-        } else if (current.itemType === 'backboard') {
-          const b = item as BackboardDto
-          defaultPrice = txType === 1 ? b.importPrice : b.salePrice || b.importPrice
-        } else if (current.itemType === 'subBackboard') {
-          defaultPrice = 0
+        if (item) {
+          if (l.itemType === 'product') {
+            const p = item as ProductDto
+            defaultPrice = txType === 1 ? p.basePrice : p.priceRetail || p.basePrice
+          } else if (l.itemType === 'material') {
+            const m = item as MaterialDto
+            defaultPrice = txType === 1 ? m.importPrice : m.salePrice || m.importPrice
+          } else if (l.itemType === 'backboard') {
+            const b = item as BackboardDto
+            defaultPrice = txType === 1 ? b.importPrice : b.salePrice || b.importPrice
+          } else if (l.itemType === 'subBackboard') {
+            defaultPrice = 0
+          }
         }
-      }
 
-      updated[index] = {
-        ...current,
-        selectedItem: item,
-        unitPrice: defaultPrice,
-      }
-      return updated
-    })
+        return {
+          ...l,
+          selectedItem: item,
+          unitPrice: defaultPrice,
+        }
+      }),
+    )
   }
 
   const handleLineValueChange = (
-    index: number,
+    id: string,
     field: 'quantity' | 'unitPrice',
     val: number | '',
   ) => {
-    setCreateLines((prev) => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: val }
-      return updated
-    })
+    setCreateLines((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, [field]: val } : l)),
+    )
   }
 
   const handleCreateSubmit = () => {
@@ -473,10 +483,25 @@ export default function InventoryTransactionsPage() {
               />
             </Grid>
 
-            {/* Chi tiết phiếu kho (Dynamic Lines) */}
+            {/* Chi tiết phiếu kho Section */}
             <Grid item xs={12}>
               <Box sx={{ borderTop: '1px solid #ededed', pt: 2, mt: 1 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                {/* Sticky Header / Toolbar */}
+                <Box
+                  sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                    bgcolor: '#ffffff',
+                    pt: 0.5,
+                    pb: 1.5,
+                    borderBottom: '1px solid #ededed',
+                    mb: 1.5,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
                       Chi tiết phiếu kho ({txType === 1 ? 'Nhập kho' : 'Xuất kho'})
@@ -496,173 +521,183 @@ export default function InventoryTransactionsPage() {
                   </Button>
                 </Box>
 
-                {createLines.map((line, idx) => {
-                  const lineTotal =
-                    typeof line.quantity === 'number' && typeof line.unitPrice === 'number'
-                      ? line.quantity * line.unitPrice
-                      : 0
+                {/* Scrollable Container for Line Cards */}
+                <Box
+                  ref={linesContainerRef}
+                  sx={{
+                    maxHeight: 'min(48vh, 460px)',
+                    overflowY: 'auto',
+                    pr: 0.5,
+                  }}
+                >
+                  {createLines.map((line) => {
+                    const lineTotal =
+                      typeof line.quantity === 'number' && typeof line.unitPrice === 'number'
+                        ? line.quantity * line.unitPrice
+                        : 0
 
-                  return (
-                    <Paper
-                      key={idx}
-                      elevation={0}
-                      sx={{
-                        p: 1.5,
-                        mb: 1.5,
-                        bgcolor: '#fafafa',
-                        border: '1px solid #ededed',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      <Grid container spacing={1.5} alignItems="center">
-                        <Grid item xs={3}>
-                          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                            LOẠI HÀNG *
-                          </Typography>
-                          <TextField
-                            select
-                            fullWidth
-                            size="small"
-                            value={line.itemType}
-                            onChange={(e) =>
-                              handleItemTypeChange(idx, e.target.value as ItemType)
-                            }
-                          >
-                            <MenuItem value="product">Sản phẩm</MenuItem>
-                            <MenuItem value="material">Vật liệu</MenuItem>
-                            <MenuItem value="backboard">Tấm lưng</MenuItem>
-                            <MenuItem value="subBackboard">Tấm lưng phụ</MenuItem>
-                          </TextField>
-                        </Grid>
-
-                        <Grid item xs={9}>
-                          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                            CHỌN HÀNG HÓA *
-                          </Typography>
-                          {line.itemType === 'product' && (
-                            <Autocomplete
+                    return (
+                      <Paper
+                        key={line.id}
+                        elevation={0}
+                        sx={{
+                          p: 1.5,
+                          mb: 1.5,
+                          bgcolor: '#fafafa',
+                          border: '1px solid #ededed',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <Grid container spacing={1.5} alignItems="center">
+                          <Grid item xs={3}>
+                            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                              LOẠI HÀNG *
+                            </Typography>
+                            <TextField
+                              select
+                              fullWidth
                               size="small"
-                              options={products}
-                              getOptionLabel={(p) => `[${p.sku}] ${p.name}`}
-                              value={(line.selectedItem as ProductDto) || null}
-                              onChange={(_, val) => handleItemSelect(idx, val)}
-                              renderInput={(params) => (
-                                <TextField {...params} placeholder="Tìm sản phẩm theo SKU/Tên..." />
-                              )}
-                            />
-                          )}
-
-                          {line.itemType === 'material' && (
-                            <Autocomplete
-                              size="small"
-                              options={materials}
-                              getOptionLabel={(m) => m.name}
-                              value={(line.selectedItem as MaterialDto) || null}
-                              onChange={(_, val) => handleItemSelect(idx, val)}
-                              renderInput={(params) => (
-                                <TextField {...params} placeholder="Tìm vật liệu..." />
-                              )}
-                            />
-                          )}
-
-                          {line.itemType === 'backboard' && (
-                            <Autocomplete
-                              size="small"
-                              options={backboards}
-                              getOptionLabel={(b) =>
-                                `Tấm lưng (Loại ${b.type})${b.description ? ' - ' + b.description : ''}`
+                              value={line.itemType}
+                              onChange={(e) =>
+                                handleItemTypeChange(line.id, e.target.value as ItemType)
                               }
-                              value={(line.selectedItem as BackboardDto) || null}
-                              onChange={(_, val) => handleItemSelect(idx, val)}
-                              renderInput={(params) => (
-                                <TextField {...params} placeholder="Tìm tấm lưng..." />
-                              )}
-                            />
-                          )}
+                            >
+                              <MenuItem value="product">Sản phẩm</MenuItem>
+                              <MenuItem value="material">Vật liệu</MenuItem>
+                              <MenuItem value="backboard">Tấm lưng</MenuItem>
+                              <MenuItem value="subBackboard">Tấm lưng phụ</MenuItem>
+                            </TextField>
+                          </Grid>
 
-                          {line.itemType === 'subBackboard' && (
-                            <Autocomplete
+                          <Grid item xs={9}>
+                            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                              CHỌN HÀNG HÓA *
+                            </Typography>
+                            {line.itemType === 'product' && (
+                              <Autocomplete
+                                size="small"
+                                options={products}
+                                getOptionLabel={(p) => `[${p.sku}] ${p.name}`}
+                                value={(line.selectedItem as ProductDto) || null}
+                                onChange={(_, val) => handleItemSelect(line.id, val)}
+                                renderInput={(params) => (
+                                  <TextField {...params} placeholder="Tìm sản phẩm theo SKU/Tên..." />
+                                )}
+                              />
+                            )}
+
+                            {line.itemType === 'material' && (
+                              <Autocomplete
+                                size="small"
+                                options={materials}
+                                getOptionLabel={(m) => m.name}
+                                value={(line.selectedItem as MaterialDto) || null}
+                                onChange={(_, val) => handleItemSelect(line.id, val)}
+                                renderInput={(params) => (
+                                  <TextField {...params} placeholder="Tìm vật liệu..." />
+                                )}
+                              />
+                            )}
+
+                            {line.itemType === 'backboard' && (
+                              <Autocomplete
+                                size="small"
+                                options={backboards}
+                                getOptionLabel={(b) =>
+                                  `Tấm lưng (Loại ${b.type})${b.description ? ' - ' + b.description : ''}`
+                                }
+                                value={(line.selectedItem as BackboardDto) || null}
+                                onChange={(_, val) => handleItemSelect(line.id, val)}
+                                renderInput={(params) => (
+                                  <TextField {...params} placeholder="Tìm tấm lưng..." />
+                                )}
+                              />
+                            )}
+
+                            {line.itemType === 'subBackboard' && (
+                              <Autocomplete
+                                size="small"
+                                options={subBackboards}
+                                getOptionLabel={(sb) =>
+                                  `Tấm lưng phụ ${sb.size}${sb.description ? ' - ' + sb.description : ''}`
+                                }
+                                value={(line.selectedItem as SubBackboardDto) || null}
+                                onChange={(_, val) => handleItemSelect(line.id, val)}
+                                renderInput={(params) => (
+                                  <TextField {...params} placeholder="Tìm tấm lưng phụ..." />
+                                )}
+                              />
+                            )}
+                          </Grid>
+
+                          <Grid item xs={3.5}>
+                            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                              SỐ LƯỢNG *
+                            </Typography>
+                            <TextField
+                              fullWidth
                               size="small"
-                              options={subBackboards}
-                              getOptionLabel={(sb) =>
-                                `Tấm lưng phụ ${sb.size}${sb.description ? ' - ' + sb.description : ''}`
+                              type="number"
+                              inputProps={{ min: 1 }}
+                              value={line.quantity}
+                              onChange={(e) =>
+                                handleLineValueChange(
+                                  line.id,
+                                  'quantity',
+                                  e.target.value === '' ? '' : Math.max(1, Number(e.target.value)),
+                                )
                               }
-                              value={(line.selectedItem as SubBackboardDto) || null}
-                              onChange={(_, val) => handleItemSelect(idx, val)}
-                              renderInput={(params) => (
-                                <TextField {...params} placeholder="Tìm tấm lưng phụ..." />
-                              )}
                             />
-                          )}
-                        </Grid>
+                          </Grid>
 
-                        <Grid item xs={3.5}>
-                          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                            SỐ LƯỢNG *
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            type="number"
-                            inputProps={{ min: 1 }}
-                            value={line.quantity}
-                            onChange={(e) =>
-                              handleLineValueChange(
-                                idx,
-                                'quantity',
-                                e.target.value === '' ? '' : Math.max(1, Number(e.target.value)),
-                              )
-                            }
-                          />
-                        </Grid>
+                          <Grid item xs={4}>
+                            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                              ĐƠN GIÁ (VND) *
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              type="number"
+                              inputProps={{ min: 0 }}
+                              value={line.unitPrice}
+                              onChange={(e) =>
+                                handleLineValueChange(
+                                  line.id,
+                                  'unitPrice',
+                                  e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
+                                )
+                              }
+                            />
+                          </Grid>
 
-                        <Grid item xs={4}>
-                          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                            ĐƠN GIÁ (VND) *
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            type="number"
-                            inputProps={{ min: 0 }}
-                            value={line.unitPrice}
-                            onChange={(e) =>
-                              handleLineValueChange(
-                                idx,
-                                'unitPrice',
-                                e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
-                              )
-                            }
-                          />
-                        </Grid>
+                          <Grid item xs={3.5}>
+                            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                              THÀNH TIỀN (XEM TRƯỚC)
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={formatVND(lineTotal)}
+                              InputProps={{ readOnly: true }}
+                              sx={{ bgcolor: '#f5f5f5' }}
+                            />
+                          </Grid>
 
-                        <Grid item xs={3.5}>
-                          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                            THÀNH TIỀN (XEM TRƯỚC)
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={formatVND(lineTotal)}
-                            InputProps={{ readOnly: true }}
-                            sx={{ bgcolor: '#f5f5f5' }}
-                          />
+                          <Grid item xs={1} sx={{ textCenter: 'center', pt: 2.5 }}>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveLine(line.id)}
+                              disabled={createLines.length <= 1}
+                            >
+                              <Trash2 size={16} />
+                            </IconButton>
+                          </Grid>
                         </Grid>
-
-                        <Grid item xs={1} sx={{ textCenter: 'center', pt: 2.5 }}>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveLine(idx)}
-                            disabled={createLines.length <= 1}
-                          >
-                            <Trash2 size={16} />
-                          </IconButton>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  )
-                })}
+                      </Paper>
+                    )
+                  })}
+                </Box>
               </Box>
             </Grid>
           </Grid>
