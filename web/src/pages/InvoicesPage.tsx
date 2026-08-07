@@ -583,9 +583,9 @@ export default function InvoicesPage() {
             </Alert>
           )}
 
-          {/* Customer Selection with Server-Side Search */}
-          <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
-            <Grid item xs={12}>
+          {/* Top Header Row: Customer Selection (Left) + Total Amount Block (Right) */}
+          <Grid container spacing={2} alignItems="center" sx={{ mt: 0.5, mb: 2 }}>
+            <Grid item xs={12} md={7} lg={8}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
                 KHÁCH HÀNG *
               </Typography>
@@ -602,6 +602,27 @@ export default function InvoicesPage() {
                   <TextField {...params} placeholder="Tìm khách hàng theo tên hoặc SĐT..." />
                 )}
               />
+            </Grid>
+
+            <Grid item xs={12} md={5} lg={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.25,
+                  px: 2,
+                  bgcolor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  textAlign: { xs: 'left', md: 'right' },
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, letterSpacing: '0.05em', display: 'block' }}>
+                  TỔNG TẠM TÍNH
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#2563eb', lineHeight: 1.2 }}>
+                  {formatVND(totalInvoiceAmount)}
+                </Typography>
+              </Paper>
             </Grid>
           </Grid>
 
@@ -621,9 +642,12 @@ export default function InvoicesPage() {
                 display: 'flex',
                 justify: 'space-between',
                 alignItems: 'center',
+                gap: 3,
+                flexWrap: 'wrap',
+                rowGap: 1,
               }}
             >
-              <Box>
+              <Box sx={{ flex: 1, minWidth: 200 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
                   Chi tiết sản phẩm
                 </Typography>
@@ -635,10 +659,10 @@ export default function InvoicesPage() {
                 size="small"
                 startIcon={<Plus size={14} />}
                 onClick={handleAddLine}
-                sx={{ color: '#171717', borderColor: '#e0e0e0' }}
+                sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
                 variant="outlined"
               >
-                Thêm sản phẩm
+                Thêm dòng sản phẩm
               </Button>
             </Box>
 
@@ -663,27 +687,6 @@ export default function InvoicesPage() {
                 />
               ))}
             </Box>
-          </Box>
-
-          {/* Real-time Estimated Total Invoice Amount */}
-          <Box
-            sx={{
-              mt: 2,
-              p: 2,
-              bgcolor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              display: 'flex',
-              justify: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              TỔNG GIÁ TRỊ HÓA ĐƠN TẠM TÍNH:
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#2563eb' }}>
-              {formatVND(totalInvoiceAmount)}
-            </Typography>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
