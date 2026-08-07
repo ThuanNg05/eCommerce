@@ -13,7 +13,7 @@ public static class SubBackboardEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
         g.MapGet("/{id:long}", async (long id, ISubBackboardService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy tấm lót phụ.", statusCode: 404));
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy ván ép.", statusCode: 404));
 
         g.MapPost("/", async (CreateSubBackboardRequest req, ISubBackboardService svc, CancellationToken ct) =>
         {
@@ -22,7 +22,7 @@ public static class SubBackboardEndpoints
         });
 
         g.MapPut("/{id:long}", async (long id, UpdateSubBackboardRequest req, ISubBackboardService svc, CancellationToken ct) =>
-            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy tấm lót phụ.", statusCode: 404));
+            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy ván hậu.", statusCode: 404));
 
         return api;
     }

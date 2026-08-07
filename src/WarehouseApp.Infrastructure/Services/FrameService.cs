@@ -121,7 +121,7 @@ public class FrameService(AppDbContext db) : IFrameService
             var found = await db.SubBackboards.Where(s => refIds.Contains(s.Id)).Select(s => s.Id).ToListAsync(ct);
             var missing = refIds.Except(found).ToList();
             if (missing.Count > 0)
-                throw new DomainValidationException($"Không tìm thấy tấm lót phụ có mã: {string.Join(", ", missing)}.");
+                throw new DomainValidationException($"Không tìm thấy ván ép có mã: {string.Join(", ", missing)}.");
         }
 
         return consolidated;

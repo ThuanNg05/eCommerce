@@ -43,7 +43,7 @@ public class SubBackboardService(AppDbContext db) : ISubBackboardService
     {
         var size = r.Size.Trim();
         if (await db.SubBackboards.AnyAsync(b => b.Size == size, ct))
-            throw new DomainValidationException($"Tấm lót phụ có kích thước '{size}' đã tồn tại.");
+            throw new DomainValidationException($"Ván hậu có kích thước '{size}' đã tồn tại.");
 
         var b = new SubBackboard
         {
@@ -65,7 +65,7 @@ public class SubBackboardService(AppDbContext db) : ISubBackboardService
 
         var size = r.Size.Trim();
         if (await db.SubBackboards.AnyAsync(x => x.Id != id && x.Size == size, ct))
-            throw new DomainValidationException($"Tấm lót phụ có kích thước '{size}' đã tồn tại.");
+            throw new DomainValidationException($"Ván hậu có kích thước '{size}' đã tồn tại.");
 
         b.Size = size;
         b.WarningStock = r.WarningStock;
