@@ -22,7 +22,16 @@ public record InvoiceSummaryDto(
     decimal Total,
     DateTimeOffset CreatedAt);
 
-public record CreateInvoiceLineRequest(long ProductId, int Quantity);
+/// <summary>
+/// A requested invoice line. <see cref="UnitPrice"/> is optional: when omitted,
+/// the server selects the customer's configured retail/wholesale price. A supplied
+/// non-negative value is snapshotted on the invoice.
+/// </summary>
+public record CreateInvoiceLineRequest(
+    long ProductId,
+    int Quantity,
+    decimal? UnitPrice = null,
+    string? Description = null);
 
 public record CreateInvoiceRequest(
     long CustomerId,

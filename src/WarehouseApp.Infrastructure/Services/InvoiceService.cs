@@ -35,13 +35,19 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         if (r.Lines is null || r.Lines.Count == 0)
             throw new DomainValidationException("An invoice must contain at least one line.");
 
-        if (!await db.Customers.AnyAsync(c => c.Id == r.CustomerId, ct))
+        var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == r.CustomerId, ct);
+        if (customer is null)
             throw new DomainValidationException($"Customer {r.CustomerId} does not exist.");
 
         // A single transaction covers stock decrement + invoice insert so a failure
         // leaves neither applied. Retry-on-failure is intentionally NOT enabled on the
         // DbContext; if it is turned on, wrap this block in an execution strategy.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Serialize invoice-code allocation across stations. The lock is automatically
+        // released at commit/rollback and does not require a schema-side sequence.
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(hashtext('warehouse.invoices.create'))", ct);
 
         var ids = r.Lines.Select(l => l.ProductId).Distinct().ToList();
         var products = await db.Products.Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
@@ -53,11 +59,17 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         };
 
         decimal total = 0m;
-        // Consolidate duplicate product lines: the invoice_detail PK is (invoice_id, product_id).
+        // invoice_detail has (invoice_id, product_id) as its primary key, so one product
+        // may appear only once per invoice.
         foreach (var group in r.Lines.GroupBy(l => l.ProductId))
         {
             var productId = group.Key;
             var quantity = group.Sum(l => l.Quantity);
+
+            if (group.Count() != 1)
+                throw new DomainValidationException("A product may appear only once on an invoice.");
+
+            var line = group.Single();
 
             if (!products.TryGetValue(productId, out var p))
                 throw new DomainValidationException($"Product {productId} does not exist.");
@@ -69,8 +81,11 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
             p.InStock -= quantity;
             p.UpdatedAt = DateTimeOffset.UtcNow;
 
-            // Snapshot the customer-facing price (retail, falling back to base cost).
-            var unitPrice = p.PriceRetail ?? p.BasePrice;
+            var unitPrice = line.UnitPrice ?? DefaultUnitPrice(customer, p);
+            if (unitPrice < 0)
+                throw new DomainValidationException($"Unit price for '{p.Sku}' cannot be negative.");
+
+            var description = NormalizeLineDescription(line.Description);
             var subtotal = unitPrice * quantity;
             total += subtotal;
 
@@ -80,7 +95,8 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
                 ProductName = p.Name,
                 UnitPrice = unitPrice,
                 Quantity = quantity,
-                Subtotal = subtotal
+                Subtotal = subtotal,
+                Description = description
             });
         }
 
@@ -107,6 +123,20 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         var prefix = $"INV-{VietnamBusinessTime.Today:yyyyMMdd}-";
         var todayCount = await db.Invoices.CountAsync(i => i.Id.StartsWith(prefix), ct);
         return $"{prefix}{todayCount + 1:D4}";
+    }
+
+    private static decimal DefaultUnitPrice(Customer customer, Product product) =>
+        customer.GroupPrice == "S"
+            ? product.PriceWholesale ?? product.PriceRetail ?? product.BasePrice
+            : product.PriceRetail ?? product.BasePrice;
+
+    private static string? NormalizeLineDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description)) return null;
+        var normalized = description.Trim();
+        if (normalized.Length > 255)
+            throw new DomainValidationException("Invoice line note must be at most 255 characters.");
+        return normalized;
     }
 
     private static InvoiceDto ToDto(Invoice i) => new(
