@@ -273,11 +273,11 @@ export default function InventoryTransactionsPage() {
     }
     if (line.backboardId) {
       const b = backboards.find((x) => x.id === line.backboardId)
-      return b ? `[Tấm lưng] Loại ${b.type}${b.description ? ' - ' + b.description : ''}` : `Tấm lưng #${line.backboardId}`
+      return b ? `[Ván ép] Loại ${b.type}${b.description ? ' - ' + b.description : ''}` : `Ván ép #${line.backboardId}`
     }
     if (line.subBackboardId) {
       const sb = subBackboards.find((x) => x.id === line.subBackboardId)
-      return sb ? `[Tấm lưng phụ] Cỡ ${sb.size}` : `Tấm lưng phụ #${line.subBackboardId}`
+      return sb ? `[Ván hậu] Cỡ ${sb.size}` : `Ván hậu #${line.subBackboardId}`
     }
     if (line.frameId) {
       return `[Rập] #${line.frameId}`
@@ -564,8 +564,8 @@ export default function InventoryTransactionsPage() {
                             >
                               <MenuItem value="product">Sản phẩm</MenuItem>
                               <MenuItem value="material">Vật liệu</MenuItem>
-                              <MenuItem value="backboard">Tấm lưng</MenuItem>
-                              <MenuItem value="subBackboard">Tấm lưng phụ</MenuItem>
+                              <MenuItem value="backboard">Ván ép</MenuItem>
+                              <MenuItem value="subBackboard">Ván hậu</MenuItem>
                             </TextField>
                           </Grid>
 
@@ -604,12 +604,12 @@ export default function InventoryTransactionsPage() {
                                 size="small"
                                 options={backboards}
                                 getOptionLabel={(b) =>
-                                  `Tấm lưng (Loại ${b.type})${b.description ? ' - ' + b.description : ''}`
+                                  `Ván ép (Loại ${b.type})${b.description ? ' - ' + b.description : ''}`
                                 }
                                 value={(line.selectedItem as BackboardDto) || null}
                                 onChange={(_, val) => handleItemSelect(line.id, val)}
                                 renderInput={(params) => (
-                                  <TextField {...params} placeholder="Tìm tấm lưng..." />
+                                  <TextField {...params} placeholder="Tìm ván ép..." />
                                 )}
                               />
                             )}
@@ -619,12 +619,12 @@ export default function InventoryTransactionsPage() {
                                 size="small"
                                 options={subBackboards}
                                 getOptionLabel={(sb) =>
-                                  `Tấm lưng phụ ${sb.size}${sb.description ? ' - ' + sb.description : ''}`
+                                  `Ván hậu ${sb.size}${sb.description ? ' - ' + sb.description : ''}`
                                 }
                                 value={(line.selectedItem as SubBackboardDto) || null}
                                 onChange={(_, val) => handleItemSelect(line.id, val)}
                                 renderInput={(params) => (
-                                  <TextField {...params} placeholder="Tìm tấm lưng phụ..." />
+                                  <TextField {...params} placeholder="Tìm ván hậu..." />
                                 )}
                               />
                             )}
