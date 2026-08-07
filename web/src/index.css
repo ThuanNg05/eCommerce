@@ -66,3 +66,94 @@ body {
   --ag-font-family: Inter, system-ui, sans-serif;
   --ag-row-height: 44px;
 }
+
+/* Professional Print Stylesheet for Invoices */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .MuiBackdrop-root,
+  .MuiDialogActions-root,
+  .MuiDialogTitle-root,
+  .MuiDivider-root,
+  aside,
+  header,
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  #printable-invoice-content,
+  #printable-invoice-content * {
+    visibility: visible !important;
+  }
+
+  #printable-invoice-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: #000000 !important;
+    font-size: 13px !important;
+  }
+
+  .MuiDialog-paper {
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  .MuiDialogContent-root {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  #printable-invoice-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 20px !important;
+  }
+
+  #printable-invoice-content th,
+  #printable-invoice-content td {
+    border: 1px solid #d1d5db !important;
+    padding: 8px 12px !important;
+    color: #000000 !important;
+  }
+
+  #printable-invoice-content thead {
+    display: table-header-group !important;
+    background-color: #f3f4f6 !important;
+  }
+
+  #printable-invoice-content tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}

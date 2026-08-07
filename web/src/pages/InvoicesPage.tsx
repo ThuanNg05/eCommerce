@@ -37,6 +37,7 @@ import {
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { STORE_INFO } from '../constants/storeInfo'
 
 interface CreateInvoiceLineState {
   id: string
@@ -892,13 +893,13 @@ export default function InvoicesPage() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700, color: '#171717' }}>
-                    XƯỞNG KHUNG TRANH E-COMMERCE
+                    {STORE_INFO.name}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#737373' }}>
-                    Địa chỉ: Số 100 Nguyễn Trãi, Q.1, TP. Hồ Chí Minh
+                  <Typography variant="body2" sx={{ color: '#404040' }}>
+                    Địa chỉ: {STORE_INFO.address}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#737373' }}>
-                    Điện thoại: (028) 3822 9999
+                  <Typography variant="body2" sx={{ color: '#404040' }}>
+                    Điện thoại: {STORE_INFO.phoneDisplay}
                   </Typography>
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
@@ -983,8 +984,8 @@ export default function InvoicesPage() {
                 </Box>
               </Box>
 
-              <Typography variant="caption" sx={{ color: '#a3a3a3', fontStyle: 'italic', display: 'block', textAlign: 'center' }}>
-                Cảm ơn quý khách đã tin tưởng xưởng khung tranh của chúng tôi!
+              <Typography variant="caption" sx={{ color: '#737373', fontStyle: 'italic', display: 'block', textAlign: 'center' }}>
+                Cảm ơn quý khách đã tin tưởng {STORE_INFO.name}!
               </Typography>
             </Box>
           ) : (
