@@ -3,6 +3,7 @@ namespace WarehouseApp.Core.Dtos;
 public record MaterialDto(
     long Id,
     string Name,
+    string? Unit,
     decimal ImportPrice,
     decimal SalePrice,
     int InStock,
@@ -13,6 +14,7 @@ public record MaterialDto(
 
 public record CreateMaterialRequest(
     string Name,
+    string? Unit,
     decimal ImportPrice,
     decimal SalePrice,
     int InStock,
@@ -22,6 +24,7 @@ public record CreateMaterialRequest(
 // Stock is managed via inventory transactions, so it is not editable here.
 public record UpdateMaterialRequest(
     string Name,
+    string? Unit,
     decimal ImportPrice,
     decimal SalePrice,
     int WarningStock,

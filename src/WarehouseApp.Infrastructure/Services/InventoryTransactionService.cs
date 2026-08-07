@@ -81,7 +81,7 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
         {
             TransactionCode = await NextCodeAsync(ct),
             Type = r.Type,
-            TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            TransactionDate = VietnamBusinessTime.Today,
             Note = r.Note,
         };
         foreach (var l in lines)

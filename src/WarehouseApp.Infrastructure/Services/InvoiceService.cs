@@ -104,7 +104,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
     /// <summary>Generates a business code like <c>INV-20260805-0001</c> (≤ 20 chars).</summary>
     private async Task<string> NextIdAsync(CancellationToken ct)
     {
-        var prefix = $"INV-{DateTime.UtcNow:yyyyMMdd}-";
+        var prefix = $"INV-{VietnamBusinessTime.Today:yyyyMMdd}-";
         var todayCount = await db.Invoices.CountAsync(i => i.Id.StartsWith(prefix), ct);
         return $"{prefix}{todayCount + 1:D4}";
     }

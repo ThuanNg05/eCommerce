@@ -4,6 +4,8 @@ public class Material
 {
     public long Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    /// <summary>Optional inventory unit, for example kg, m, sheet, or piece.</summary>
+    public string? Unit { get; set; }
     public decimal ImportPrice { get; set; }
     public decimal SalePrice { get; set; }
     public int InStock { get; set; }

@@ -1,3 +1,4 @@
+using WarehouseApp.Core;
 using WarehouseApp.Core.Abstractions;
 
 namespace WarehouseApp.Api.Endpoints;
@@ -13,8 +14,8 @@ public static class ReportEndpoints
 
         g.MapGet("/sales-summary", async (DateOnly? from, DateOnly? to, IReportQueries q, CancellationToken ct) =>
         {
-            var f = from ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
-            var t = to ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var t = to ?? VietnamBusinessTime.Today;
+            var f = from ?? t.AddDays(-30);
             return Results.Ok(await q.GetSalesSummaryAsync(f, t, ct));
         });
 
