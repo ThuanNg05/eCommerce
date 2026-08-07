@@ -33,11 +33,11 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
     public async Task<InvoiceDto> CreateAsync(CreateInvoiceRequest r, CancellationToken ct = default)
     {
         if (r.Lines is null || r.Lines.Count == 0)
-            throw new DomainValidationException("An invoice must contain at least one line.");
+            throw new DomainValidationException("Hóa đơn phải có ít nhất một dòng sản phẩm.");
 
         var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == r.CustomerId, ct);
         if (customer is null)
-            throw new DomainValidationException($"Customer {r.CustomerId} does not exist.");
+            throw new DomainValidationException("Khách hàng không tồn tại.");
 
         // A single transaction covers stock decrement + invoice insert so a failure
         // leaves neither applied. Retry-on-failure is intentionally NOT enabled on the
@@ -67,23 +67,23 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
             var quantity = group.Sum(l => l.Quantity);
 
             if (group.Count() != 1)
-                throw new DomainValidationException("A product may appear only once on an invoice.");
+                throw new DomainValidationException("Một sản phẩm chỉ được xuất hiện một lần trong hóa đơn.");
 
             var line = group.Single();
 
             if (!products.TryGetValue(productId, out var p))
-                throw new DomainValidationException($"Product {productId} does not exist.");
+                throw new DomainValidationException("Sản phẩm không tồn tại.");
             if (quantity <= 0)
-                throw new DomainValidationException($"Quantity for '{p.Sku}' must be positive.");
+                throw new DomainValidationException($"Số lượng của sản phẩm '{p.Sku}' phải lớn hơn 0.");
             if (p.InStock < quantity)
-                throw new DomainValidationException($"Insufficient stock for '{p.Sku}': in stock {p.InStock}, requested {quantity}.");
+                throw new DomainValidationException($"Sản phẩm '{p.Sku}' không đủ tồn kho (còn {p.InStock}, yêu cầu {quantity}).");
 
             p.InStock -= quantity;
             p.UpdatedAt = DateTimeOffset.UtcNow;
 
             var unitPrice = line.UnitPrice ?? DefaultUnitPrice(customer, p);
             if (unitPrice < 0)
-                throw new DomainValidationException($"Unit price for '{p.Sku}' cannot be negative.");
+                throw new DomainValidationException($"Đơn giá của sản phẩm '{p.Sku}' không được âm.");
 
             var description = NormalizeLineDescription(line.Description);
             var subtotal = unitPrice * quantity;
@@ -111,7 +111,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         catch (DbUpdateConcurrencyException)
         {
             await tx.RollbackAsync(ct);
-            throw new ConcurrencyConflictException("Stock changed while creating the invoice. Please retry.");
+            throw new ConcurrencyConflictException("Tồn kho đã thay đổi trong lúc tạo hóa đơn. Vui lòng thử lại.");
         }
 
         return ToDto(invoice);
@@ -135,7 +135,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         if (string.IsNullOrWhiteSpace(description)) return null;
         var normalized = description.Trim();
         if (normalized.Length > 255)
-            throw new DomainValidationException("Invoice line note must be at most 255 characters.");
+            throw new DomainValidationException("Ghi chú của dòng hóa đơn không được quá 255 ký tự.");
         return normalized;
     }
 

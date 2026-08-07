@@ -57,9 +57,9 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
     public async Task<InventoryTransactionDto> CreateAsync(CreateInventoryTransactionRequest r, CancellationToken ct = default)
     {
         if (r.Type != TypeReceipt && r.Type != TypeIssue)
-            throw new DomainValidationException("Transaction type must be 1 (Nhập/receipt) or 2 (Xuất/issue).");
+            throw new DomainValidationException("Loại phiếu phải là 1 (Nhập kho) hoặc 2 (Xuất kho).");
         if (r.Details is null || r.Details.Count == 0)
-            throw new DomainValidationException("A transaction must contain at least one line.");
+            throw new DomainValidationException("Phiếu kho phải có ít nhất một dòng hàng.");
 
         var lines = r.Details.Select(NormalizeLine).ToList();
 
@@ -108,7 +108,7 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
         catch (DbUpdateConcurrencyException)
         {
             await tx.RollbackAsync(ct);
-            throw new ConcurrencyConflictException("Stock changed on another station while saving this transaction. Please retry.");
+            throw new ConcurrencyConflictException("Tồn kho đã thay đổi ở máy khác trong lúc lưu phiếu. Vui lòng thử lại.");
         }
 
         return ToDto(entity);
@@ -173,7 +173,7 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
     {
         var next = current + delta;
         if (next < 0)
-            throw new DomainValidationException($"Transaction would drive {label} below zero (in stock {current}, net change {delta}).");
+            throw new DomainValidationException($"Giao dịch sẽ làm tồn kho {label} âm (hiện còn {current}, thay đổi {delta}).");
         return next;
     }
 
@@ -193,7 +193,7 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
     {
         var missing = requested.Except(found).ToList();
         if (missing.Count > 0)
-            throw new DomainValidationException($"{char.ToUpper(kind[0]) + kind[1..]}(s) not found: {string.Join(", ", missing)}.");
+            throw new DomainValidationException($"Không tìm thấy {kind} có mã: {string.Join(", ", missing)}.");
     }
 
     // ----- helpers -----
@@ -202,15 +202,15 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
     {
         var fks = new long?[] { d.ProductId, d.BackboardId, d.MaterialId, d.FrameId, d.SubBackboardId };
         if (fks.Count(x => x is > 0) != 1)
-            throw new DomainValidationException("Each line must reference exactly one item (product, backboard, material, frame, or sub-backboard).");
+            throw new DomainValidationException("Mỗi dòng chỉ được chọn đúng một loại hàng hóa.");
         if (d.FrameId is > 0)
-            throw new DomainValidationException("Frames are assembled to order and carry no stock; they cannot appear on an inventory transaction.");
+            throw new DomainValidationException("Rập được lắp theo đơn và không quản lý tồn kho, nên không thể xuất hiện trong phiếu kho.");
         if (d.Quantity <= 0)
-            throw new DomainValidationException("Line quantity must be positive.");
+            throw new DomainValidationException("Số lượng của dòng hàng phải lớn hơn 0.");
         if (d.Direction != DirectionIn && d.Direction != DirectionOut)
-            throw new DomainValidationException("Line direction must be 1 (In) or 2 (Out).");
+            throw new DomainValidationException("Hướng giao dịch của dòng hàng phải là 1 (Nhập) hoặc 2 (Xuất).");
         if (d.UnitPrice < 0)
-            throw new DomainValidationException("Line unit price cannot be negative.");
+            throw new DomainValidationException("Đơn giá của dòng hàng không được âm.");
 
         return new NormalizedLine(d.ProductId, d.BackboardId, d.MaterialId, d.SubBackboardId, d.Quantity, d.UnitPrice, d.Direction);
     }

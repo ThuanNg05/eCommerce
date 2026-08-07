@@ -45,7 +45,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
     public async Task<ProductDto> CreateAsync(CreateProductRequest r, CancellationToken ct = default)
     {
         if (await db.Products.AnyAsync(p => p.Sku == r.Sku, ct))
-            throw new DomainValidationException($"A product with SKU '{r.Sku}' already exists.");
+            throw new DomainValidationException($"Sản phẩm có SKU '{r.Sku}' đã tồn tại.");
 
         var categories = await ResolveCategoriesAsync(r.CategoryIds, ct);
 
@@ -110,7 +110,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
         catch (DbUpdateConcurrencyException)
         {
             await tx.RollbackAsync(ct);
-            throw new ConcurrencyConflictException("This product was modified on another station. Reload and try again.");
+            throw new ConcurrencyConflictException("Sản phẩm đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
         }
 
         return ToDto(p, categories ?? await CategoriesOfAsync(id, ct));
@@ -123,7 +123,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
         var newQty = p.InStock + r.Delta;
         if (newQty < 0)
-            throw new DomainValidationException($"Adjustment of {r.Delta} would drive '{p.Sku}' below zero (in stock {p.InStock}).");
+            throw new DomainValidationException($"Điều chỉnh {r.Delta} sẽ làm tồn kho của '{p.Sku}' âm (hiện còn {p.InStock}).");
 
         p.InStock = newQty;
         p.UpdatedAt = DateTimeOffset.UtcNow;
@@ -131,7 +131,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException)
         {
-            throw new ConcurrencyConflictException("Stock for this product changed on another station. Reload and try again.");
+            throw new ConcurrencyConflictException("Tồn kho sản phẩm đã thay đổi ở máy khác. Vui lòng tải lại và thử lại.");
         }
 
         return ToDto(p, await CategoriesOfAsync(id, ct));
@@ -153,7 +153,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
         var missing = ids.Except(found.Select(c => c.Id)).ToList();
         if (missing.Count > 0)
-            throw new DomainValidationException($"Category(ies) not found: {string.Join(", ", missing)}.");
+            throw new DomainValidationException($"Không tìm thấy danh mục có mã: {string.Join(", ", missing)}.");
 
         return found;
     }

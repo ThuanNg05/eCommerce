@@ -23,9 +23,9 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(cs))
         {
             throw new InvalidOperationException(
-                "Missing connection string 'ConnectionStrings:Default'. Set it via appsettings, " +
-                "user-secrets, or the environment variable ConnectionStrings__Default. " +
-                "For Supabase use the pooler host, e.g. " +
+                "Thiếu chuỗi kết nối 'ConnectionStrings:Default'. Hãy cấu hình trong appsettings, " +
+                "user-secrets hoặc biến môi trường ConnectionStrings__Default. " +
+                "Với Supabase, hãy dùng pooler host, ví dụ: " +
                 "Host=aws-0-<region>.pooler.supabase.com;Port=5432;Database=postgres;" +
                 "Username=postgres.<project-ref>;Password=<db-password>;SSL Mode=Require;Trust Server Certificate=true");
         }

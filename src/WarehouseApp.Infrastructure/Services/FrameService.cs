@@ -59,7 +59,7 @@ public class FrameService(AppDbContext db) : IFrameService
     public async Task<FrameDto> CreateAsync(CreateFrameRequest r, CancellationToken ct = default)
     {
         if (await db.Frames.AnyAsync(f => f.Code == r.Code, ct))
-            throw new DomainValidationException($"A frame with code '{r.Code}' already exists.");
+            throw new DomainValidationException($"Mẫu rập có mã '{r.Code}' đã tồn tại.");
 
         var lines = await NormalizeLinesAsync(r.Lines, ct);
 
@@ -82,7 +82,7 @@ public class FrameService(AppDbContext db) : IFrameService
         if (frame is null) return null;
 
         if (await db.Frames.AnyAsync(f => f.Id != id && f.Code == r.Code, ct))
-            throw new DomainValidationException($"A frame with code '{r.Code}' already exists.");
+            throw new DomainValidationException($"Mẫu rập có mã '{r.Code}' đã tồn tại.");
 
         var lines = await NormalizeLinesAsync(r.Lines, ct);
 
@@ -121,7 +121,7 @@ public class FrameService(AppDbContext db) : IFrameService
             var found = await db.SubBackboards.Where(s => refIds.Contains(s.Id)).Select(s => s.Id).ToListAsync(ct);
             var missing = refIds.Except(found).ToList();
             if (missing.Count > 0)
-                throw new DomainValidationException($"Sub-backboard(s) not found: {string.Join(", ", missing)}.");
+                throw new DomainValidationException($"Không tìm thấy tấm lót phụ có mã: {string.Join(", ", missing)}.");
         }
 
         return consolidated;

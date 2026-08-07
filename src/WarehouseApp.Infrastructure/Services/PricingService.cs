@@ -54,7 +54,7 @@ public class PricingService(AppDbContext db) : IPricingService
         catch (DbUpdateConcurrencyException)
         {
             await tx.RollbackAsync(ct);
-            throw new ConcurrencyConflictException("A product price changed on another station during repricing. Please retry.");
+            throw new ConcurrencyConflictException("Giá sản phẩm đã được thay đổi ở máy khác trong lúc cập nhật. Vui lòng thử lại.");
         }
 
         return ToRateCardDto(card);
@@ -93,7 +93,7 @@ public class PricingService(AppDbContext db) : IPricingService
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new ConcurrencyConflictException("This product was modified on another station. Reload and try again.");
+            throw new ConcurrencyConflictException("Sản phẩm đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
         }
 
         return ToComponentDto(comp, product.BasePrice);

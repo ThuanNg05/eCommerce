@@ -17,7 +17,7 @@ public sealed class DomainExceptionHandler : IExceptionHandler
             NotFoundException => (StatusCodes.Status404NotFound, ex.Message),
             DomainValidationException => (StatusCodes.Status400BadRequest, ex.Message),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, ex.Message),
-            _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.")
+            _ => (StatusCodes.Status500InternalServerError, "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau.")
         };
 
         ctx.Response.StatusCode = status;

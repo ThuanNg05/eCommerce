@@ -48,13 +48,13 @@ public class AccountService(AppDbContext db) : IAccountService
     {
         var username = r.Username?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(username))
-            throw new DomainValidationException("Username is required.");
+            throw new DomainValidationException("Tên đăng nhập là bắt buộc.");
         if (string.IsNullOrEmpty(r.Password) || r.Password.Length < MinPasswordLength)
-            throw new DomainValidationException($"Password must be at least {MinPasswordLength} characters.");
+            throw new DomainValidationException($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
         if (!Roles.IsValid(r.RoleId))
-            throw new DomainValidationException("Role must be 1 (Admin) or 2 (Staff).");
+            throw new DomainValidationException("Vai trò phải là 1 (Quản trị viên) hoặc 2 (Nhân viên).");
         if (await db.Accounts.AnyAsync(a => a.Username == username, ct))
-            throw new DomainValidationException($"Username '{username}' is already taken.");
+            throw new DomainValidationException($"Tên đăng nhập '{username}' đã được sử dụng.");
 
         var account = new Account
         {
@@ -74,14 +74,14 @@ public class AccountService(AppDbContext db) : IAccountService
         if (account is null) return null;
 
         if (!Roles.IsValid(r.RoleId))
-            throw new DomainValidationException("Role must be 1 (Admin) or 2 (Staff).");
+            throw new DomainValidationException("Vai trò phải là 1 (Quản trị viên) hoặc 2 (Nhân viên).");
 
         account.RoleId = r.RoleId;
         account.Status = r.Status;
         if (!string.IsNullOrWhiteSpace(r.Password))
         {
             if (r.Password.Length < MinPasswordLength)
-                throw new DomainValidationException($"Password must be at least {MinPasswordLength} characters.");
+                throw new DomainValidationException($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
             account.Password = BCrypt.Net.BCrypt.HashPassword(r.Password);
         }
         account.UpdatedAt = DateTimeOffset.UtcNow;

@@ -44,7 +44,7 @@ public class MaterialService(AppDbContext db) : IMaterialService
         var name = r.Name.Trim();
         var unit = NormalizeUnit(r.Unit);
         if (await db.Materials.AnyAsync(m => m.Name == name, ct))
-            throw new DomainValidationException($"A material named '{name}' already exists.");
+            throw new DomainValidationException($"Vật liệu '{name}' đã tồn tại.");
 
         var m = new Material
         {
@@ -70,7 +70,7 @@ public class MaterialService(AppDbContext db) : IMaterialService
         var name = r.Name.Trim();
         var unit = NormalizeUnit(r.Unit);
         if (await db.Materials.AnyAsync(x => x.Id != id && x.Name == name, ct))
-            throw new DomainValidationException($"A material named '{name}' already exists.");
+            throw new DomainValidationException($"Vật liệu '{name}' đã tồn tại.");
 
         m.Name = name;
         m.Unit = unit;
@@ -93,7 +93,7 @@ public class MaterialService(AppDbContext db) : IMaterialService
         if (string.IsNullOrWhiteSpace(unit)) return null;
         var normalized = unit.Trim();
         if (normalized.Length > 50)
-            throw new DomainValidationException("Material unit must be at most 50 characters.");
+            throw new DomainValidationException("Đơn vị tính của vật liệu không được quá 50 ký tự.");
         return normalized;
     }
 }

@@ -42,7 +42,7 @@ public class CategoryService(AppDbContext db) : ICategoryService
     {
         var name = r.Name.Trim();
         if (await db.Categories.AnyAsync(c => c.Name == name, ct))
-            throw new DomainValidationException($"A category named '{name}' already exists.");
+            throw new DomainValidationException($"Danh mục '{name}' đã tồn tại.");
 
         var c = new Category { Name = name };
         db.Categories.Add(c);
@@ -57,7 +57,7 @@ public class CategoryService(AppDbContext db) : ICategoryService
 
         var name = r.Name.Trim();
         if (await db.Categories.AnyAsync(x => x.Id != id && x.Name == name, ct))
-            throw new DomainValidationException($"A category named '{name}' already exists.");
+            throw new DomainValidationException($"Danh mục '{name}' đã tồn tại.");
 
         c.Name = name;
         await db.SaveChangesAsync(ct);

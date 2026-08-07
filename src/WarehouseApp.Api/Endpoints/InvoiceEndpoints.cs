@@ -13,7 +13,7 @@ public static class InvoiceEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, ct)));
 
         g.MapGet("/{id}", async (string id, IInvoiceService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy hóa đơn.", statusCode: 404));
 
         g.MapPost("/", async (CreateInvoiceRequest req, IInvoiceService svc, CancellationToken ct) =>
         {

@@ -37,10 +37,10 @@ public partial class MainWindow : Window
         {
             core.NavigateToString(
                 "<html><body style='font-family:sans-serif;padding:2rem'>" +
-                "<h2>React bundle not found</h2>" +
-                "<p>Build the front-end and rebuild the desktop app:</p>" +
+                "<h2>Không tìm thấy React bundle</h2>" +
+                "<p>Hãy build frontend rồi build lại ứng dụng desktop:</p>" +
                 "<pre>cd web &amp;&amp; npm install &amp;&amp; npm run build</pre>" +
-                "<p>The bundle is copied into <code>wwwroot</code> on the next build.</p>" +
+                "<p>Bundle sẽ được sao chép vào <code>wwwroot</code> ở lần build kế tiếp.</p>" +
                 "</body></html>");
         }
     }

@@ -16,10 +16,10 @@ public static class PricingEndpoints
             Results.Ok(await svc.UpdateRateCardAsync(req, ct)));
 
         g.MapGet("/components/{productId:long}", async (long productId, IPricingService svc, CancellationToken ct) =>
-            await svc.GetComponentsAsync(productId, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetComponentsAsync(productId, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
 
         g.MapPut("/components/{productId:long}", async (long productId, UpsertProductComponentRequest req, IPricingService svc, CancellationToken ct) =>
-            await svc.UpsertComponentsAsync(productId, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.UpsertComponentsAsync(productId, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
 
         return api;
     }
