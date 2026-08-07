@@ -638,7 +638,7 @@ export default function InvoicesPage() {
                 sx={{ color: '#171717', borderColor: '#e0e0e0' }}
                 variant="outlined"
               >
-                Thêm dòng sản phẩm
+                Thêm sản phẩm
               </Button>
             </Box>
 
