@@ -36,13 +36,14 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
     public async Task<IReadOnlyList<SalesSummaryRowDto>> GetSalesSummaryAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         const string sql = """
-            select (created_at at time zone 'UTC')::date as date,
+            select (created_at at time zone 'Asia/Ho_Chi_Minh')::date as date,
                    count(*)                              as invoice_count,
                    coalesce(sum(total), 0)               as total
             from invoice
-            where (created_at at time zone 'UTC')::date between @from and @to
-            group by (created_at at time zone 'UTC')::date
-            order by (created_at at time zone 'UTC')::date;
+            where created_at >= (cast(@from as timestamp) at time zone 'Asia/Ho_Chi_Minh')
+              and created_at < ((cast(@to as timestamp) + interval '1 day') at time zone 'Asia/Ho_Chi_Minh')
+            group by (created_at at time zone 'Asia/Ho_Chi_Minh')::date
+            order by (created_at at time zone 'Asia/Ho_Chi_Minh')::date;
             """;
 
         using var conn = factory.Create();
