@@ -117,6 +117,105 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         return ToDto(invoice);
     }
 
+    public async Task<InvoiceDto?> UpdateLinesAsync(string id, UpdateInvoiceLinesRequest r, CancellationToken ct = default)
+    {
+        if (r.Lines is null || r.Lines.Count == 0)
+            throw new DomainValidationException("Hóa đơn phải có ít nhất một dòng sản phẩm.");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({"warehouse.invoices.update:" + id}))", ct);
+
+        var invoice = await db.Invoices
+            .Include(i => i.Customer)
+            .Include(i => i.Details)
+            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (invoice is null) return null;
+
+        var lastEditableDate = VietnamBusinessTime.DateOf(invoice.CreatedAt).AddDays(2);
+        if (VietnamBusinessTime.Today > lastEditableDate)
+            throw new DomainValidationException(
+                $"Hóa đơn chỉ được chỉnh sửa hàng hóa đến hết ngày {lastEditableDate:dd/MM/yyyy}.");
+
+        // Return the old quantities before applying the replacement lines. The entire
+        // operation remains atomic, so any later validation failure rolls this back.
+        var oldDetails = invoice.Details.ToList();
+        var requestedProductIds = r.Lines.Select(l => l.ProductId).Distinct().ToList();
+        var allProductIds = oldDetails.Select(d => d.ProductId).Concat(requestedProductIds).Distinct().ToList();
+        var products = await db.Products.Where(p => allProductIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
+
+        foreach (var oldLine in oldDetails)
+        {
+            if (!products.TryGetValue(oldLine.ProductId, out var product))
+                throw new DomainValidationException("Không tìm thấy sản phẩm của hóa đơn hiện tại.");
+
+            product.InStock += oldLine.Quantity;
+            product.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        db.InvoiceDetails.RemoveRange(oldDetails);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await tx.RollbackAsync(ct);
+            throw new ConcurrencyConflictException("Hóa đơn hoặc tồn kho đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
+        }
+
+        invoice.Details.Clear();
+        decimal total = 0m;
+        foreach (var group in r.Lines.GroupBy(l => l.ProductId))
+        {
+            if (group.Count() != 1)
+                throw new DomainValidationException("Một sản phẩm chỉ được xuất hiện một lần trong hóa đơn.");
+
+            var line = group.Single();
+            if (!products.TryGetValue(line.ProductId, out var product))
+                throw new DomainValidationException("Sản phẩm không tồn tại.");
+            if (line.Quantity <= 0)
+                throw new DomainValidationException($"Số lượng của sản phẩm '{product.Sku}' phải lớn hơn 0.");
+            if (product.InStock < line.Quantity)
+                throw new DomainValidationException($"Sản phẩm '{product.Sku}' không đủ tồn kho (còn {product.InStock}, yêu cầu {line.Quantity}).");
+
+            var unitPrice = line.UnitPrice ?? DefaultUnitPrice(invoice.Customer!, product);
+            if (unitPrice < 0)
+                throw new DomainValidationException($"Đơn giá của sản phẩm '{product.Sku}' không được âm.");
+
+            product.InStock -= line.Quantity;
+            product.UpdatedAt = DateTimeOffset.UtcNow;
+
+            var subtotal = unitPrice * line.Quantity;
+            total += subtotal;
+            invoice.Details.Add(new InvoiceDetail
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                UnitPrice = unitPrice,
+                Quantity = line.Quantity,
+                Subtotal = subtotal,
+                Description = NormalizeLineDescription(line.Description)
+            });
+        }
+
+        invoice.Total = total;
+        invoice.UpdatedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await tx.RollbackAsync(ct);
+            throw new ConcurrencyConflictException("Hóa đơn hoặc tồn kho đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
+        }
+
+        return ToDto(invoice);
+    }
+
     /// <summary>Generates a business code like <c>INV-20260805-0001</c> (≤ 20 chars).</summary>
     private async Task<string> NextIdAsync(CancellationToken ct)
     {
