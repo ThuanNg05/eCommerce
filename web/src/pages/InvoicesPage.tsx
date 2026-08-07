@@ -917,55 +917,127 @@ export default function InvoicesPage() {
               Đang tải chi tiết hóa đơn...
             </Typography>
           ) : invoiceDetail ? (
-            <Box sx={{ p: 2 }}>
-              {/* Header Invoice Print Header */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ p: 1 }}>
+              {/* 3-Column Header: Store Info (Left) | Title & Code (Center) | QR Code (Right) */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto auto',
+                  alignItems: 'start',
+                  gap: 3,
+                  mb: 2.5,
+                }}
+              >
+                {/* Column 1: Logo & Store Information */}
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                   <Box
                     component="img"
                     src="/assets/logo.jpg"
                     alt="Logo Hòa Thuận"
                     sx={{
-                      width: 60,
-                      height: 60,
+                      width: 56,
+                      height: 56,
                       objectFit: 'cover',
                       borderRadius: '6px',
                       border: '1px solid #e2e8f0',
+                      flexShrink: 0,
                     }}
                   />
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 17, lineHeight: 1.2 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: '#171717',
+                        fontSize: 16,
+                        lineHeight: 1.25,
+                        whiteSpace: 'nowrap',
+                        wordBreak: 'keep-all',
+                      }}
+                    >
                       {STORE_INFO.name}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 13, mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 12.5, mt: 0.25 }}>
                       Địa chỉ: {STORE_INFO.address}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 13 }}>
-                      Điện thoại: {STORE_INFO.phoneDisplay}
+                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 12.5, mt: 0.25 }}>
+                      Điện thoại:{' '}
+                      <Box component="span" sx={{ whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        {STORE_INFO.phoneLine1}
+                      </Box>
+                      {' • '}
+                      <Box component="span" sx={{ whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        {STORE_INFO.phoneLine2}
+                      </Box>
                     </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 18 }}>
-                      HÓA ĐƠN BÁN HÀNG
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.5 }}>
-                      Mã số: {invoiceDetail.id}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#525252', fontSize: 13 }}>
-                      Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
+
+                {/* Column 2: Invoice Title, Code & Date */}
+                <Box sx={{ textAlign: 'center', px: 1 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: '#171717',
+                      fontSize: 17,
+                      whiteSpace: 'nowrap',
+                      wordBreak: 'keep-all',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    HÓA ĐƠN BÁN HÀNG
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#171717',
+                      fontSize: 13,
+                      mt: 0.5,
+                      whiteSpace: 'nowrap',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    Mã số: {invoiceDetail.id}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: '#525252',
+                      fontSize: 12.5,
+                      mt: 0.25,
+                      whiteSpace: 'nowrap',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
+                  </Typography>
+                </Box>
+
+                {/* Column 3: QR Code & 2-Line Semantic Caption */}
+                {invoiceDetail.id && (
+                  <Box sx={{ textAlign: 'center', flexShrink: 0 }}>
+                    <QRCodeSVG value={invoiceDetail.id} size={72} level="M" />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: '#737373',
+                        fontSize: 10,
+                        display: 'block',
+                        mt: 0.25,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                        Quét để tra cứu
+                      </Box>
+                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                        mã hóa đơn
+                      </Box>
                     </Typography>
                   </Box>
-                  {invoiceDetail.id && (
-                    <Box sx={{ textAlign: 'center' }}>
-                      <QRCodeSVG value={invoiceDetail.id} size={84} level="M" />
-                      <Typography variant="caption" sx={{ color: '#737373', fontSize: 10, display: 'block', mt: 0.5 }}>
-                        Quét để tra cứu mã hóa đơn
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
+                )}
               </Box>
 
               <Divider sx={{ mb: 2.5 }} />
