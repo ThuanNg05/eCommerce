@@ -27,7 +27,7 @@ public class MaterialService(AppDbContext db) : IMaterialService
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(m => new MaterialDto(
-                m.Id, m.Name, m.ImportPrice, m.SalePrice, m.InStock, m.WarningStock, m.Status, m.Description, m.UpdatedAt))
+                m.Id, m.Name, m.Unit, m.ImportPrice, m.SalePrice, m.InStock, m.WarningStock, m.Status, m.Description, m.UpdatedAt))
             .ToListAsync(ct);
 
         return new PagedResult<MaterialDto>(items, page, pageSize, total);
@@ -42,12 +42,14 @@ public class MaterialService(AppDbContext db) : IMaterialService
     public async Task<MaterialDto> CreateAsync(CreateMaterialRequest r, CancellationToken ct = default)
     {
         var name = r.Name.Trim();
+        var unit = NormalizeUnit(r.Unit);
         if (await db.Materials.AnyAsync(m => m.Name == name, ct))
             throw new DomainValidationException($"A material named '{name}' already exists.");
 
         var m = new Material
         {
             Name = name,
+            Unit = unit,
             ImportPrice = r.ImportPrice,
             SalePrice = r.SalePrice,
             InStock = r.InStock,
@@ -66,10 +68,12 @@ public class MaterialService(AppDbContext db) : IMaterialService
         if (m is null) return null;
 
         var name = r.Name.Trim();
+        var unit = NormalizeUnit(r.Unit);
         if (await db.Materials.AnyAsync(x => x.Id != id && x.Name == name, ct))
             throw new DomainValidationException($"A material named '{name}' already exists.");
 
         m.Name = name;
+        m.Unit = unit;
         m.ImportPrice = r.ImportPrice;
         m.SalePrice = r.SalePrice;
         m.WarningStock = r.WarningStock;
@@ -82,5 +86,14 @@ public class MaterialService(AppDbContext db) : IMaterialService
     }
 
     private static MaterialDto ToDto(Material m) =>
-        new(m.Id, m.Name, m.ImportPrice, m.SalePrice, m.InStock, m.WarningStock, m.Status, m.Description, m.UpdatedAt);
+        new(m.Id, m.Name, m.Unit, m.ImportPrice, m.SalePrice, m.InStock, m.WarningStock, m.Status, m.Description, m.UpdatedAt);
+
+    private static string? NormalizeUnit(string? unit)
+    {
+        if (string.IsNullOrWhiteSpace(unit)) return null;
+        var normalized = unit.Trim();
+        if (normalized.Length > 50)
+            throw new DomainValidationException("Material unit must be at most 50 characters.");
+        return normalized;
+    }
 }
