@@ -47,6 +47,7 @@ export default function MaterialsPage() {
   // Form States
   const [createForm, setCreateForm] = useState<CreateMaterialRequest>({
     name: '',
+    unit: '',
     importPrice: 0,
     salePrice: 0,
     inStock: 0,
@@ -56,6 +57,7 @@ export default function MaterialsPage() {
 
   const [editForm, setEditForm] = useState<UpdateMaterialRequest>({
     name: '',
+    unit: '',
     importPrice: 0,
     salePrice: 0,
     warningStock: 0,
@@ -71,7 +73,11 @@ export default function MaterialsPage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: createMaterial,
+    mutationFn: (req: CreateMaterialRequest) =>
+      createMaterial({
+        ...req,
+        unit: req.unit?.trim() || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] })
       setIsCreateOpen(false)
@@ -81,7 +87,11 @@ export default function MaterialsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, req }: { id: number; req: UpdateMaterialRequest }) => updateMaterial(id, req),
+    mutationFn: ({ id, req }: { id: number; req: UpdateMaterialRequest }) =>
+      updateMaterial(id, {
+        ...req,
+        unit: req.unit?.trim() || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] })
       setEditMaterial(null)
@@ -92,6 +102,7 @@ export default function MaterialsPage() {
   const resetCreateForm = () => {
     setCreateForm({
       name: '',
+      unit: '',
       importPrice: 0,
       salePrice: 0,
       inStock: 0,
@@ -105,6 +116,7 @@ export default function MaterialsPage() {
     setEditMaterial(m)
     setEditForm({
       name: m.name,
+      unit: m.unit || '',
       importPrice: m.importPrice,
       salePrice: m.salePrice,
       warningStock: m.warningStock || 0,
@@ -124,6 +136,14 @@ export default function MaterialsPage() {
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
       { field: 'name', headerName: 'TÊN VẬT LIỆU', flex: 1, minWidth: 180, filter: true, sortable: true },
+      {
+        field: 'unit',
+        headerName: 'ĐƠN VỊ',
+        width: 100,
+        filter: true,
+        sortable: true,
+        valueFormatter: (p: ValueFormatterParams<MaterialDto, string>) => p.value || '—',
+      },
       {
         field: 'importPrice',
         headerName: 'GIÁ NHẬP',
@@ -317,7 +337,7 @@ export default function MaterialsPage() {
           )}
 
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12}>
+            <Grid item xs={8}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 TÊN VẬT LIỆU *
               </Typography>
@@ -326,6 +346,19 @@ export default function MaterialsPage() {
                 value={createForm.name}
                 onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                 placeholder="vd: Kính Trắng 3mm"
+              />
+            </Grid>
+
+            <Grid item xs={4}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                ĐƠN VỊ TÍNH
+              </Typography>
+              <TextField
+                fullWidth
+                inputProps={{ maxLength: 50 }}
+                value={createForm.unit || ''}
+                onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })}
+                placeholder="kg, m, tấm..."
               />
             </Grid>
 
@@ -427,7 +460,7 @@ export default function MaterialsPage() {
           )}
 
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12}>
+            <Grid item xs={8}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 TÊN VẬT LIỆU *
               </Typography>
@@ -435,6 +468,19 @@ export default function MaterialsPage() {
                 fullWidth
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </Grid>
+
+            <Grid item xs={4}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                ĐƠN VỊ TÍNH
+              </Typography>
+              <TextField
+                fullWidth
+                inputProps={{ maxLength: 50 }}
+                value={editForm.unit || ''}
+                onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                placeholder="kg, m, tấm..."
               />
             </Grid>
 

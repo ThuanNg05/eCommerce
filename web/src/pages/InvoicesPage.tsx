@@ -135,7 +135,13 @@ export default function InvoicesPage() {
         minWidth: 160,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<InvoiceSummaryDto, string>) =>
-          p.value ? new Date(p.value).toLocaleString('vi-VN') : '—',
+          p.value
+            ? new Intl.DateTimeFormat('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                dateStyle: 'short',
+                timeStyle: 'short',
+              }).format(new Date(p.value))
+            : '—',
       },
       {
         field: 'total',
@@ -424,7 +430,7 @@ export default function InvoicesPage() {
                     Mã số: {invoiceDetail.id}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                    Ngày lập: {new Date(invoiceDetail.createdAt).toLocaleString('vi-VN')}
+                    Ngày lập: {new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(invoiceDetail.createdAt))}
                   </Typography>
                 </Box>
               </Box>

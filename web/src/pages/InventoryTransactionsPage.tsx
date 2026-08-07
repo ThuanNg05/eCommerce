@@ -62,11 +62,15 @@ const createEmptyLine = (): CreateLineState => ({
 const formatVND = (v: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v)
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr?: string | null) => {
   if (!dateStr) return ''
   try {
     const d = new Date(dateStr)
-    return d.toLocaleString('vi-VN')
+    return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(d)
   } catch {
     return dateStr
   }
@@ -210,7 +214,7 @@ export default function InventoryTransactionsPage() {
 
   const handleLineValueChange = (
     id: string,
-    field: 'quantity' | 'unitPrice',
+    field: 'quantity',
     val: number | '',
   ) => {
     setCreateLines((prev) =>
@@ -238,7 +242,7 @@ export default function InventoryTransactionsPage() {
         return
       }
       if (typeof line.unitPrice !== 'number' || line.unitPrice < 0) {
-        setActionError(`Dòng thứ ${i + 1}: Đơn giá không được âm.`)
+        setActionError(`Dòng thứ ${i + 1}: Đơn giá không hợp lệ.`)
         return
       }
     }
@@ -498,7 +502,7 @@ export default function InventoryTransactionsPage() {
                     borderBottom: '1px solid #ededed',
                     mb: 1.5,
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justify: 'space-between',
                     alignItems: 'center',
                   }}
                 >
@@ -548,7 +552,7 @@ export default function InventoryTransactionsPage() {
                           borderRadius: '6px',
                         }}
                       >
-                        <Grid container spacing={1.5} alignItems="center">
+                        <Grid container spacing={1.5} alignItems="flex-start">
                           <Grid item xs={3}>
                             <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                               LOẠI HÀNG *
@@ -590,7 +594,7 @@ export default function InventoryTransactionsPage() {
                               <Autocomplete
                                 size="small"
                                 options={materials}
-                                getOptionLabel={(m) => m.name}
+                                getOptionLabel={(m) => `${m.name}${m.unit ? ` (${m.unit})` : ''}`}
                                 value={(line.selectedItem as MaterialDto) || null}
                                 onChange={(_, val) => handleItemSelect(line.id, val)}
                                 renderInput={(params) => (
@@ -652,21 +656,17 @@ export default function InventoryTransactionsPage() {
 
                           <Grid item xs={4}>
                             <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                              ĐƠN GIÁ (VND) *
+                              ĐƠN GIÁ (VND)
                             </Typography>
                             <TextField
                               fullWidth
                               size="small"
                               type="number"
-                              inputProps={{ min: 0 }}
                               value={line.unitPrice}
-                              onChange={(e) =>
-                                handleLineValueChange(
-                                  line.id,
-                                  'unitPrice',
-                                  e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
-                                )
-                              }
+                              InputProps={{ readOnly: true }}
+                              helperText="Đơn giá được lấy tự động từ hàng hóa đã chọn."
+                              FormHelperTextProps={{ sx: { fontSize: 11, color: '#737373', mx: 0, mt: 0.5 } }}
+                              sx={{ bgcolor: '#f5f5f5' }}
                             />
                           </Grid>
 
@@ -683,7 +683,7 @@ export default function InventoryTransactionsPage() {
                             />
                           </Grid>
 
-                          <Grid item xs={1} sx={{ textCenter: 'center', pt: 2.5 }}>
+                          <Grid item xs={1} sx={{ textAlign: 'center', pt: 2.5 }}>
                             <IconButton
                               size="small"
                               color="error"
