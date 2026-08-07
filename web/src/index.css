@@ -69,6 +69,11 @@ body {
 
 /* Professional Print Stylesheet for Invoices */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm; /* 1cm margin on all 4 edges */
+  }
+
   body * {
     visibility: hidden;
   }
@@ -79,6 +84,15 @@ body {
     padding: 0 !important;
     height: auto !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
   .MuiBackdrop-root,
@@ -132,13 +146,13 @@ body {
   #printable-invoice-content table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-bottom: 20px !important;
+    margin-bottom: 16px !important;
   }
 
   #printable-invoice-content th,
   #printable-invoice-content td {
     border: 1px solid #d1d5db !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     color: #000000 !important;
   }
 
@@ -150,10 +164,5 @@ body {
   #printable-invoice-content tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  @page {
-    size: A4;
-    margin: 15mm;
   }
 }
