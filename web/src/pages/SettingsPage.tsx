@@ -231,7 +231,7 @@ export default function SettingsPage() {
             {/* Footer / Submit */}
             <Grid item xs={12} sx={{ pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: '#a3a3a3' }}>
-                Cập nhật gần nhất: {smtpData?.updatedAt ? new Date(smtpData.updatedAt).toLocaleString('vi-VN') : '—'}
+                Cập nhật gần nhất: {smtpData?.updatedAt ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(smtpData.updatedAt)) : '—'}
               </Typography>
 
               <Button

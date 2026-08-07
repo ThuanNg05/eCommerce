@@ -4,6 +4,7 @@ import type { PagedResult } from './inventory'
 export interface MaterialDto {
   id: number
   name: string
+  unit?: string | null
   importPrice: number
   salePrice: number
   inStock: number
@@ -16,6 +17,7 @@ export interface MaterialDto {
 
 export interface CreateMaterialRequest {
   name: string
+  unit?: string | null
   importPrice: number
   salePrice: number
   inStock: number
@@ -25,6 +27,7 @@ export interface CreateMaterialRequest {
 
 export interface UpdateMaterialRequest {
   name: string
+  unit?: string | null
   importPrice: number
   salePrice: number
   warningStock: number

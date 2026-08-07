@@ -113,7 +113,14 @@ export default function CategoriesPage() {
         headerName: 'NGÀY TẠO',
         width: 180,
         sortable: true,
-        valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString('vi-VN') : '—'),
+        valueFormatter: (p) =>
+          p.value
+            ? new Intl.DateTimeFormat('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                dateStyle: 'short',
+                timeStyle: 'short',
+              }).format(new Date(p.value))
+            : '—',
       },
       {
         headerName: 'THAO TÁC',

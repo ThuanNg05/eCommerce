@@ -116,7 +116,14 @@ export default function AuditLogsPage() {
         headerName: 'THỜI GIAN',
         width: 190,
         sortable: true,
-        valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString('vi-VN') : '—'),
+        valueFormatter: (p) =>
+          p.value
+            ? new Intl.DateTimeFormat('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                dateStyle: 'short',
+                timeStyle: 'short',
+              }).format(new Date(p.value))
+            : '—',
       },
       {
         headerName: 'CHI TIẾT SNAPSHOT',
@@ -262,7 +269,7 @@ export default function AuditLogsPage() {
               Thao tác: <strong>{selectedAuditLog?.action}</strong>
             </Typography>
             <Typography variant="caption" sx={{ color: '#737373' }}>
-              Thời gian: <strong>{selectedAuditLog?.changedAt ? new Date(selectedAuditLog.changedAt).toLocaleString('vi-VN') : '—'}</strong>
+              Thời gian: <strong>{selectedAuditLog?.changedAt ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(selectedAuditLog.changedAt)) : '—'}</strong>
             </Typography>
           </Box>
 
