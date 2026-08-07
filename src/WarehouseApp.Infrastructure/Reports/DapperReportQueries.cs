@@ -53,8 +53,18 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
         var toTimestamp = to.ToDateTime(TimeOnly.MinValue);
 
         using var conn = factory.Create();
-        var rows = await conn.QueryAsync<SalesSummaryRowDto>(new CommandDefinition(
+        var rows = await conn.QueryAsync<SalesSummaryDbRow>(new CommandDefinition(
             sql, new { from = fromTimestamp, to = toTimestamp }, cancellationToken: ct));
-        return rows.AsList();
+        return rows.Select(row => new SalesSummaryRowDto(
+            DateOnly.FromDateTime(row.Date),
+            checked((int)row.InvoiceCount),
+            row.Total)).ToList();
     }
+
+    /// <summary>
+    /// PostgreSQL's <c>date</c> and <c>count(*)</c> are materialized by Npgsql as
+    /// <see cref="DateTime"/> and <see cref="long"/>. Keep this database-shaped row
+    /// private and convert it explicitly to the API's DateOnly/int DTO.
+    /// </summary>
+    private sealed record SalesSummaryDbRow(DateTime Date, long InvoiceCount, decimal Total);
 }
