@@ -110,7 +110,7 @@ export default function SubBackboardsPage() {
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
-      { field: 'size', headerName: 'KÍCH THƯỚC (SIZE)', width: 180, filter: true, sortable: true },
+      { field: 'size', headerName: 'KÍCH THƯỚC', width: 180, filter: true, sortable: true },
       {
         field: 'inStock',
         headerName: 'TỒN KHO',
@@ -176,7 +176,7 @@ export default function SubBackboardsPage() {
           if (!p.data) return null
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-              <Tooltip title="Sửa thông tin tấm lưng phụ">
+              <Tooltip title="Sửa thông tin ván hậu">
                 <IconButton size="small" onClick={() => handleOpenEdit(p.data)} sx={{ color: '#404040' }}>
                   <Edit3 size={16} />
                 </IconButton>
@@ -195,10 +195,10 @@ export default function SubBackboardsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600, color: '#171717', mb: 0.5 }}>
-            Quản lý Tấm lưng phụ
+            Quản lý Chi tiết ván hậu
           </Typography>
           <Typography variant="body2" sx={{ color: '#737373' }}>
-            Thông số nẹp và tấm lưng phụ theo các quy chuẩn kích thước.
+            Thông số ván hậu theo các quy chuẩn kích thước.
           </Typography>
         </Box>
 
@@ -220,7 +220,7 @@ export default function SubBackboardsPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff' }}
           >
-            Thêm nẹp phụ
+            Thêm
           </Button>
         </Box>
       </Box>
@@ -229,14 +229,14 @@ export default function SubBackboardsPage() {
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <SearchField
-            placeholder="Tìm theo kích thước nẹp (vd: 30x40)..."
+            placeholder="Tìm theo kích thước ván hậu (vd: 30x40)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             width={320}
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>
-            Hiển thị: <strong>{data?.items.length ?? 0}</strong> / Tổng số: <strong>{data?.totalCount ?? 0}</strong> tấm lưng phụ
+            Hiển thị: <strong>{data?.items.length ?? 0}</strong> / Tổng số: <strong>{data?.totalCount ?? 0}</strong> ván hậu
           </Typography>
         </Box>
       </Paper>
@@ -266,7 +266,7 @@ export default function SubBackboardsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
-            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu tấm lưng phụ</span>'
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu ván hậu</span>'
             animateRows
             pagination
             paginationPageSize={50}
@@ -283,7 +283,7 @@ export default function SubBackboardsPage() {
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
       >
-        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>Thêm tấm lưng phụ mới</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>Thêm ván hậu mới</DialogTitle>
         <DialogContent>
           {actionError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: '6px' }}>
@@ -339,7 +339,7 @@ export default function SubBackboardsPage() {
                 rows={2}
                 value={createForm.description || ''}
                 onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                placeholder="Mô tả thông số quy chuẩn nẹp..."
+                placeholder="Mô tả thông số quy chuẩn ván hậu..."
               />
             </Grid>
           </Grid>
@@ -354,7 +354,7 @@ export default function SubBackboardsPage() {
             disabled={createMutation.isPending || !createForm.size}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Lưu nẹp phụ
+            Lưu
           </Button>
         </DialogActions>
       </Dialog>
@@ -368,7 +368,7 @@ export default function SubBackboardsPage() {
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
       >
         <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>
-          Cập nhật tấm lưng phụ: {editSubBackboard?.size}
+          Cập nhật ván hậu: {editSubBackboard?.size}
         </DialogTitle>
         <DialogContent>
           {actionError && (
