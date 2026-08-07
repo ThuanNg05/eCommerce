@@ -177,7 +177,7 @@ export default function FramesPage() {
     // Check duplicate subBackboardId
     const selectedIds = validLines.map((l) => l.subBackboardId as number)
     if (new Set(selectedIds).size !== selectedIds.length) {
-      setActionError('Không được chọn trùng cùng một tấm lưng phụ.')
+      setActionError('Không được chọn trùng cùng một cỡ ván.')
       return
     }
 
@@ -217,7 +217,7 @@ export default function FramesPage() {
     // Check duplicate subBackboardId
     const selectedIds = validLines.map((l) => l.subBackboardId as number)
     if (new Set(selectedIds).size !== selectedIds.length) {
-      setActionError('Không được chọn trùng cùng một tấm lưng phụ.')
+      setActionError('Không được chọn trùng cùng một cỡ ván.')
       return
     }
 
@@ -444,7 +444,7 @@ export default function FramesPage() {
                       Cấu thành rập (Chi tiết ván hậu)
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#737373' }}>
-                      Chọn các tấm lưng phụ và số lượng tương ứng cho rập
+                      Chọn các cỡ ván và số lượng tương ứng cho rập
                     </Typography>
                   </Box>
                   <Button
@@ -470,7 +470,7 @@ export default function FramesPage() {
                           select
                           fullWidth
                           size="small"
-                          label="Tấm lưng phụ"
+                          label="Cỡ ván"
                           value={line.subBackboardId}
                           onChange={(e) =>
                             handleCreateLineChange(
@@ -480,7 +480,7 @@ export default function FramesPage() {
                             )
                           }
                         >
-                          <MenuItem value="">-- Chọn tấm lưng phụ --</MenuItem>
+                          <MenuItem value="">-- Chọn cỡ ván --</MenuItem>
                           {subBackboards.map((sb) => (
                             <MenuItem
                               key={sb.id}
@@ -612,7 +612,7 @@ export default function FramesPage() {
                       Cấu thành rập (Chi tiết ván hậu)
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#737373' }}>
-                      Chọn các tấm lưng phụ và số lượng tương ứng cho rập
+                      Chọn các cỡ ván và số lượng tương ứng cho rập
                     </Typography>
                   </Box>
                   <Button
@@ -638,7 +638,7 @@ export default function FramesPage() {
                           select
                           fullWidth
                           size="small"
-                          label="Tấm lưng phụ"
+                          label="Cỡ ván"
                           value={line.subBackboardId}
                           onChange={(e) =>
                             handleEditLineChange(
@@ -648,7 +648,7 @@ export default function FramesPage() {
                             )
                           }
                         >
-                          <MenuItem value="">-- Chọn tấm lưng phụ --</MenuItem>
+                          <MenuItem value="">-- Chọn cỡ ván --</MenuItem>
                           {subBackboards.map((sb) => (
                             <MenuItem
                               key={sb.id}

@@ -235,7 +235,7 @@ export default function PricingPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       setComponentActionMsg({
         type: 'success',
-        text: `Đã lưu công thức sản phẩm! Giá gốc (BasePrice) tính từ server là ${formatVND(res.basePrice)}.`,
+        text: `Đã lưu công thức sản phẩm! Giá gốc được tính là ${formatVND(res.basePrice)}.`,
       })
     },
     onError: (err: Error) => {
@@ -389,7 +389,7 @@ export default function PricingPage() {
             </DialogTitle>
             <DialogContent>
               <Typography variant="body2" sx={{ color: '#404040' }}>
-                Lưu bảng giá mới sẽ kích hoạt lại thuật toán tính <strong>Giá gốc (Base Price)</strong> cho tất cả sản phẩm đang có trong hệ thống.
+                Lưu bảng giá mới sẽ kích hoạt lại thuật toán tính <strong>Giá gốc</strong> cho tất cả sản phẩm đang có trong hệ thống.
               </Typography>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -585,7 +585,7 @@ export default function PricingPage() {
                 startIcon={<Save size={16} />}
                 sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
               >
-                Lưu công thức &amp; tính giá gốc
+                Lưu
               </Button>
             </Box>
           </Paper>
