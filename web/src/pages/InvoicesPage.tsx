@@ -205,7 +205,7 @@ function ProductLineItem({
             onChange={(_, val) => handleProductSelect(val)}
             onInputChange={(_, newInputValue) => setSearchTerm(newInputValue)}
             renderInput={(params) => (
-              <TextField {...params} placeholder="Tìm theo SKU hoặc tên..." />
+              <TextField {...params} id={`product-select-${line.id}`} placeholder="Tìm theo SKU hoặc tên..." />
             )}
           />
         </Grid>
@@ -310,6 +310,7 @@ export default function InvoicesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const linesContainerRef = useRef<HTMLDivElement>(null)
+  const editLinesContainerRef = useRef<HTMLDivElement>(null)
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -430,11 +431,43 @@ export default function InvoicesPage() {
   }
 
   const handleAddEditLine = () => {
-    setEditLines((prev) => [...prev, createEmptyInvoiceLine()])
+    const incompleteLine = editLines.find((l) => !l.selectedProduct)
+    if (incompleteLine) {
+      setToastState({
+        open: true,
+        message: 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.',
+      })
+      setTimeout(() => {
+        document.getElementById(`product-select-${incompleteLine.id}`)?.focus()
+      }, 50)
+      return
+    }
+    const newDraft = createEmptyInvoiceLine()
+    setEditLines((prev) => [newDraft, ...prev])
+    setTimeout(() => {
+      document.getElementById(`product-select-${newDraft.id}`)?.focus()
+      editLinesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 50)
   }
 
   const handleUpdateEditLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
-    setEditLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
+    setEditLines((prev) => {
+      const target = prev.find((l) => l.id === id)
+      if (!target) return prev
+
+      const isNowCompleting =
+        target.selectedProduct === null &&
+        updated.selectedProduct !== undefined &&
+        updated.selectedProduct !== null
+
+      const updatedLine = { ...target, ...updated }
+
+      if (isNowCompleting) {
+        const remaining = prev.filter((l) => l.id !== id)
+        return [...remaining, updatedLine]
+      }
+      return prev.map((l) => (l.id === id ? updatedLine : l))
+    })
   }
 
   const handleRemoveEditLine = (id: string) => {
@@ -578,9 +611,21 @@ export default function InvoicesPage() {
 
   // Prepend line to top and scroll to top mượt
   const handleAddLine = () => {
-    const newLine = createEmptyInvoiceLine()
-    setCreateLines((prev) => [newLine, ...prev])
+    const incompleteLine = createLines.find((l) => !l.selectedProduct)
+    if (incompleteLine) {
+      setToastState({
+        open: true,
+        message: 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.',
+      })
+      setTimeout(() => {
+        document.getElementById(`product-select-${incompleteLine.id}`)?.focus()
+      }, 50)
+      return
+    }
+    const newDraft = createEmptyInvoiceLine()
+    setCreateLines((prev) => [newDraft, ...prev])
     setTimeout(() => {
+      document.getElementById(`product-select-${newDraft.id}`)?.focus()
       linesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }, 50)
   }
@@ -590,10 +635,33 @@ export default function InvoicesPage() {
   }
 
   const handleUpdateLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
-    setCreateLines((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, ...updated } : l)),
-    )
+    setCreateLines((prev) => {
+      const target = prev.find((l) => l.id === id)
+      if (!target) return prev
+
+      const isNowCompleting =
+        target.selectedProduct === null &&
+        updated.selectedProduct !== undefined &&
+        updated.selectedProduct !== null
+
+      const updatedLine = { ...target, ...updated }
+
+      if (isNowCompleting) {
+        const remaining = prev.filter((l) => l.id !== id)
+        return [...remaining, updatedLine]
+      }
+      return prev.map((l) => (l.id === id ? updatedLine : l))
+    })
   }
+
+  const hasIncompleteCreateLine = useMemo(
+    () => createLines.some((l) => !l.selectedProduct),
+    [createLines],
+  )
+  const hasIncompleteEditLine = useMemo(
+    () => editLines.some((l) => !l.selectedProduct),
+    [editLines],
+  )
 
   // Total invoice estimated value
   const totalInvoiceAmount = useMemo(() => {
@@ -918,15 +986,26 @@ export default function InvoicesPage() {
                   Chọn sản phẩm, số lượng, đơn giá và ghi chú từng dòng
                 </Typography>
               </Box>
-              <Button
-                size="small"
-                startIcon={<Plus size={14} />}
-                onClick={handleAddLine}
-                sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
-                variant="outlined"
+              <Tooltip
+                title={
+                  hasIncompleteCreateLine
+                    ? 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.'
+                    : ''
+                }
               >
-                Thêm dòng sản phẩm
-              </Button>
+                <span>
+                  <Button
+                    size="small"
+                    startIcon={<Plus size={14} />}
+                    onClick={handleAddLine}
+                    disabled={hasIncompleteCreateLine}
+                    sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
+                    variant="outlined"
+                  >
+                    Thêm dòng sản phẩm
+                  </Button>
+                </span>
+              </Tooltip>
             </Box>
 
             {/* Scrollable Container for Line Items */}
@@ -1323,19 +1402,30 @@ export default function InvoicesPage() {
                   Điều chỉnh danh sách sản phẩm, số lượng, đơn giá và ghi chú
                 </Typography>
               </Box>
-              <Button
-                size="small"
-                startIcon={<Plus size={14} />}
-                onClick={handleAddEditLine}
-                sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
-                variant="outlined"
+              <Tooltip
+                title={
+                  hasIncompleteEditLine
+                    ? 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.'
+                    : ''
+                }
               >
-                Thêm dòng sản phẩm
-              </Button>
+                <span>
+                  <Button
+                    size="small"
+                    startIcon={<Plus size={14} />}
+                    onClick={handleAddEditLine}
+                    disabled={hasIncompleteEditLine}
+                    sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
+                    variant="outlined"
+                  >
+                    Thêm dòng sản phẩm
+                  </Button>
+                </span>
+              </Tooltip>
             </Box>
 
             {/* Scrollable Container */}
-            <Box sx={{ maxHeight: 'min(48vh, 460px)', overflowY: 'auto', pr: 0.5 }}>
+            <Box ref={editLinesContainerRef} sx={{ maxHeight: 'min(48vh, 460px)', overflowY: 'auto', pr: 0.5 }}>
               {editLines.map((line) => (
                 <ProductLineItem
                   key={line.id}
