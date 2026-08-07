@@ -349,6 +349,17 @@ export default function InvoicesPage() {
     enabled: Boolean(invoiceDetail?.customerId),
   })
 
+  // Print Handler with dynamic PDF filename (document.title = invoiceDetail.id)
+  const handlePrintInvoice = () => {
+    if (!invoiceDetail) return
+    const originalTitle = document.title
+    document.title = invoiceDetail.id
+    window.print()
+    setTimeout(() => {
+      document.title = originalTitle
+    }, 1000)
+  }
+
   // Create Invoice Mutation
   const createMutation = useMutation({
     mutationFn: (req: CreateInvoiceRequest) => createInvoice(req),
@@ -891,7 +902,7 @@ export default function InvoicesPage() {
           </Typography>
           <Button
             variant="contained"
-            onClick={() => window.print()}
+            onClick={handlePrintInvoice}
             startIcon={<Printer size={16} />}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
@@ -960,6 +971,7 @@ export default function InvoicesPage() {
                 <TableHead sx={{ bgcolor: '#f9f9f9' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
                       SỐ LƯỢNG
                     </TableCell>
@@ -974,17 +986,9 @@ export default function InvoicesPage() {
                 <TableBody>
                   {invoiceDetail.lines.map((line, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {line.productName}
-                          </Typography>
-                          {line.description && (
-                            <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                              Ghi chú: {line.description}
-                            </Typography>
-                          )}
-                        </Box>
+                      <TableCell sx={{ fontWeight: 500 }}>{line.productName}</TableCell>
+                      <TableCell sx={{ color: '#404040', fontSize: 13 }}>
+                        {line.description ? line.description : '—'}
                       </TableCell>
                       <TableCell align="right">{line.quantity}</TableCell>
                       <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
