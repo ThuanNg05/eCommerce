@@ -971,7 +971,6 @@ export default function InvoicesPage() {
                 <TableHead sx={{ bgcolor: '#f9f9f9' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
                       SỐ LƯỢNG
                     </TableCell>
@@ -981,19 +980,20 @@ export default function InvoicesPage() {
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
                       THÀNH TIỀN
                     </TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {invoiceDetail.lines.map((line, idx) => (
                     <TableRow key={idx}>
                       <TableCell sx={{ fontWeight: 500 }}>{line.productName}</TableCell>
-                      <TableCell sx={{ color: '#404040', fontSize: 13 }}>
-                        {line.description ? line.description : '—'}
-                      </TableCell>
                       <TableCell align="right">{line.quantity}</TableCell>
                       <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
                         {formatVND(line.subtotal)}
+                      </TableCell>
+                      <TableCell sx={{ color: '#404040', fontSize: 13 }}>
+                        {line.description ? line.description : '—'}
                       </TableCell>
                     </TableRow>
                   ))}
