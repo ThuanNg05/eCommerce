@@ -35,7 +35,7 @@ import {
   type CreateInvoiceRequest,
 } from '../api/invoices'
 import { fetchInventory, type ProductDto } from '../api/inventory'
-import { fetchCustomers, type CustomerDto } from '../api/customers'
+import { fetchCustomers, fetchCustomerById, type CustomerDto } from '../api/customers'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { STORE_INFO } from '../constants/storeInfo'
 
@@ -66,6 +66,16 @@ const formatVND = (value?: number | null) => {
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+const formatDateDDMMYYYY = (dateStr?: string | null) => {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return '—'
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
 }
 
 const isWholesaleGroup = (customer: CustomerDto | null): boolean => {
@@ -330,6 +340,13 @@ export default function InvoicesPage() {
     queryKey: ['invoice', viewInvoiceId],
     queryFn: () => (viewInvoiceId ? fetchInvoiceById(viewInvoiceId) : null),
     enabled: Boolean(viewInvoiceId),
+  })
+
+  // Query Customer Details for Viewing / Printing Invoice
+  const { data: customerDetail } = useQuery({
+    queryKey: ['customerDetail', invoiceDetail?.customerId],
+    queryFn: () => (invoiceDetail?.customerId ? fetchCustomerById(invoiceDetail.customerId) : null),
+    enabled: Boolean(invoiceDetail?.customerId),
   })
 
   // Create Invoice Mutation
@@ -890,42 +907,51 @@ export default function InvoicesPage() {
           ) : invoiceDetail ? (
             <Box sx={{ p: 2 }}>
               {/* Header Invoice Print Header */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#171717' }}>
-                    {STORE_INFO.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#404040' }}>
-                    Địa chỉ: {STORE_INFO.address}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#404040' }}>
-                    Điện thoại: {STORE_INFO.phoneDisplay}
-                  </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Box
+                    component="img"
+                    src="/assets/logo.jpg"
+                    alt="Logo Hòa Thuận"
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      objectFit: 'cover',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 17, lineHeight: 1.2 }}>
+                      {STORE_INFO.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 13, mt: 0.5 }}>
+                      Địa chỉ: {STORE_INFO.address}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 13 }}>
+                      Điện thoại: {STORE_INFO.phoneDisplay}
+                    </Typography>
+                  </Box>
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#7299ED' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 18 }}>
                     HÓA ĐƠN BÁN HÀNG
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.5 }}>
                     Mã số: {invoiceDetail.id}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                    Ngày lập:{' '}
-                    {new Intl.DateTimeFormat('vi-VN', {
-                      timeZone: 'Asia/Ho_Chi_Minh',
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    }).format(new Date(invoiceDetail.createdAt))}
+                  <Typography variant="body2" sx={{ color: '#525252', fontSize: 13 }}>
+                    Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
                   </Typography>
                 </Box>
               </Box>
 
-              <Divider sx={{ mb: 3 }} />
+              <Divider sx={{ mb: 2.5 }} />
 
               {/* Customer Info */}
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
-                  Khách hàng: KH-{invoiceDetail.customerId}
+              <Box sx={{ mb: 2.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717', fontSize: 15 }}>
+                  Khách hàng: {customerDetail ? `${customerDetail.name}${customerDetail.phone ? ' - ' + customerDetail.phone : ''}` : `KH-${invoiceDetail.customerId}`}
                 </Typography>
               </Box>
 
@@ -971,22 +997,18 @@ export default function InvoicesPage() {
               </Table>
 
               {/* Total Calculation */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
                 <Box sx={{ width: 260 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717' }}>
                       TỔNG THÀNH TIỀN:
                     </Typography>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#7299ED' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717' }}>
                       {formatVND(invoiceDetail.total)}
                     </Typography>
                   </Box>
                 </Box>
               </Box>
-
-              <Typography variant="caption" sx={{ color: '#737373', fontStyle: 'italic', display: 'block', textAlign: 'center' }}>
-                Cảm ơn quý khách đã tin tưởng {STORE_INFO.name}!
-              </Typography>
             </Box>
           ) : (
             <Typography variant="body2" sx={{ color: '#b91c1c', py: 2 }}>
