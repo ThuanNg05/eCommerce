@@ -46,9 +46,15 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
             order by (created_at at time zone 'Asia/Ho_Chi_Minh')::date;
             """;
 
+        // Dapper 2.1.66 does not bind DateOnly values. Preserve the date-only
+        // semantics by passing midnight with an unspecified kind; PostgreSQL then
+        // interprets it as a Vietnam local timestamp in the SQL above.
+        var fromTimestamp = from.ToDateTime(TimeOnly.MinValue);
+        var toTimestamp = to.ToDateTime(TimeOnly.MinValue);
+
         using var conn = factory.Create();
         var rows = await conn.QueryAsync<SalesSummaryRowDto>(new CommandDefinition(
-            sql, new { from, to }, cancellationToken: ct));
+            sql, new { from = fromTimestamp, to = toTimestamp }, cancellationToken: ct));
         return rows.AsList();
     }
 }
