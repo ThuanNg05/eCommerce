@@ -28,6 +28,8 @@ export interface InvoiceSummaryDto {
 export interface CreateInvoiceLineRequest {
   productId: number
   quantity: number
+  unitPrice?: number | null
+  description?: string | null
 }
 
 export interface CreateInvoiceRequest {
@@ -53,8 +55,6 @@ export function createInvoice(req: CreateInvoiceRequest): Promise<InvoiceDto> {
   return apiPost<InvoiceDto>('/api/invoices', req)
 }
 
-// PENDING API: FR015 Edit Invoice endpoint
 export function updateInvoice(id: string, req: UpdateInvoiceRequest): Promise<InvoiceDto> {
-  // TODO: Waiting for backend endpoint PUT /api/invoices/{id}
   return apiPut<InvoiceDto>(`/api/invoices/${encodeURIComponent(id)}`, req)
 }

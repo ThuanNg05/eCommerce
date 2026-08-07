@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, ValueFormatterParams } from 'ag-grid-community'
@@ -22,6 +22,7 @@ import {
   TableRow,
   TableCell,
   Divider,
+  Autocomplete,
 } from '@mui/material'
 import { Plus, RefreshCw, Printer, Eye, Trash2 } from 'lucide-react'
 import SearchField from '../components/SearchField'
@@ -32,7 +33,26 @@ import {
   type InvoiceSummaryDto,
   type CreateInvoiceRequest,
 } from '../api/invoices'
-import { fetchInventory } from '../api/inventory'
+import { fetchInventory, type ProductDto } from '../api/inventory'
+import { fetchCustomers, type CustomerDto } from '../api/customers'
+
+interface CreateInvoiceLineState {
+  id: string
+  selectedProduct: ProductDto | null
+  productSearchTerm: string
+  quantity: number
+  unitPrice: number
+  description: string
+}
+
+const createEmptyInvoiceLine = (): CreateInvoiceLineState => ({
+  id: `inv-line-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+  selectedProduct: null,
+  productSearchTerm: '',
+  quantity: 1,
+  unitPrice: 0,
+  description: '',
+})
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -43,31 +63,233 @@ const formatVND = (value?: number | null) => {
   }).format(value)
 }
 
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debouncedValue
+}
+
+// Single Product Line Component for Clean Hook & Search State Scope
+function ProductLineItem({
+  line,
+  selectedCustomer,
+  selectedProductIds,
+  onUpdateLine,
+  onRemoveLine,
+  canRemove,
+}: {
+  line: CreateInvoiceLineState
+  selectedCustomer: CustomerDto | null
+  selectedProductIds: number[]
+  onUpdateLine: (id: string, updated: Partial<CreateInvoiceLineState>) => void
+  onRemoveLine: (id: string) => void
+  canRemove: boolean
+}) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearch = useDebounce(searchTerm, 300)
+
+  const { data: searchResultsData, isLoading: isSearchLoading } = useQuery({
+    queryKey: ['inventorySearch', debouncedSearch],
+    queryFn: () => fetchInventory(debouncedSearch, 1, 50),
+  })
+
+  const searchResults = searchResultsData?.items ?? []
+
+  // Ensure current selected product is included in options if not in search results
+  const options = useMemo(() => {
+    if (!line.selectedProduct) return searchResults
+    const exists = searchResults.some((p) => p.id === line.selectedProduct?.id)
+    return exists ? searchResults : [line.selectedProduct, ...searchResults]
+  }, [searchResults, line.selectedProduct])
+
+  const calculateDefaultUnitPrice = (product: ProductDto, customer: CustomerDto | null): number => {
+    const isGroupS = customer?.groupPrice?.trim().toUpperCase() === 'S'
+    if (isGroupS) {
+      return product.priceWholesale ?? product.priceRetail ?? product.basePrice
+    }
+    return product.priceRetail ?? product.basePrice
+  }
+
+  const handleProductSelect = (product: ProductDto | null) => {
+    if (!product) {
+      onUpdateLine(line.id, { selectedProduct: null, unitPrice: 0 })
+      return
+    }
+    const defaultPrice = calculateDefaultUnitPrice(product, selectedCustomer)
+    onUpdateLine(line.id, {
+      selectedProduct: product,
+      unitPrice: defaultPrice,
+    })
+  }
+
+  const lineTotal = (line.quantity || 0) * (line.unitPrice || 0)
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
+        mb: 1.5,
+        bgcolor: '#fafafa',
+        border: '1px solid #ededed',
+        borderRadius: '6px',
+      }}
+    >
+      <Grid container spacing={1.5} alignItems="center">
+        {/* Product Autocomplete */}
+        <Grid item xs={12} md={5}>
+          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            SẢN PHẨM *
+          </Typography>
+          <Autocomplete
+            size="small"
+            options={options}
+            loading={isSearchLoading}
+            getOptionLabel={(p) => `[${p.sku}] ${p.name}`}
+            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+            getOptionDisabled={(opt) =>
+              selectedProductIds.includes(opt.id) && opt.id !== line.selectedProduct?.id
+            }
+            value={line.selectedProduct}
+            onChange={(_, val) => handleProductSelect(val)}
+            onInputChange={(_, newInputValue) => setSearchTerm(newInputValue)}
+            renderInput={(params) => (
+              <TextField {...params} placeholder="Tìm theo SKU hoặc tên..." />
+            )}
+          />
+        </Grid>
+
+        {/* Quantity Input */}
+        <Grid item xs={6} md={2}>
+          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            SỐ LƯỢNG *
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            type="number"
+            inputProps={{ min: 1 }}
+            value={line.quantity}
+            onWheel={(e) => e.currentTarget.blur()}
+            onChange={(e) => {
+              const val = Number(e.target.value)
+              onUpdateLine(line.id, { quantity: isNaN(val) ? 1 : Math.max(1, Math.floor(val)) })
+            }}
+            onBlur={() => {
+              if (!line.quantity || line.quantity < 1) {
+                onUpdateLine(line.id, { quantity: 1 })
+              }
+            }}
+          />
+        </Grid>
+
+        {/* Editable Unit Price */}
+        <Grid item xs={6} md={2.5}>
+          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            ĐƠN GIÁ (VND) *
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            type="number"
+            inputProps={{ min: 0 }}
+            value={line.unitPrice}
+            onChange={(e) => {
+              const val = Number(e.target.value)
+              onUpdateLine(line.id, { unitPrice: isNaN(val) ? 0 : Math.max(0, val) })
+            }}
+          />
+        </Grid>
+
+        {/* Read-Only Subtotal Preview */}
+        <Grid item xs={10} md={2}>
+          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            THÀNH TIỀN
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            value={formatVND(lineTotal)}
+            InputProps={{ readOnly: true }}
+            sx={{ bgcolor: '#f5f5f5' }}
+          />
+        </Grid>
+
+        {/* Remove Line Button */}
+        <Grid item xs={2} md={0.5} sx={{ textAlign: 'center', pt: { md: 2.5 } }}>
+          <IconButton
+            size="small"
+            onClick={() => onRemoveLine(line.id)}
+            disabled={!canRemove}
+            sx={{ color: '#b91c1c' }}
+          >
+            <Trash2 size={16} />
+          </IconButton>
+        </Grid>
+
+        {/* Full-width Line Note / Description */}
+        <Grid item xs={12}>
+          <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            GHI CHÚ DÒNG SẢN PHẨM
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Ghi chú chi tiết cho dòng sản phẩm (tùy chọn)..."
+            value={line.description}
+            onChange={(e) => onUpdateLine(line.id, { description: e.target.value })}
+          />
+        </Grid>
+      </Grid>
+    </Paper>
+  )
+}
+
 export default function InvoicesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const linesContainerRef = useRef<HTMLDivElement>(null)
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewInvoiceId, setViewInvoiceId] = useState<string | null>(null)
-
-  // Create Form State
-  const [customerId, setCustomerId] = useState<number>(1)
-  const [lines, setLines] = useState<{ productId: number; quantity: number }[]>([
-    { productId: 1, quantity: 1 },
-  ])
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Customer Autocomplete Server-Side Search State
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerDto | null>(null)
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('')
+  const debouncedCustomerSearch = useDebounce(customerSearchTerm, 300)
+
+  const { data: customersData, isLoading: isCustomersLoading } = useQuery({
+    queryKey: ['customersSearch', debouncedCustomerSearch],
+    queryFn: () => fetchCustomers(debouncedCustomerSearch, 1, 50),
+    enabled: isCreateOpen,
+  })
+
+  const customerOptions = useMemo(() => {
+    const list = customersData?.items ?? []
+    if (!selectedCustomer) return list
+    const exists = list.some((c) => c.id === selectedCustomer.id)
+    return exists ? list : [selectedCustomer, ...list]
+  }, [customersData, selectedCustomer])
+
+  // Create Invoice Lines State
+  const [createLines, setCreateLines] = useState<CreateInvoiceLineState[]>([createEmptyInvoiceLine()])
+
+  // Selected Product IDs for Duplicate Prevention
+  const selectedProductIds = useMemo(() => {
+    return createLines
+      .map((l) => l.selectedProduct?.id)
+      .filter((id): id is number => typeof id === 'number' && id > 0)
+  }, [createLines])
 
   // Query Invoices List
   const { data: invoicesData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => fetchInvoices(),
-  })
-
-  // Query Products List for Create Invoice Dropdown
-  const { data: productsData } = useQuery({
-    queryKey: ['inventory'],
-    queryFn: () => fetchInventory('', 1, 200),
   })
 
   // Query Selected Invoice Detail for Viewing / Printing
@@ -83,26 +305,91 @@ export default function InvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setIsCreateOpen(false)
-      setLines([{ productId: 1, quantity: 1 }])
-      setActionError(null)
+      resetCreateForm()
     },
     onError: (err: Error) => setActionError(err.message),
   })
 
+  const resetCreateForm = () => {
+    setSelectedCustomer(null)
+    setCustomerSearchTerm('')
+    setCreateLines([createEmptyInvoiceLine()])
+    setActionError(null)
+  }
+
+  // Prepend line to top and scroll to top mượt
   const handleAddLine = () => {
-    const defaultProductId = productsData?.items[0]?.id || 1
-    setLines([...lines, { productId: defaultProductId, quantity: 1 }])
+    const newLine = createEmptyInvoiceLine()
+    setCreateLines((prev) => [newLine, ...prev])
+    setTimeout(() => {
+      linesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 50)
   }
 
-  const handleRemoveLine = (index: number) => {
-    if (lines.length === 1) return
-    setLines(lines.filter((_, i) => i !== index))
+  const handleRemoveLine = (id: string) => {
+    setCreateLines((prev) => prev.filter((l) => l.id !== id))
   }
 
-  const handleLineChange = (index: number, field: 'productId' | 'quantity', val: number) => {
-    const updated = [...lines]
-    updated[index] = { ...updated[index], [field]: val }
-    setLines(updated)
+  const handleUpdateLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
+    setCreateLines((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, ...updated } : l)),
+    )
+  }
+
+  // Total invoice estimated value
+  const totalInvoiceAmount = useMemo(() => {
+    return createLines.reduce((sum, line) => {
+      if (!line.selectedProduct) return sum
+      return sum + (line.quantity || 0) * (line.unitPrice || 0)
+    }, 0)
+  }, [createLines])
+
+  // Handle Create Submit
+  const handleCreateSubmit = () => {
+    setActionError(null)
+
+    if (!selectedCustomer) {
+      setActionError('Vui lòng chọn khách hàng.')
+      return
+    }
+
+    const validLines = createLines.filter((l) => l.selectedProduct !== null)
+    if (validLines.length === 0) {
+      setActionError('Vui lòng chọn ít nhất một sản phẩm cho hóa đơn.')
+      return
+    }
+
+    // Check duplicate products
+    const productIds = validLines.map((l) => l.selectedProduct!.id)
+    if (new Set(productIds).size !== productIds.length) {
+      setActionError('Không được chọn trùng sản phẩm ở nhiều dòng.')
+      return
+    }
+
+    // Validate quantities & prices
+    for (let i = 0; i < validLines.length; i++) {
+      const line = validLines[i]
+      if (!line.quantity || line.quantity < 1) {
+        setActionError(`Dòng ${i + 1}: Số lượng phải lớn hơn hoặc bằng 1.`)
+        return
+      }
+      if (line.unitPrice < 0) {
+        setActionError(`Dòng ${i + 1}: Đơn giá không được âm.`)
+        return
+      }
+    }
+
+    const payload: CreateInvoiceRequest = {
+      customerId: selectedCustomer.id,
+      lines: validLines.map((l) => ({
+        productId: l.selectedProduct!.id,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        description: l.description.trim() || null,
+      })),
+    }
+
+    createMutation.mutate(payload)
   }
 
   const filteredInvoices = useMemo(() => {
@@ -215,7 +502,10 @@ export default function InvoicesPage() {
 
           <Button
             variant="contained"
-            onClick={() => setIsCreateOpen(true)}
+            onClick={() => {
+              resetCreateForm()
+              setIsCreateOpen(true)
+            }}
             startIcon={<Plus size={16} />}
             sx={{
               height: 36,
@@ -293,94 +583,125 @@ export default function InvoicesPage() {
             </Alert>
           )}
 
-          <Grid container spacing={2} sx={{ mt: 0.5, mb: 3 }}>
-            <Grid item xs={6}>
+          {/* Customer Selection with Server-Side Search */}
+          <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
+            <Grid item xs={12}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-                MÃ KHÁCH HÀNG (CUSTOMER ID) *
+                KHÁCH HÀNG *
               </Typography>
-              <TextField
-                fullWidth
-                type="number"
-                value={customerId}
-                onChange={(e) => setCustomerId(Number(e.target.value))}
-                placeholder="Nhập Customer ID"
+              <Autocomplete
+                size="small"
+                options={customerOptions}
+                loading={isCustomersLoading}
+                getOptionLabel={(c) => `${c.name}${c.phone ? ' — ' + c.phone : ''}`}
+                isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                value={selectedCustomer}
+                onChange={(_, val) => setSelectedCustomer(val)}
+                onInputChange={(_, newInputValue) => setCustomerSearchTerm(newInputValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Tìm khách hàng theo tên hoặc SĐT..." />
+                )}
               />
             </Grid>
           </Grid>
 
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#171717' }}>
-            Chi tiết các dòng sản phẩm trong hóa đơn
-          </Typography>
+          {/* Lines Section */}
+          <Box sx={{ borderTop: '1px solid #ededed', pt: 1.5, mt: 1 }}>
+            {/* Sticky Header / Toolbar */}
+            <Box
+              sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                bgcolor: '#ffffff',
+                pt: 0.5,
+                pb: 1.5,
+                borderBottom: '1px solid #ededed',
+                mb: 1.5,
+                display: 'flex',
+                justify: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
+                  Chi tiết sản phẩm
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#737373' }}>
+                  Chọn sản phẩm, số lượng, đơn giá và ghi chú từng dòng
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                startIcon={<Plus size={14} />}
+                onClick={handleAddLine}
+                sx={{ color: '#171717', borderColor: '#e0e0e0' }}
+                variant="outlined"
+              >
+                Thêm dòng sản phẩm
+              </Button>
+            </Box>
 
-          {lines.map((line, index) => (
-            <Grid container spacing={2} key={index} alignItems="center" sx={{ mb: 1.5 }}>
-              <Grid item xs={7}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label={`Sản phẩm #${index + 1}`}
-                  value={line.productId}
-                  onChange={(e) => handleLineChange(index, 'productId', Number(e.target.value))}
-                  SelectProps={{ native: true }}
-                >
-                  {productsData?.items.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.sku} - {p.name} ({formatVND(p.priceRetail || p.basePrice)})
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Số lượng"
-                  value={line.quantity}
-                  onChange={(e) => handleLineChange(index, 'quantity', Number(e.target.value))}
+            {/* Scrollable Container for Line Items */}
+            <Box
+              ref={linesContainerRef}
+              sx={{
+                maxHeight: 'min(48vh, 460px)',
+                overflowY: 'auto',
+                pr: 0.5,
+              }}
+            >
+              {createLines.map((line) => (
+                <ProductLineItem
+                  key={line.id}
+                  line={line}
+                  selectedCustomer={selectedCustomer}
+                  selectedProductIds={selectedProductIds}
+                  onUpdateLine={handleUpdateLine}
+                  onRemoveLine={handleRemoveLine}
+                  canRemove={createLines.length > 1}
                 />
-              </Grid>
+              ))}
+            </Box>
+          </Box>
 
-              <Grid item xs={2}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleRemoveLine(index)}
-                  disabled={lines.length === 1}
-                  sx={{ color: '#b91c1c' }}
-                >
-                  <Trash2 size={18} />
-                </IconButton>
-              </Grid>
-            </Grid>
-          ))}
-
-          <Button
-            variant="outlined"
-            onClick={handleAddLine}
-            startIcon={<Plus size={15} />}
-            sx={{ mt: 1, borderColor: '#e0e0e0', color: '#171717' }}
+          {/* Real-time Estimated Total Invoice Amount */}
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              bgcolor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+            }}
           >
-            Thêm dòng sản phẩm
-          </Button>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b' }}>
+              TỔNG GIÁ TRỊ HÓA ĐƠN TẠM TÍNH:
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#2563eb' }}>
+              {formatVND(totalInvoiceAmount)}
+            </Typography>
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setIsCreateOpen(false)} variant="outlined" color="inherit">
             Hủy
           </Button>
           <Button
-            onClick={() => createMutation.mutate({ customerId, lines })}
+            onClick={handleCreateSubmit}
             variant="contained"
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || !selectedCustomer}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Tạo hóa đơn
+            Lưu hóa đơn
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* PRINTABLE INVOICE DETAIL MODAL (FR016) */}
+      {/* PRINTABLE INVOICE DETAIL MODAL */}
       <Dialog
         open={Boolean(viewInvoiceId)}
         onClose={() => setViewInvoiceId(null)}
@@ -430,7 +751,12 @@ export default function InvoicesPage() {
                     Mã số: {invoiceDetail.id}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                    Ngày lập: {new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(invoiceDetail.createdAt))}
+                    Ngày lập:{' '}
+                    {new Intl.DateTimeFormat('vi-VN', {
+                      timeZone: 'Asia/Ho_Chi_Minh',
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    }).format(new Date(invoiceDetail.createdAt))}
                   </Typography>
                 </Box>
               </Box>
@@ -463,7 +789,18 @@ export default function InvoicesPage() {
                 <TableBody>
                   {invoiceDetail.lines.map((line, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{line.productName}</TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {line.productName}
+                          </Typography>
+                          {line.description && (
+                            <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                              Ghi chú: {line.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
                       <TableCell align="right">{line.quantity}</TableCell>
                       <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
