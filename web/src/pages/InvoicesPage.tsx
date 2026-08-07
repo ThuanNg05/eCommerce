@@ -918,17 +918,9 @@ export default function InvoicesPage() {
             </Typography>
           ) : invoiceDetail ? (
             <Box sx={{ p: 1 }}>
-              {/* 3-Column Header: Store Info (Left) | Title & Code (Center) | QR Code (Right) */}
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto auto',
-                  alignItems: 'start',
-                  gap: 3,
-                  mb: 2.5,
-                }}
-              >
-                {/* Column 1: Logo & Store Information */}
+              {/* Header: Store Info (Left) | Title & Code (Right) */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
+                {/* Logo & Store Information */}
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                   <Box
                     component="img"
@@ -973,14 +965,14 @@ export default function InvoicesPage() {
                   </Box>
                 </Box>
 
-                {/* Column 2: Invoice Title, Code & Date */}
-                <Box sx={{ textAlign: 'center', px: 1 }}>
+                {/* Invoice Title, Code & Date */}
+                <Box sx={{ textAlign: 'right' }}>
                   <Typography
                     variant="h6"
                     sx={{
                       fontWeight: 700,
                       color: '#171717',
-                      fontSize: 17,
+                      fontSize: 18,
                       whiteSpace: 'nowrap',
                       wordBreak: 'keep-all',
                       letterSpacing: '0.02em',
@@ -1014,30 +1006,6 @@ export default function InvoicesPage() {
                     Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
                   </Typography>
                 </Box>
-
-                {/* Column 3: QR Code & 2-Line Semantic Caption */}
-                {invoiceDetail.id && (
-                  <Box sx={{ textAlign: 'center', flexShrink: 0 }}>
-                    <QRCodeSVG value={invoiceDetail.id} size={72} level="M" />
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: '#737373',
-                        fontSize: 10,
-                        display: 'block',
-                        mt: 0.25,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
-                        Quét để tra cứu
-                      </Box>
-                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
-                        mã hóa đơn
-                      </Box>
-                    </Typography>
-                  </Box>
-                )}
               </Box>
 
               <Divider sx={{ mb: 2.5 }} />
@@ -1083,8 +1051,31 @@ export default function InvoicesPage() {
                 </TableBody>
               </Table>
 
-              {/* Total Calculation */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+              {/* Footer Row: QR Code (Left) + Total Amount Calculation (Right) */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2 }}>
+                {invoiceDetail.id ? (
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <QRCodeSVG value={invoiceDetail.id} size={72} level="M" />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: '#737373',
+                        fontSize: 11,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                        Quét để tra cứu
+                      </Box>
+                      <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                        mã hóa đơn
+                      </Box>
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box />
+                )}
+
                 <Box sx={{ width: 260 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717' }}>
