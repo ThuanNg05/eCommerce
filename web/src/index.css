@@ -71,7 +71,7 @@ body {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm; /* 1cm margin on all 4 edges */
+    margin: 5mm; /* 5mm margin on all 4 edges */
   }
 
   body * {
