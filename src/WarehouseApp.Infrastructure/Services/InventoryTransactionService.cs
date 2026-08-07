@@ -68,6 +68,13 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
         // applied. Mirrors InvoiceService.CreateAsync.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
+        // `MAX(transaction_code) + 1` must not run concurrently on two stations. This
+        // transaction-scoped PostgreSQL advisory lock serializes receipt/issue creation
+        // until commit/rollback, covering both code allocation and stock updates for the
+        // stockable tables that do not have an xmin concurrency token.
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(hashtext('warehouse.inventory-transactions.create'))", ct);
+
         await ApplyStockAsync(lines, ct);
 
         var entity = new InventoryTransaction
