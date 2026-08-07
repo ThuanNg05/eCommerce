@@ -44,6 +44,7 @@ import { QRCodeSVG } from 'qrcode.react'
 
 interface CreateInvoiceLineState {
   id: string
+  entryTimestamp: number
   selectedProduct: ProductDto | null
   productSearchTerm: string
   quantity: number
@@ -54,6 +55,7 @@ interface CreateInvoiceLineState {
 
 const createEmptyInvoiceLine = (): CreateInvoiceLineState => ({
   id: `inv-line-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+  entryTimestamp: Date.now(),
   selectedProduct: null,
   productSearchTerm: '',
   quantity: 1,
@@ -405,8 +407,10 @@ export default function InvoicesPage() {
 
   const handleOpenEditModal = () => {
     if (!invoiceDetail) return
+    const baseTimestamp = Date.now()
     const initialLines: CreateInvoiceLineState[] = invoiceDetail.lines.map((l, index) => ({
-      id: `edit-line-${index}-${Date.now()}`,
+      id: `edit-line-${index}-${baseTimestamp + index}`,
+      entryTimestamp: baseTimestamp + index,
       selectedProduct: {
         id: l.productId,
         sku: `SP-${l.productId}`,
@@ -431,15 +435,17 @@ export default function InvoicesPage() {
   }
 
   const handleAddEditLine = () => {
-    const incompleteLine = editLines.find((l) => !l.selectedProduct)
-    if (incompleteLine) {
+    const topLine = editLines[0]
+    if (!topLine || !topLine.selectedProduct) {
       setToastState({
         open: true,
         message: 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.',
       })
-      setTimeout(() => {
-        document.getElementById(`product-select-${incompleteLine.id}`)?.focus()
-      }, 50)
+      if (topLine) {
+        setTimeout(() => {
+          document.getElementById(`product-select-${topLine.id}`)?.focus()
+        }, 50)
+      }
       return
     }
     const newDraft = createEmptyInvoiceLine()
@@ -451,23 +457,7 @@ export default function InvoicesPage() {
   }
 
   const handleUpdateEditLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
-    setEditLines((prev) => {
-      const target = prev.find((l) => l.id === id)
-      if (!target) return prev
-
-      const isNowCompleting =
-        target.selectedProduct === null &&
-        updated.selectedProduct !== undefined &&
-        updated.selectedProduct !== null
-
-      const updatedLine = { ...target, ...updated }
-
-      if (isNowCompleting) {
-        const remaining = prev.filter((l) => l.id !== id)
-        return [...remaining, updatedLine]
-      }
-      return prev.map((l) => (l.id === id ? updatedLine : l))
-    })
+    setEditLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
   }
 
   const handleRemoveEditLine = (id: string) => {
@@ -486,31 +476,29 @@ export default function InvoicesPage() {
     setEditActionError(null)
     if (!viewInvoiceId || !invoiceDetail) return
 
-    if (editLines.length === 0) {
+    const validLines = editLines
+      .filter((l) => l.selectedProduct !== null)
+      .sort((a, b) => (a.entryTimestamp || 0) - (b.entryTimestamp || 0))
+
+    if (validLines.length === 0) {
       setEditActionError('Hóa đơn phải có ít nhất 1 dòng sản phẩm.')
       return
     }
 
-    const hasEmptyProduct = editLines.some((l) => !l.selectedProduct)
-    if (hasEmptyProduct) {
-      setEditActionError('Vui lòng chọn sản phẩm cho tất cả các dòng.')
-      return
-    }
-
-    const productIds = editLines.map((l) => l.selectedProduct!.id)
+    const productIds = validLines.map((l) => l.selectedProduct!.id)
     const hasDuplicates = new Set(productIds).size !== productIds.length
     if (hasDuplicates) {
       setEditActionError('Mỗi sản phẩm chỉ được xuất hiện một lần trong hóa đơn.')
       return
     }
 
-    const hasInvalidQty = editLines.some((l) => !l.quantity || l.quantity < 1)
+    const hasInvalidQty = validLines.some((l) => !l.quantity || l.quantity < 1)
     if (hasInvalidQty) {
       setEditActionError('Số lượng sản phẩm phải lớn hơn hoặc bằng 1.')
       return
     }
 
-    const reqLines: CreateInvoiceLineRequest[] = editLines.map((l) => ({
+    const reqLines: CreateInvoiceLineRequest[] = validLines.map((l) => ({
       productId: l.selectedProduct!.id,
       quantity: l.quantity,
       unitPrice: l.unitPrice,
@@ -611,15 +599,17 @@ export default function InvoicesPage() {
 
   // Prepend line to top and scroll to top mượt
   const handleAddLine = () => {
-    const incompleteLine = createLines.find((l) => !l.selectedProduct)
-    if (incompleteLine) {
+    const topLine = createLines[0]
+    if (!topLine || !topLine.selectedProduct) {
       setToastState({
         open: true,
         message: 'Vui lòng chọn sản phẩm cho dòng hiện tại trước khi thêm dòng mới.',
       })
-      setTimeout(() => {
-        document.getElementById(`product-select-${incompleteLine.id}`)?.focus()
-      }, 50)
+      if (topLine) {
+        setTimeout(() => {
+          document.getElementById(`product-select-${topLine.id}`)?.focus()
+        }, 50)
+      }
       return
     }
     const newDraft = createEmptyInvoiceLine()
@@ -635,33 +625,18 @@ export default function InvoicesPage() {
   }
 
   const handleUpdateLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
-    setCreateLines((prev) => {
-      const target = prev.find((l) => l.id === id)
-      if (!target) return prev
-
-      const isNowCompleting =
-        target.selectedProduct === null &&
-        updated.selectedProduct !== undefined &&
-        updated.selectedProduct !== null
-
-      const updatedLine = { ...target, ...updated }
-
-      if (isNowCompleting) {
-        const remaining = prev.filter((l) => l.id !== id)
-        return [...remaining, updatedLine]
-      }
-      return prev.map((l) => (l.id === id ? updatedLine : l))
-    })
+    setCreateLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
   }
 
-  const hasIncompleteCreateLine = useMemo(
-    () => createLines.some((l) => !l.selectedProduct),
-    [createLines],
-  )
-  const hasIncompleteEditLine = useMemo(
-    () => editLines.some((l) => !l.selectedProduct),
-    [editLines],
-  )
+  const hasIncompleteCreateLine = useMemo(() => {
+    const topLine = createLines[0]
+    return !topLine || topLine.selectedProduct === null
+  }, [createLines])
+
+  const hasIncompleteEditLine = useMemo(() => {
+    const topLine = editLines[0]
+    return !topLine || topLine.selectedProduct === null
+  }, [editLines])
 
   // Total invoice estimated value
   const totalInvoiceAmount = useMemo(() => {
@@ -680,7 +655,9 @@ export default function InvoicesPage() {
       return
     }
 
-    const validLines = createLines.filter((l) => l.selectedProduct !== null)
+    const validLines = createLines
+      .filter((l) => l.selectedProduct !== null)
+      .sort((a, b) => (a.entryTimestamp || 0) - (b.entryTimestamp || 0))
     if (validLines.length === 0) {
       setActionError('Vui lòng chọn ít nhất một sản phẩm cho hóa đơn.')
       return
