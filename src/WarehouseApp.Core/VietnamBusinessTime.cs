@@ -12,6 +12,10 @@ public static class VietnamBusinessTime
     public static DateOnly Today => DateOnly.FromDateTime(
         TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Zone).DateTime);
 
+    /// <summary>Returns the calendar date in Vietnam for a persisted instant.</summary>
+    public static DateOnly DateOf(DateTimeOffset instant) => DateOnly.FromDateTime(
+        TimeZoneInfo.ConvertTime(instant, Zone).DateTime);
+
     private static TimeZoneInfo FindZone()
     {
         try

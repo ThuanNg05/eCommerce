@@ -21,6 +21,11 @@ public static class InvoiceEndpoints
             return Results.Created($"/api/invoices/{dto.Id}", dto);
         });
 
+        g.MapPut("/{id}/lines", async (string id, UpdateInvoiceLinesRequest req, IInvoiceService svc, CancellationToken ct) =>
+            await svc.UpdateLinesAsync(id, req, ct) is { } dto
+                ? Results.Ok(dto)
+                : Results.Problem(detail: "Không tìm thấy hóa đơn.", statusCode: 404));
+
         return api;
     }
 }

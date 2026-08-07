@@ -36,3 +36,10 @@ public record CreateInvoiceLineRequest(
 public record CreateInvoiceRequest(
     long CustomerId,
     IReadOnlyList<CreateInvoiceLineRequest> Lines);
+
+/// <summary>
+/// Replaces only the merchandise lines of an existing invoice. Customer, invoice code,
+/// and creation date are deliberately not editable through this request.
+/// </summary>
+public record UpdateInvoiceLinesRequest(
+    IReadOnlyList<CreateInvoiceLineRequest> Lines);
