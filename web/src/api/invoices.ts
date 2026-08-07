@@ -58,3 +58,11 @@ export function createInvoice(req: CreateInvoiceRequest): Promise<InvoiceDto> {
 export function updateInvoice(id: string, req: UpdateInvoiceRequest): Promise<InvoiceDto> {
   return apiPut<InvoiceDto>(`/api/invoices/${encodeURIComponent(id)}`, req)
 }
+
+export interface UpdateInvoiceLinesRequest {
+  lines: CreateInvoiceLineRequest[]
+}
+
+export function updateInvoiceLines(id: string, lines: CreateInvoiceLineRequest[]): Promise<InvoiceDto> {
+  return apiPut<InvoiceDto>(`/api/invoices/${encodeURIComponent(id)}/lines`, { lines })
+}

@@ -25,14 +25,16 @@ import {
   Autocomplete,
   Snackbar,
 } from '@mui/material'
-import { Plus, RefreshCw, Printer, Eye, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Printer, Eye, Trash2, Edit } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import {
   fetchInvoices,
   fetchInvoiceById,
   createInvoice,
+  updateInvoiceLines,
   type InvoiceSummaryDto,
   type CreateInvoiceRequest,
+  type CreateInvoiceLineRequest,
 } from '../api/invoices'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, fetchCustomerById, type CustomerDto } from '../api/customers'
@@ -77,6 +79,28 @@ const formatDateDDMMYYYY = (dateStr?: string | null) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
   return `${day}/${month}/${year}`
+}
+
+const isInvoiceEditable = (createdAtStr?: string | null): boolean => {
+  if (!createdAtStr) return false
+  const createdDate = new Date(createdAtStr)
+  if (isNaN(createdDate.getTime())) return false
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const formattedDateStr = formatter.format(createdDate)
+  const [yearStr, monthStr, dayStr] = formattedDateStr.split('-')
+  const year = parseInt(yearStr, 10)
+  const month = parseInt(monthStr, 10) - 1
+  const day = parseInt(dayStr, 10)
+
+  const deadlineVn = new Date(Date.UTC(year, month, day + 3, 0, 0, 0, 0) - 7 * 3600 * 1000)
+
+  return new Date().getTime() < deadlineVn.getTime()
 }
 
 const isWholesaleGroup = (customer: CustomerDto | null): boolean => {
@@ -359,6 +383,108 @@ export default function InvoicesPage() {
     setTimeout(() => {
       document.title = originalTitle
     }, 1000)
+  }
+
+  // Edit Invoice Lines Dialog State
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editLines, setEditLines] = useState<CreateInvoiceLineState[]>([])
+  const [editActionError, setEditActionError] = useState<string | null>(null)
+
+  // Edit Invoice Lines Mutation
+  const editMutation = useMutation({
+    mutationFn: ({ id, lines }: { id: string; lines: CreateInvoiceLineRequest[] }) => updateInvoiceLines(id, lines),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', viewInvoiceId] })
+      setIsEditOpen(false)
+      setToastState({ open: true, message: 'Đã cập nhật hóa đơn thành công.' })
+    },
+    onError: (err: Error) => setEditActionError(err.message),
+  })
+
+  const handleOpenEditModal = () => {
+    if (!invoiceDetail) return
+    const initialLines: CreateInvoiceLineState[] = invoiceDetail.lines.map((l, index) => ({
+      id: `edit-line-${index}-${Date.now()}`,
+      selectedProduct: {
+        id: l.productId,
+        sku: `SP-${l.productId}`,
+        name: l.productName,
+        basePrice: l.unitPrice,
+        priceRetail: l.unitPrice,
+        priceWholesale: l.unitPrice,
+        inStock: 9999,
+        warningStock: 0,
+        status: 1,
+        updatedAt: '',
+      },
+      productSearchTerm: l.productName,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      description: l.description || '',
+      isPriceManuallyEdited: false,
+    }))
+    setEditLines(initialLines)
+    setEditActionError(null)
+    setIsEditOpen(true)
+  }
+
+  const handleAddEditLine = () => {
+    setEditLines((prev) => [...prev, createEmptyInvoiceLine()])
+  }
+
+  const handleUpdateEditLine = (id: string, updated: Partial<CreateInvoiceLineState>) => {
+    setEditLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
+  }
+
+  const handleRemoveEditLine = (id: string) => {
+    setEditLines((prev) => prev.filter((l) => l.id !== id))
+  }
+
+  const editSelectedProductIds = useMemo(() => {
+    return editLines.map((l) => l.selectedProduct?.id).filter((id): id is number => id != null)
+  }, [editLines])
+
+  const editTotalInvoiceAmount = useMemo(() => {
+    return editLines.reduce((acc, l) => acc + (l.quantity || 0) * (l.unitPrice || 0), 0)
+  }, [editLines])
+
+  const handleEditSubmit = () => {
+    setEditActionError(null)
+    if (!viewInvoiceId || !invoiceDetail) return
+
+    if (editLines.length === 0) {
+      setEditActionError('Hóa đơn phải có ít nhất 1 dòng sản phẩm.')
+      return
+    }
+
+    const hasEmptyProduct = editLines.some((l) => !l.selectedProduct)
+    if (hasEmptyProduct) {
+      setEditActionError('Vui lòng chọn sản phẩm cho tất cả các dòng.')
+      return
+    }
+
+    const productIds = editLines.map((l) => l.selectedProduct!.id)
+    const hasDuplicates = new Set(productIds).size !== productIds.length
+    if (hasDuplicates) {
+      setEditActionError('Mỗi sản phẩm chỉ được xuất hiện một lần trong hóa đơn.')
+      return
+    }
+
+    const hasInvalidQty = editLines.some((l) => !l.quantity || l.quantity < 1)
+    if (hasInvalidQty) {
+      setEditActionError('Số lượng sản phẩm phải lớn hơn hoặc bằng 1.')
+      return
+    }
+
+    const reqLines: CreateInvoiceLineRequest[] = editLines.map((l) => ({
+      productId: l.selectedProduct!.id,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      description: l.description.trim() || undefined,
+    }))
+
+    editMutation.mutate({ id: viewInvoiceId, lines: reqLines })
   }
 
   // Create Invoice Mutation
@@ -897,18 +1023,44 @@ export default function InvoicesPage() {
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16 }}>
             Chi tiết hóa đơn {invoiceDetail?.id}
           </Typography>
-          <Button
-            variant="contained"
-            onClick={handlePrintInvoice}
-            startIcon={<Printer size={16} />}
-            sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
-          >
-            In hóa đơn
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {invoiceDetail && (
+              isInvoiceEditable(invoiceDetail.createdAt) ? (
+                <Button
+                  variant="outlined"
+                  onClick={handleOpenEditModal}
+                  startIcon={<Edit size={16} />}
+                  sx={{ color: '#171717', borderColor: '#e0e0e0' }}
+                >
+                  Sửa hóa đơn
+                </Button>
+              ) : (
+                <Tooltip title="Hóa đơn chỉ được chỉnh sửa hàng hóa trong 2 ngày sau khi tạo.">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      disabled
+                      startIcon={<Edit size={16} />}
+                    >
+                      Sửa hóa đơn
+                    </Button>
+                  </span>
+                </Tooltip>
+              )
+            )}
+            <Button
+              variant="contained"
+              onClick={handlePrintInvoice}
+              startIcon={<Printer size={16} />}
+              sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
+            >
+              In hóa đơn
+            </Button>
+          </Box>
         </DialogTitle>
         <Divider />
         <DialogContent id="printable-invoice-content">
@@ -1097,6 +1249,118 @@ export default function InvoicesPage() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setViewInvoiceId(null)} variant="outlined" color="inherit">
             Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* EDIT INVOICE LINES MODAL */}
+      <Dialog
+        open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>
+          Chỉnh sửa danh sách sản phẩm - Hóa đơn {invoiceDetail?.id}
+        </DialogTitle>
+        <DialogContent>
+          {editActionError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: '6px' }}>
+              {editActionError}
+            </Alert>
+          )}
+
+          {/* Top Header Row: Total Amount Block */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, mt: 0.5 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.25,
+                px: 2,
+                bgcolor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                textAlign: 'right',
+                minWidth: 200,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, letterSpacing: '0.05em', display: 'block' }}>
+                TỔNG TẠM TÍNH
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#2563eb', lineHeight: 1.2 }}>
+                {formatVND(editTotalInvoiceAmount)}
+              </Typography>
+            </Paper>
+          </Box>
+
+          {/* Lines Section */}
+          <Box sx={{ borderTop: '1px solid #ededed', pt: 1.5 }}>
+            {/* Sticky Header / Toolbar */}
+            <Box
+              sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                bgcolor: '#ffffff',
+                pt: 0.5,
+                pb: 1.5,
+                borderBottom: '1px solid #ededed',
+                mb: 1.5,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 3,
+                flexWrap: 'wrap',
+                rowGap: 1,
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 200 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
+                  Chi tiết sản phẩm
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#737373' }}>
+                  Điều chỉnh danh sách sản phẩm, số lượng, đơn giá và ghi chú
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                startIcon={<Plus size={14} />}
+                onClick={handleAddEditLine}
+                sx={{ color: '#171717', borderColor: '#e0e0e0', whiteSpace: 'nowrap' }}
+                variant="outlined"
+              >
+                Thêm dòng sản phẩm
+              </Button>
+            </Box>
+
+            {/* Scrollable Container */}
+            <Box sx={{ maxHeight: 'min(48vh, 460px)', overflowY: 'auto', pr: 0.5 }}>
+              {editLines.map((line) => (
+                <ProductLineItem
+                  key={line.id}
+                  line={line}
+                  selectedCustomer={customerDetail ?? null}
+                  selectedProductIds={editSelectedProductIds}
+                  onUpdateLine={handleUpdateEditLine}
+                  onRemoveLine={handleRemoveEditLine}
+                  canRemove={editLines.length > 1}
+                />
+              ))}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setIsEditOpen(false)} variant="outlined" color="inherit">
+            Hủy
+          </Button>
+          <Button
+            onClick={handleEditSubmit}
+            variant="contained"
+            disabled={editMutation.isPending || !invoiceDetail}
+            sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
+          >
+            Lưu thay đổi
           </Button>
         </DialogActions>
       </Dialog>
