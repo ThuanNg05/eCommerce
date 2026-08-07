@@ -13,7 +13,7 @@ public static class InventoryTransactionEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
         g.MapGet("/{id:long}", async (long id, IInventoryTransactionService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy phiếu kho.", statusCode: 404));
 
         g.MapPost("/", async (CreateInventoryTransactionRequest req, IInventoryTransactionService svc, CancellationToken ct) =>
         {

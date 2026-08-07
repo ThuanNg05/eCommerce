@@ -13,7 +13,7 @@ public static class CategoryEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
         g.MapGet("/{id:long}", async (long id, ICategoryService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy danh mục.", statusCode: 404));
 
         g.MapPost("/", async (CreateCategoryRequest req, ICategoryService svc, CancellationToken ct) =>
         {
@@ -22,7 +22,7 @@ public static class CategoryEndpoints
         });
 
         g.MapPut("/{id:long}", async (long id, UpdateCategoryRequest req, ICategoryService svc, CancellationToken ct) =>
-            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy danh mục.", statusCode: 404));
 
         return api;
     }

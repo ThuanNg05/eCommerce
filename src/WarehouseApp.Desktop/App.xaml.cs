@@ -32,7 +32,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"The in-process API failed to start.\n\n{ex.Message}\n\n" +
+                $"Không thể khởi động API tích hợp.\n\n{ex.Message}\n\n" +
                 "Set the ConnectionStrings__Default environment variable (see README) and restart.",
                 "Warehouse App — startup", MessageBoxButton.OK, MessageBoxImage.Warning);
         }

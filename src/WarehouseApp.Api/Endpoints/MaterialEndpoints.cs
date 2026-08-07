@@ -13,7 +13,7 @@ public static class MaterialEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
         g.MapGet("/{id:long}", async (long id, IMaterialService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy vật liệu.", statusCode: 404));
 
         g.MapPost("/", async (CreateMaterialRequest req, IMaterialService svc, CancellationToken ct) =>
         {
@@ -22,7 +22,7 @@ public static class MaterialEndpoints
         });
 
         g.MapPut("/{id:long}", async (long id, UpdateMaterialRequest req, IMaterialService svc, CancellationToken ct) =>
-            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy vật liệu.", statusCode: 404));
 
         return api;
     }

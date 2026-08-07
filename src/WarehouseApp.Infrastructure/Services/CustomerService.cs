@@ -89,11 +89,11 @@ public class CustomerService(AppDbContext db) : ICustomerService
     private async Task EnsureUniqueAsync(long? excludeId, string name, string phone, string? email, CancellationToken ct)
     {
         if (await db.Customers.AnyAsync(c => c.Id != excludeId && c.Name == name, ct))
-            throw new DomainValidationException($"A customer named '{name}' already exists.");
+            throw new DomainValidationException($"Khách hàng tên '{name}' đã tồn tại.");
         if (await db.Customers.AnyAsync(c => c.Id != excludeId && c.Phone == phone, ct))
-            throw new DomainValidationException($"A customer with phone '{phone}' already exists.");
+            throw new DomainValidationException($"Số điện thoại '{phone}' đã được sử dụng.");
         if (email is not null && await db.Customers.AnyAsync(c => c.Id != excludeId && c.Email == email, ct))
-            throw new DomainValidationException($"A customer with email '{email}' already exists.");
+            throw new DomainValidationException($"Email '{email}' đã được sử dụng.");
     }
 
     /// <summary>GroupPrice is a single-character tier code; keep at most one char or null.</summary>

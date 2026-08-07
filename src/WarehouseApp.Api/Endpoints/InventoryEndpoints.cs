@@ -13,7 +13,7 @@ public static class InventoryEndpoints
             Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 50, search, ct)));
 
         g.MapGet("/{id:long}", async (long id, IInventoryService svc, CancellationToken ct) =>
-            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.GetAsync(id, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
 
         g.MapPost("/", async (CreateProductRequest req, IInventoryService svc, CancellationToken ct) =>
         {
@@ -22,10 +22,10 @@ public static class InventoryEndpoints
         });
 
         g.MapPut("/{id:long}", async (long id, UpdateProductRequest req, IInventoryService svc, CancellationToken ct) =>
-            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
 
         g.MapPost("/{id:long}/adjust", async (long id, StockAdjustmentRequest req, IInventoryService svc, CancellationToken ct) =>
-            await svc.AdjustStockAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.NotFound());
+            await svc.AdjustStockAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
 
         return api;
     }
