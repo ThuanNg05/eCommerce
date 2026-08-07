@@ -374,7 +374,7 @@ export default function ProductsPage() {
               '&:hover': { bgcolor: '#000000' },
             }}
           >
-            Thêm sản phẩm
+            Thêm mới
           </Button>
         </Box>
       </Box>
@@ -596,7 +596,7 @@ export default function ProductsPage() {
             disabled={createMutation.isPending}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Lưu sản phẩm
+            Lưu
           </Button>
         </DialogActions>
       </Dialog>

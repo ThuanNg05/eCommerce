@@ -228,7 +228,7 @@ export default function AccountsPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff' }}
           >
-            Thêm tài khoản
+            Thêm mới
           </Button>
         </Box>
       </Box>

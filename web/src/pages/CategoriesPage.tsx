@@ -174,7 +174,7 @@ export default function CategoriesPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }}
           >
-            Thêm danh mục
+            Thêm mới
           </Button>
         </Box>
       </Box>
@@ -245,7 +245,7 @@ export default function CategoriesPage() {
               disabled={isSubmitting}
               sx={{ bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }}
             >
-              {editingCategory ? 'Cập nhật' : 'Thêm mới'}
+              {editingCategory ? 'Cập nhật' : 'Lưu'}
             </Button>
           </DialogActions>
         </form>

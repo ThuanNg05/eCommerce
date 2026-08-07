@@ -207,7 +207,7 @@ export default function CustomersPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }}
           >
-            Thêm khách hàng
+            Thêm mới
           </Button>
         </Box>
       </Box>
@@ -369,7 +369,7 @@ export default function CustomersPage() {
             disabled={createMutation.isPending || !createForm.name || !createForm.phone}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Lưu khách hàng
+            Lưu
           </Button>
         </DialogActions>
       </Dialog>

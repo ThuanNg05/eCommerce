@@ -247,7 +247,7 @@ export default function BackboardsPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff' }}
           >
-            Thêm
+            Thêm mới
           </Button>
         </Box>
       </Box>

@@ -266,7 +266,7 @@ export default function MaterialsPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff' }}
           >
-            Thêm vật liệu
+            Thêm mới
           </Button>
         </Box>
       </Box>
@@ -438,7 +438,7 @@ export default function MaterialsPage() {
             disabled={createMutation.isPending || !createForm.name}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Lưu vật liệu
+            Lưu
           </Button>
         </DialogActions>
       </Dialog>
