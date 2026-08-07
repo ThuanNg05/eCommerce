@@ -38,6 +38,7 @@ import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, fetchCustomerById, type CustomerDto } from '../api/customers'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { STORE_INFO } from '../constants/storeInfo'
+import { QRCodeSVG } from 'qrcode.react'
 
 interface CreateInvoiceLineState {
   id: string
@@ -944,16 +945,26 @@ export default function InvoicesPage() {
                     </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 18 }}>
-                    HÓA ĐƠN BÁN HÀNG
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.5 }}>
-                    Mã số: {invoiceDetail.id}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#525252', fontSize: 13 }}>
-                    Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
-                  </Typography>
+                <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#171717', fontSize: 18 }}>
+                      HÓA ĐƠN BÁN HÀNG
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.5 }}>
+                      Mã số: {invoiceDetail.id}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#525252', fontSize: 13 }}>
+                      Ngày lập: {formatDateDDMMYYYY(invoiceDetail.createdAt)}
+                    </Typography>
+                  </Box>
+                  {invoiceDetail.id && (
+                    <Box sx={{ textAlign: 'center' }}>
+                      <QRCodeSVG value={invoiceDetail.id} size={84} level="M" />
+                      <Typography variant="caption" sx={{ color: '#737373', fontSize: 10, display: 'block', mt: 0.5 }}>
+                        Quét để tra cứu mã hóa đơn
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
 
