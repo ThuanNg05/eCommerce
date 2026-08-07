@@ -29,6 +29,7 @@ import {
   type CreateCustomerRequest,
   type UpdateCustomerRequest,
 } from '../api/customers'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 export const GROUP_PRICE_LABEL: Record<string, string> = {
   L: 'Lẻ',
@@ -252,6 +253,7 @@ export default function CustomersPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu khách hàng</span>'
             animateRows
             pagination

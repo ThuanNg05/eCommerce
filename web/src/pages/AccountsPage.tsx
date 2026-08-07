@@ -31,6 +31,8 @@ import {
   type UpdateAccountRequest,
 } from '../api/accounts'
 
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+
 export default function AccountsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
@@ -272,6 +274,7 @@ export default function AccountsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
+            localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu tài khoản</span>'
             animateRows
             pagination

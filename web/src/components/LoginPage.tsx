@@ -30,11 +30,11 @@ export default function LoginPage() {
     setErrorMsg('')
 
     if (!username.trim()) {
-      setErrorMsg('Vui lòng nhập Username.')
+      setErrorMsg('Vui lòng nhập tên đăng nhập.')
       return
     }
     if (!password.trim()) {
-      setErrorMsg('Vui lòng nhập Password.')
+      setErrorMsg('Vui lòng nhập mật khẩu.')
       return
     }
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
             fontFamily: 'system-ui, -apple-system, sans-serif',
           }}
         >
-          Sign In
+          Đăng nhập
         </Typography>
 
         {errorMsg && (
@@ -109,14 +109,14 @@ export default function LoginPage() {
               fontSize: '0.75rem',
             }}
           >
-            USERNAME
+            TÊN ĐĂNG NHẬP
           </Typography>
           <TextField
             fullWidth
             size="medium"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your username"
+            placeholder="Nhập tên đăng nhập"
             variant="outlined"
             disabled={isSubmitting}
             sx={{
@@ -143,7 +143,7 @@ export default function LoginPage() {
               fontSize: '0.75rem',
             }}
           >
-            PASSWORD
+            MẬT KHẨU
           </Typography>
           <TextField
             fullWidth
@@ -151,7 +151,7 @@ export default function LoginPage() {
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
+            placeholder="Nhập mật khẩu"
             variant="outlined"
             disabled={isSubmitting}
             InputProps={{
@@ -192,7 +192,7 @@ export default function LoginPage() {
               underline="always"
               onClick={(e) => {
                 e.preventDefault()
-                alert('Liên hệ quản trị viên để đặt lại mật khẩu')
+                alert('Vui lòng liên hệ quản trị viên để đặt lại mật khẩu.')
               }}
               sx={{
                 color: '#111827',
@@ -202,7 +202,7 @@ export default function LoginPage() {
                 textDecorationColor: '#111827',
               }}
             >
-              Forgot Password?
+              Quên mật khẩu?
             </Link>
           </Box>
 
@@ -227,7 +227,7 @@ export default function LoginPage() {
               },
             }}
           >
-            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'LOGIN'}
+            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'ĐĂNG NHẬP'}
           </Button>
         </Box>
       </Paper>

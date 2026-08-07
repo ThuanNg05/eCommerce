@@ -35,6 +35,7 @@ import {
 } from '../api/invoices'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
+import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 interface CreateInvoiceLineState {
   id: string
@@ -559,6 +560,8 @@ export default function InvoicesPage() {
             rowData={filteredInvoices}
             columnDefs={columns}
             loading={isLoading}
+            localeText={AG_GRID_LOCALE_VI}
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu hóa đơn</span>'
             animateRows
             pagination
             paginationPageSize={50}
