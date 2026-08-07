@@ -123,7 +123,7 @@ export default function BackboardsPage() {
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
-      { field: 'type', headerName: 'LOẠI TẤM LƯNG (TYPE)', width: 180, sortable: true },
+      { field: 'type', headerName: 'LOẠI', width: 180, sortable: true },
       {
         field: 'importPrice',
         headerName: 'GIÁ NHẬP',
@@ -202,7 +202,7 @@ export default function BackboardsPage() {
           if (!p.data) return null
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-              <Tooltip title="Sửa thông tin tấm lưng">
+              <Tooltip title="Sửa thông tin ván hậu">
                 <IconButton size="small" onClick={() => handleOpenEdit(p.data)} sx={{ color: '#404040' }}>
                   <Edit3 size={16} />
                 </IconButton>
@@ -221,10 +221,10 @@ export default function BackboardsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600, color: '#171717', mb: 0.5 }}>
-            Quản lý Tấm lưng
+            Quản lý ván hậu
           </Typography>
           <Typography variant="body2" sx={{ color: '#737373' }}>
-            Thông số và tồn kho tấm lưng ván lót MDF, Alu.
+            Thông số và tồn kho ván hậu ván lót MDF, Alu.
           </Typography>
         </Box>
 
@@ -246,7 +246,7 @@ export default function BackboardsPage() {
             startIcon={<Plus size={16} />}
             sx={{ height: 36, bgcolor: '#1a1a1a', color: '#ffffff' }}
           >
-            Thêm tấm lưng
+            Thêm
           </Button>
         </Box>
       </Box>
@@ -255,14 +255,14 @@ export default function BackboardsPage() {
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <SearchField
-            placeholder="Tìm theo mô tả tấm lưng..."
+            placeholder="Tìm theo mô tả..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             width={320}
           />
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>
-            Hiển thị: <strong>{data?.items.length ?? 0}</strong> / Tổng số: <strong>{data?.totalCount ?? 0}</strong> tấm lưng
+            Hiển thị: <strong>{data?.items.length ?? 0}</strong> / Tổng số: <strong>{data?.totalCount ?? 0}</strong> loại ván hậu
           </Typography>
         </Box>
       </Paper>
@@ -292,7 +292,7 @@ export default function BackboardsPage() {
             columnDefs={columns}
             loading={isLoading}
             quickFilterText={search}
-            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu tấm lưng</span>'
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu ván hậu</span>'
             animateRows
             pagination
             paginationPageSize={50}
@@ -309,7 +309,7 @@ export default function BackboardsPage() {
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
       >
-        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>Thêm tấm lưng mới</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>Thêm ván hậu mới</DialogTitle>
         <DialogContent>
           {actionError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: '6px' }}>
@@ -404,7 +404,7 @@ export default function BackboardsPage() {
             disabled={createMutation.isPending}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            Lưu tấm lưng
+            Lưu
           </Button>
         </DialogActions>
       </Dialog>
@@ -418,7 +418,7 @@ export default function BackboardsPage() {
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
       >
         <DialogTitle sx={{ fontWeight: 600, fontSize: 16 }}>
-          Cập nhật tấm lưng #{editBackboard?.id} (Loại: {editBackboard?.type})
+          Cập nhật ván hậu #{editBackboard?.id} (Loại: {editBackboard?.type})
         </DialogTitle>
         <DialogContent>
           {actionError && (
