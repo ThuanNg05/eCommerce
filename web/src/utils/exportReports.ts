@@ -439,48 +439,74 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     }
   `
 
-  document.body.appendChild(container)
-
-  // Step 2: Wait for DOM layout, fonts ready, and two requestAnimationFrame cycles
-  if (document.fonts && document.fonts.ready) {
-    try {
-      await document.fonts.ready
-    } catch {
-      // Fallback ignore
-    }
-  }
-
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve())
-    })
-  })
-  await new Promise((resolve) => setTimeout(resolve, 150))
-
-  // Step 3 & 4: Pagebreak config and pre-save canvas validation
-  const opt = {
-    margin: [8, 8, 8, 8] as [number, number, number, number],
-    filename: fileName,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      windowWidth: 1120,
-    },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const },
-    pagebreak: { mode: ['css', 'legacy'] },
-  }
-
   try {
+    document.body.appendChild(container)
+
+    // Stage 1: Log container metrics & validate container dimensions
+    const rect = container.getBoundingClientRect()
+    const innerTextLen = container.innerText ? container.innerText.trim().length : 0
+
+    console.log('[PDF Export Stage 1: Container attached]', {
+      rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left },
+      scrollWidth: container.scrollWidth,
+      scrollHeight: container.scrollHeight,
+      innerTextLength: innerTextLen,
+    })
+
+    if (rect.width <= 0 || rect.height <= 0 || innerTextLen === 0) {
+      throw new Error(
+        `Khung nội dung PDF không có kích thước hợp lệ (${rect.width}x${rect.height}) hoặc bị rỗng (độ dài chữ: ${innerTextLen}).`,
+      )
+    }
+
+    // Wait for DOM layout calculation and fonts ready
+    if (document.fonts && document.fonts.ready) {
+      try {
+        await document.fonts.ready
+      } catch {
+        // Fallback ignore font load error
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve())
+      })
+    })
+    await new Promise((resolve) => setTimeout(resolve, 150))
+
+    const opt = {
+      margin: [8, 8, 8, 8] as [number, number, number, number],
+      filename: fileName,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: 1120,
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }
+
+    // Stage 2: Render to canvas
+    console.log('[PDF Export Stage 2: Starting worker toCanvas()]')
     const worker = html2pdf().from(container).set(opt).toCanvas()
     const canvas = (await worker.get('canvas')) as HTMLCanvasElement | null
 
+    // Stage 3: Canvas validation
+    console.log('[PDF Export Stage 3: Canvas generated]', {
+      width: canvas?.width ?? 0,
+      height: canvas?.height ?? 0,
+    })
+
     if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      throw new Error('Không thể tạo hình ảnh cho file PDF (canvas rỗng). Vui lòng thử lại.')
+      throw new Error(`Không thể tạo hình ảnh canvas cho PDF (kích thước: ${canvas?.width ?? 0}x${canvas?.height ?? 0}).`)
     }
 
-    await worker.save()
+    // Stage 4: Convert canvas to PDF and trigger save
+    console.log('[PDF Export Stage 4: Saving PDF file]', fileName)
+    await worker.toPdf().save()
   } finally {
     if (container && document.body.contains(container)) {
       document.body.removeChild(container)
