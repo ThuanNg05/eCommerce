@@ -23,6 +23,9 @@ import {
   Alert,
   Tooltip as MuiTooltip,
   Pagination,
+  Menu,
+  CircularProgress,
+  Snackbar,
   type SelectChangeEvent,
 } from '@mui/material'
 import {
@@ -36,6 +39,9 @@ import {
   BarChart2,
   Users,
   Package,
+  Download,
+  ChevronDown,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   fetchSalesOverview,
@@ -46,11 +52,13 @@ import {
   fetchInvoiceDetails,
   fetchLowStockReports,
   type SalesReportFilter,
+  type InvoiceReportRowDto,
 } from '../api/reports'
 import { fetchCategories, type CategoryDto } from '../api/categories'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import SearchField from '../components/SearchField'
+import { exportReportsToExcel, exportReportsToPdf, type ExportReportsData } from '../utils/exportReports'
 
 // Utility formatters
 const formatVND = (amount?: number | null) => {
@@ -138,6 +146,15 @@ export default function ReportsPage() {
   // Invoice Details Pagination
   const [detailsPage, setDetailsPage] = useState<number>(1)
   const [detailsPageSize, setDetailsPageSize] = useState<number>(20)
+
+  // Export State & Menu
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null)
+  const [isExporting, setIsExporting] = useState<boolean>(false)
+  const [toastState, setToastState] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  })
 
   // Server-Side Autocomplete search terms
   const [categorySearchTerm, setCategorySearchTerm] = useState('')
@@ -300,17 +317,176 @@ export default function ReportsPage() {
     return Math.max(...flowData.map((d) => Math.max(d.inQuantity, d.outQuantity)), 1)
   }, [flowData])
 
+  // Check if report has valid data to export
+  const hasReportData = Boolean(
+    overviewData ||
+      (summaryData && summaryData.length > 0) ||
+      (invoiceDetailsData && invoiceDetailsData.totalCount > 0),
+  )
+
+  const getFilterDescriptionLabel = () => {
+    let base = ''
+    if (datePreset === 'today') base = 'Hôm nay'
+    else if (datePreset === '7days') base = '7 ngày'
+    else if (datePreset === 'thisMonth') base = 'Tháng này'
+    else if (datePreset === 'lastMonth') base = 'Tháng trước'
+    else if (fromDate && toDate) {
+      const formatStr = (dStr: string) => {
+        const parts = dStr.split('-')
+        if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`
+        return dStr
+      }
+      base = `${formatStr(fromDate)} đến ${formatStr(toDate)}`
+    } else {
+      base = 'Tùy chọn'
+    }
+
+    if (groupPrice === 'S') base += ' - Sỉ'
+    if (groupPrice === 'L') base += ' - Lẻ'
+    return base
+  }
+
+  const buildExportData = async (): Promise<ExportReportsData> => {
+    const filterDesc = getFilterDescriptionLabel()
+    const groupPriceLabel = groupPrice === 'S' ? 'Giá sỉ (S)' : groupPrice === 'L' ? 'Giá lẻ (L)' : 'Tất cả nhóm'
+    const categoryLabel = selectedCategory ? selectedCategory.name : 'Tất cả danh mục'
+    const productLabel = selectedProduct ? `[${selectedProduct.sku}] ${selectedProduct.name}` : 'Tất cả sản phẩm'
+    const customerLabel = selectedCustomer
+      ? `${selectedCustomer.name}${selectedCustomer.phone ? ' - ' + selectedCustomer.phone : ''}`
+      : 'Tất cả khách hàng'
+    const searchLabel = search.trim() ? search.trim() : 'Không có'
+
+    // Fetch full invoice details for export (up to 500 items)
+    let completeInvoiceDetails: InvoiceReportRowDto[] = []
+    try {
+      const detailsRes = await fetchInvoiceDetails(salesFilter, 1, 500)
+      completeInvoiceDetails = detailsRes.items
+    } catch (err) {
+      console.error('Failed to fetch full invoice details for export:', err)
+      completeInvoiceDetails = invoiceDetailsData?.items ?? []
+    }
+
+    return {
+      filterDescription: filterDesc,
+      filterGroupPriceLabel: groupPriceLabel,
+      filterCategoryLabel: categoryLabel,
+      filterProductLabel: productLabel,
+      filterCustomerLabel: customerLabel,
+      filterSearchLabel: searchLabel,
+      overviewData,
+      summaryData,
+      topProductsData,
+      topCustomersData,
+      flowData,
+      invoiceDetails: completeInvoiceDetails,
+      lowStockData,
+    }
+  }
+
+  const handleExportExcel = async () => {
+    setExportAnchorEl(null)
+    if (!hasReportData) return
+    setIsExporting(true)
+    try {
+      const exportData = await buildExportData()
+      await exportReportsToExcel(exportData)
+      setToastState({ open: true, message: 'Đã xuất báo cáo Excel thành công.', severity: 'success' })
+    } catch (err) {
+      console.error(err)
+      setToastState({ open: true, message: 'Lỗi khi xuất file Excel. Vui lòng thử lại.', severity: 'error' })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportPdf = async () => {
+    setExportAnchorEl(null)
+    if (!hasReportData) return
+    setIsExporting(true)
+    try {
+      const exportData = await buildExportData()
+      await exportReportsToPdf(exportData)
+      setToastState({ open: true, message: 'Đã xuất báo cáo PDF thành công.', severity: 'success' })
+    } catch (err) {
+      console.error(err)
+      setToastState({ open: true, message: 'Lỗi khi xuất file PDF. Vui lòng thử lại.', severity: 'error' })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <Box sx={{ width: '100%', pb: 6 }}>
-      {/* Title Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#171717', mb: 0.5, letterSpacing: '-0.01em' }}>
-          Thống kê &amp; Báo cáo Tổng hợp
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#737373' }}>
-          Phân tích doanh thu, sản lượng bán hàng, nhóm khách hàng, luồng xuất nhập kho và tồn kho.
-        </Typography>
+      {/* Title & Export Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#171717', mb: 0.5, letterSpacing: '-0.01em' }}>
+            Thống kê &amp; Báo cáo Tổng hợp
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#737373' }}>
+            Phân tích doanh thu, sản lượng bán hàng, nhóm khách hàng, luồng xuất nhập kho và tồn kho.
+          </Typography>
+        </Box>
+
+        {/* Export Button & Menu */}
+        <MuiTooltip title={!hasReportData ? 'Không có dữ liệu để xuất.' : ''}>
+          <span>
+            <Button
+              variant="contained"
+              disabled={!hasReportData || isExporting}
+              onClick={(e) => setExportAnchorEl(e.currentTarget)}
+              startIcon={isExporting ? <CircularProgress size={16} color="inherit" /> : <Download size={16} />}
+              endIcon={<ChevronDown size={16} />}
+              sx={{
+                bgcolor: '#1e293b',
+                '&:hover': { bgcolor: '#0f172a' },
+                height: 38,
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 2,
+              }}
+            >
+              {isExporting ? 'Đang tạo báo cáo...' : 'Xuất báo cáo'}
+            </Button>
+          </span>
+        </MuiTooltip>
+
+        <Menu
+          anchorEl={exportAnchorEl}
+          open={Boolean(exportAnchorEl)}
+          onClose={() => setExportAnchorEl(null)}
+          PaperProps={{ sx: { borderRadius: '6px', minWidth: 180, mt: 0.5, boxShadow: 3 } }}
+        >
+          <MenuItem onClick={handleExportPdf} sx={{ gap: 1.5, py: 1 }}>
+            <FileText size={16} color="#e11d48" />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Xuất PDF
+            </Typography>
+          </MenuItem>
+          <MenuItem onClick={handleExportExcel} sx={{ gap: 1.5, py: 1 }}>
+            <FileSpreadsheet size={16} color="#15803d" />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Xuất Excel (.xlsx)
+            </Typography>
+          </MenuItem>
+        </Menu>
       </Box>
+
+      {/* Toast Notification */}
+      <Snackbar
+        open={toastState.open}
+        autoHideDuration={4000}
+        onClose={() => setToastState({ ...toastState, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToastState({ ...toastState, open: false })}
+          severity={toastState.severity}
+          sx={{ width: '100%', borderRadius: '6px', boxShadow: 3 }}
+        >
+          {toastState.message}
+        </Alert>
+      </Snackbar>
 
       {/* Global Error Banner */}
       {generalError && (
