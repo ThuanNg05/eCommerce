@@ -407,9 +407,21 @@ export default function ReportsPage() {
       const exportData = await buildExportData()
       await exportReportsToPdf(exportData)
       setToastState({ open: true, message: 'Đã xuất báo cáo PDF thành công.', severity: 'success' })
-    } catch (err) {
-      console.error(err)
-      setToastState({ open: true, message: 'Lỗi khi xuất file PDF. Vui lòng thử lại.', severity: 'error' })
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+
+      console.error('[Reports PDF export failed]', {
+        message: err.message,
+        stack: err.stack,
+        filter: salesFilter,
+        error,
+      })
+
+      setToastState({
+        open: true,
+        severity: 'error',
+        message: `Không thể xuất PDF: ${err.message}`,
+      })
     } finally {
       setIsExporting(false)
     }
