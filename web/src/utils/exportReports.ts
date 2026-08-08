@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
-import html2pdf from 'html2pdf.js'
-import { STORE_INFO } from '../constants/storeInfo'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { ROBOTO_REGULAR_BASE64, ROBOTO_BOLD_BASE64 } from '../assets/fonts/robotoFonts'
 import type {
   SalesOverviewDto,
   SalesSummaryRowDto,
@@ -80,7 +81,6 @@ export const exportReportsToExcel = async (data: ExportReportsData) => {
 
   // 1. Sheet: Tổng quan
   const overviewAoa = [
-    [STORE_INFO.name.toUpperCase()],
     ['BÁO CÁO THỐNG KÊ TỔNG HỢP KINH DOANH & KHO HÀNG'],
     [],
     ['I. THÔNG TIN BỘ LỌC ÁP DỤNG'],
@@ -198,458 +198,470 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
   const exportTimeStr = formatDateTime(now.toISOString())
   const fileName = getReportFileName(data.filterDescription, 'pdf')
 
-  // Create temporary isolated iframe (pure HTML/CSS environment, free from MUI/Lucide SVGs)
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.left = '0'
-  iframe.style.top = '0'
-  iframe.style.width = '1120px'
-  iframe.style.height = '1600px'
-  iframe.style.border = 'none'
-  iframe.style.zIndex = '999999'
-  iframe.style.opacity = '1'
-  iframe.style.pointerEvents = 'none'
-  iframe.style.backgroundColor = '#ffffff'
+  // Initialize jsPDF document in portrait A4
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  })
 
-  try {
-    document.body.appendChild(iframe)
+  // Register Roboto Regular & Bold fonts under the exact same family name 'Roboto'
+  doc.addFileToVFS('Roboto-Regular.ttf', ROBOTO_REGULAR_BASE64)
+  doc.addFileToVFS('Roboto-Bold.ttf', ROBOTO_BOLD_BASE64)
 
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!iframeDoc) {
-      throw new Error('Không thể khởi tạo tài liệu HTML trong iframe để xuất PDF.')
-    }
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal')
+  doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold')
 
-    console.log('[PDF Export Stage 1: Iframe attached]', {
-      width: iframe.style.width,
-      height: iframe.style.height,
-    })
+  // Set default font family for the entire document
+  doc.setFont('Roboto', 'normal')
 
-    const reportHtml = `
-      <!DOCTYPE html>
-      <html lang="vi">
-      <head>
-        <meta charset="UTF-8">
-        <title>${fileName}</title>
-        <style>
-          * { box-sizing: border-box; }
-          body {
-            margin: 0;
-            padding: 24px;
-            background-color: #ffffff;
-            color: #1e293b;
-            font-family: Arial, Roboto, "Helvetica Neue", sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-          }
-          .header-row {
-            margin-bottom: 20px;
-            border-bottom: 2px solid #2563eb;
-            padding-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-          }
-          .header-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
-          .header-sub { margin: 4px 0 0 0; font-size: 12px; color: #475569; }
-          .report-title { margin: 0; font-size: 20px; font-weight: 700; color: #2563eb; text-align: right; }
-          .filter-box {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            break-inside: avoid;
-            page-break-inside: avoid;
-          }
-          .filter-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            font-size: 12px;
-            color: #475569;
-          }
-          .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-top: 8px;
-          }
-          .kpi-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 12px;
-            background: #ffffff;
-          }
-          .kpi-title { font-size: 11px; font-weight: 700; color: #64748b; }
-          .kpi-val { font-size: 18px; font-weight: 700; margin-top: 4px; }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11.5px;
-          }
-          th, td {
-            border: 1px solid #e2e8f0;
-            padding: 6px 8px;
-          }
-          th {
-            background-color: #f1f5f9;
-            font-weight: 700;
-            text-align: left;
-          }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: 700; }
-          .section-block {
-            margin-bottom: 24px;
-            break-inside: avoid;
-            page-break-inside: avoid;
-          }
-          .section-title {
-            margin: 0 0 10px 0;
-            font-size: 15px;
-            font-weight: 700;
-            color: #0f172a;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header-row">
-          <div>
-            <h1 class="header-title">${STORE_INFO.name.toUpperCase()}</h1>
-            <p class="header-sub">Địa chỉ: ${STORE_INFO.address}</p>
-            <p class="header-sub">Điện thoại: ${STORE_INFO.phoneDisplay}</p>
-          </div>
-          <div>
-            <h2 class="report-title">BÁO CÁO THỐNG KÊ TỔNG HỢP</h2>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b; text-align: right;">Thời điểm xuất: <strong>${exportTimeStr}</strong></p>
-          </div>
-        </div>
+  let currentY = 12
 
-        <div class="filter-box">
-          <h3 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase;">Bộ lọc áp dụng:</h3>
-          <div class="filter-grid">
-            <div><strong>Thời gian:</strong> ${data.filterDescription}</div>
-            <div><strong>Nhóm giá:</strong> ${data.filterGroupPriceLabel}</div>
-            <div><strong>Danh mục:</strong> ${data.filterCategoryLabel}</div>
-            <div><strong>Sản phẩm:</strong> ${data.filterProductLabel}</div>
-            <div><strong>Khách hàng:</strong> ${data.filterCustomerLabel}</div>
-            <div><strong>Từ khóa:</strong> ${data.filterSearchLabel}</div>
-          </div>
-        </div>
-
-        <div class="section-block">
-          <h3 class="section-title">1. CHỈ SỐ KPI TỔNG QUAN</h3>
-          <div class="kpi-grid">
-            <div class="kpi-card" style="border-left: 4px solid #2563eb;">
-              <div class="kpi-title">DOANH THU</div>
-              <div class="kpi-val" style="color: #2563eb;">${formatVND(data.overviewData?.revenue)}</div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #059669;">
-              <div class="kpi-title">SỐ HÓA ĐƠN</div>
-              <div class="kpi-val" style="color: #059669;">${data.overviewData?.invoiceCount ?? 0}</div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #d97706;">
-              <div class="kpi-title">SẢN PHẨM ĐÃ BÁN</div>
-              <div class="kpi-val" style="color: #d97706;">${data.overviewData?.unitsSold ?? 0}</div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #7c3aed;">
-              <div class="kpi-title">GIÁ TRỊ HĐ TRUNG BÌNH</div>
-              <div class="kpi-val" style="color: #7c3aed;">${formatVND(data.overviewData?.averageInvoiceValue)}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-block">
-          <h3 class="section-title">2. DOANH THU THEO THỜI GIAN</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Mốc thời gian</th>
-                <th class="text-right">Số hóa đơn</th>
-                <th class="text-right">Doanh thu (VND)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                data.summaryData && data.summaryData.length > 0
-                  ? data.summaryData
-                      .map(
-                        (row) => `
-                <tr>
-                  <td>${row.date}</td>
-                  <td class="text-right">${row.invoiceCount}</td>
-                  <td class="text-right font-bold">${formatVND(row.total)}</td>
-                </tr>
-              `,
-                      )
-                      .join('')
-                  : '<tr><td colspan="3" class="text-center" style="color: #94a3b8; padding: 12px;">Không có dữ liệu</td></tr>'
-              }
-            </tbody>
-          </table>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;" class="section-block">
-          <div>
-            <h3 class="section-title" style="color: #d97706;">3. TOP SẢN PHẨM BÁN CHẠY</h3>
-            <table>
-              <thead>
-                <tr style="background-color: #fef3c7;">
-                  <th class="text-center">#</th>
-                  <th>Sản phẩm</th>
-                  <th class="text-right">SL</th>
-                  <th class="text-right">Doanh thu</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  data.topProductsData && data.topProductsData.length > 0
-                    ? data.topProductsData
-                        .map(
-                          (p, i) => `
-                  <tr>
-                    <td class="text-center font-bold" style="color: #d97706;">${i + 1}</td>
-                    <td>[${p.sku}] ${p.name}</td>
-                    <td class="text-right font-bold">${p.quantitySold}</td>
-                    <td class="text-right font-bold">${formatVND(p.revenue)}</td>
-                  </tr>
-                `,
-                        )
-                        .join('')
-                    : '<tr><td colspan="4" class="text-center" style="color: #94a3b8; padding: 10px;">Không có dữ liệu</td></tr>'
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <div>
-            <h3 class="section-title" style="color: #059669;">4. TOP KHÁCH HÀNG THÂN THIẾT</h3>
-            <table>
-              <thead>
-                <tr style="background-color: #dcfce7;">
-                  <th class="text-center">#</th>
-                  <th>Khách hàng</th>
-                  <th class="text-center">Nhóm</th>
-                  <th class="text-right">Doanh thu</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  data.topCustomersData && data.topCustomersData.length > 0
-                    ? data.topCustomersData
-                        .map(
-                          (c, i) => `
-                  <tr>
-                    <td class="text-center font-bold" style="color: #059669;">${i + 1}</td>
-                    <td>${c.name} (${c.phone || '—'})</td>
-                    <td class="text-center">${c.groupPrice === 'S' ? 'Sỉ' : 'Lẻ'}</td>
-                    <td class="text-right font-bold">${formatVND(c.revenue)}</td>
-                  </tr>
-                `,
-                        )
-                        .join('')
-                    : '<tr><td colspan="4" class="text-center" style="color: #94a3b8; padding: 10px;">Không có dữ liệu</td></tr>'
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        ${
-          data.flowData && data.flowData.length > 0
-            ? `
-          <div class="section-block">
-            <h3 class="section-title" style="color: #0284c7;">5. LUỒNG NHẬP XUẤT KHO HÀNG HÓA</h3>
-            <table>
-              <thead>
-                <tr style="background-color: #e0f2fe;">
-                  <th>Ngày giao dịch</th>
-                  <th class="text-right">Số lượng nhập</th>
-                  <th class="text-right">Giá trị nhập</th>
-                  <th class="text-right">Số lượng xuất</th>
-                  <th class="text-right">Giá trị xuất</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.flowData
-                  .map(
-                    (row) => `
-                  <tr>
-                    <td>${row.date}</td>
-                    <td class="text-right font-bold" style="color: #0284c7;">${row.inQuantity}</td>
-                    <td class="text-right">${formatVND(row.inValue)}</td>
-                    <td class="text-right font-bold" style="color: #e11d48;">${row.outQuantity}</td>
-                    <td class="text-right">${formatVND(row.outValue)}</td>
-                  </tr>
-                `,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        `
-            : ''
-        }
-
-        ${
-          data.invoiceDetails && data.invoiceDetails.length > 0
-            ? `
-          <div class="section-block">
-            <h3 class="section-title" style="color: #7c3aed;">6. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)</h3>
-            <table>
-              <thead>
-                <tr style="background-color: #f3e8ff;">
-                  <th>Mã HĐ</th>
-                  <th>Ngày tạo</th>
-                  <th>Khách hàng</th>
-                  <th>SKU</th>
-                  <th>Sản phẩm</th>
-                  <th class="text-right">SL</th>
-                  <th class="text-right">Đơn giá</th>
-                  <th class="text-right">Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.invoiceDetails
-                  .map(
-                    (row) => `
-                  <tr>
-                    <td class="font-bold" style="color: #2563eb;">${row.invoiceId}</td>
-                    <td>${formatDateTime(row.createdAt)}</td>
-                    <td>${row.customerName}</td>
-                    <td>${row.sku}</td>
-                    <td>${row.productName}</td>
-                    <td class="text-right font-bold">${row.quantity}</td>
-                    <td class="text-right">${formatVND(row.unitPrice)}</td>
-                    <td class="text-right font-bold">${formatVND(row.subtotal)}</td>
-                  </tr>
-                `,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        `
-            : ''
-        }
-
-        ${
-          data.lowStockData && data.lowStockData.length > 0
-            ? `
-          <div class="section-block">
-            <h3 class="section-title" style="color: #b45309;">7. CẢNH BÁO TỒN KHO THẤP</h3>
-            <table>
-              <thead>
-                <tr style="background-color: #fffbeb;">
-                  <th>Mã SKU</th>
-                  <th>Tên sản phẩm</th>
-                  <th class="text-right">Tồn kho hiện tại</th>
-                  <th class="text-right">Ngưỡng cảnh báo</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.lowStockData
-                  .map(
-                    (row) => `
-                  <tr>
-                    <td class="font-bold" style="color: #b45309;">${row.sku}</td>
-                    <td>${row.name}</td>
-                    <td class="text-right font-bold" style="color: #dc2626;">${row.inStock}</td>
-                    <td class="text-right">${row.warningStock}</td>
-                  </tr>
-                `,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        `
-            : ''
-        }
-      </body>
-      </html>
-    `
-
-    iframeDoc.open()
-    iframeDoc.write(reportHtml)
-    iframeDoc.close()
-
-    // Wait for iframe document ready and layout stabilization
-    await new Promise<void>((resolve) => {
-      if (iframeDoc.readyState === 'complete') {
-        resolve()
-      } else {
-        iframe.onload = () => resolve()
-      }
-    })
-
-    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-      try {
-        await iframeDoc.fonts.ready
-      } catch {
-        // Fallback ignore font load error
-      }
-    }
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve())
-      })
-    })
-    await new Promise((resolve) => setTimeout(resolve, 150))
-
-    const bodyElem = iframeDoc.body
-    const bodyRect = bodyElem.getBoundingClientRect()
-    const innerTextLen = bodyElem.innerText ? bodyElem.innerText.trim().length : 0
-
-    console.log('[PDF Export Stage 2: Iframe content ready]', {
-      rect: { width: bodyRect.width, height: bodyRect.height },
-      scrollWidth: bodyElem.scrollWidth,
-      scrollHeight: bodyElem.scrollHeight,
-      innerTextLength: innerTextLen,
-    })
-
-    if (bodyRect.width <= 0 || bodyElem.scrollHeight <= 0 || innerTextLen === 0) {
-      throw new Error(
-        `Nội dung báo cáo trong iframe không có kích thước hợp lệ (${bodyRect.width}x${bodyElem.scrollHeight}) hoặc bị rỗng.`,
-      )
-    }
-
-    // Set height of iframe dynamically to match scrollHeight
-    iframe.style.height = `${Math.max(bodyElem.scrollHeight + 50, 1200)}px`
-
-    const opt = {
-      margin: [8, 8, 8, 8] as [number, number, number, number],
-      filename: fileName,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        windowWidth: 1120,
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const },
-      pagebreak: { mode: ['css', 'legacy'] },
-    }
-
-    // Render canvas from iframeDoc.body (pure HTML/CSS DOM, completely isolated from app SVGs)
-    const worker = html2pdf().from(iframeDoc.body).set(opt).toCanvas()
-    const canvas = (await worker.get('canvas')) as HTMLCanvasElement | null
-
-    console.log('[PDF Export Stage 3: Canvas generated]', {
-      width: canvas?.width ?? 0,
-      height: canvas?.height ?? 0,
-    })
-
-    if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      throw new Error(`Không thể tạo hình ảnh canvas cho PDF từ iframe (kích thước: ${canvas?.width ?? 0}x${canvas?.height ?? 0}).`)
-    }
-
-    console.log('[PDF Export Stage 4: PDF saved]', fileName)
-    await worker.toPdf().save()
-  } finally {
-    if (iframe && document.body.contains(iframe)) {
-      document.body.removeChild(iframe)
+  const checkSpace = (neededMm: number) => {
+    const pageHeight = doc.internal.pageSize.height
+    if (currentY + neededMm > pageHeight - 12) {
+      doc.addPage()
+      currentY = 12
+      doc.setFont('Roboto', 'normal')
     }
   }
+
+  const addSectionTitle = (title: string, color: [number, number, number] = [15, 23, 42]) => {
+    checkSpace(28) // Ensure title + table header + first rows stay together
+    doc.setFont('Roboto', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...color)
+    doc.text(title, 14, currentY + 4)
+    currentY += 7
+  }
+
+  // 1. Report Title & Header
+  doc.setFont('Roboto', 'bold')
+  doc.setFontSize(15)
+  doc.setTextColor(30, 64, 175) // #1e40af
+  doc.text('BÁO CÁO THỐNG KÊ TỔNG HỢP', 14, currentY + 5)
+
+  doc.setFont('Roboto', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 116, 139) // #64748b
+  doc.text(`Thời điểm xuất: ${exportTimeStr}`, 14, currentY + 11)
+
+  currentY += 15
+
+  // Header separator line
+  doc.setDrawColor(37, 99, 235)
+  doc.setLineWidth(0.4)
+  doc.line(14, currentY, 196, currentY)
+  currentY += 5
+
+  // 2. Filter Box Table
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      fontSize: 8.5,
+      cellPadding: 2.2,
+      lineWidth: 0.15,
+      lineColor: [226, 232, 240],
+      textColor: [51, 65, 85],
+    },
+    headStyles: {
+      font: 'Roboto',
+      fontStyle: 'bold',
+      fillColor: [248, 250, 252],
+      textColor: [51, 65, 85],
+      fontSize: 9,
+    },
+    bodyStyles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      textColor: [51, 65, 85],
+    },
+    head: [
+      [
+        {
+          content: 'BỘ LỌC ÁP DỤNG',
+          colSpan: 2,
+        },
+      ],
+    ],
+    body: [
+      [`Thời gian: ${data.filterDescription}`, `Nhóm giá: ${data.filterGroupPriceLabel}`],
+      [`Danh mục: ${data.filterCategoryLabel}`, `Sản phẩm: ${data.filterProductLabel}`],
+      [`Khách hàng: ${data.filterCustomerLabel}`, `Từ khóa: ${data.filterSearchLabel}`],
+    ],
+  })
+
+  currentY = (doc as any).lastAutoTable.finalY + 7
+
+  // 3. Section 1: KPI Overview Table
+  addSectionTitle('1. CHỈ SỐ KPI TỔNG QUAN')
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      fontSize: 9,
+      cellPadding: 3,
+      lineWidth: 0.2,
+      lineColor: [180, 190, 205],
+      textColor: [30, 41, 59],
+    },
+    headStyles: {
+      font: 'Roboto',
+      fontStyle: 'bold',
+      fillColor: [241, 245, 249],
+      textColor: [15, 23, 42],
+      lineWidth: 0.2,
+      lineColor: [180, 190, 205],
+    },
+    bodyStyles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      textColor: [30, 41, 59],
+    },
+    columnStyles: {
+      0: { cellWidth: 90, font: 'Roboto', fontStyle: 'bold' },
+      1: { cellWidth: 92, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+    },
+    head: [['Chỉ số', 'Giá trị']],
+    body: [
+      ['Tổng doanh thu', formatVND(data.overviewData?.revenue)],
+      ['Số hóa đơn phát hành', (data.overviewData?.invoiceCount ?? 0).toLocaleString('vi-VN')],
+      ['Sản phẩm đã bán', (data.overviewData?.unitsSold ?? 0).toLocaleString('vi-VN')],
+      ['Giá trị hóa đơn trung bình', formatVND(data.overviewData?.averageInvoiceValue)],
+    ],
+    rowPageBreak: 'avoid',
+  })
+
+  currentY = (doc as any).lastAutoTable.finalY + 7
+
+  // 4. Section 2: Sales Summary
+  addSectionTitle('2. DOANH THU THEO THỜI GIAN')
+
+  const summaryRows =
+    data.summaryData && data.summaryData.length > 0
+      ? data.summaryData.map((r) => [r.date, r.invoiceCount.toLocaleString('vi-VN'), formatVND(r.total)])
+      : [['Không có dữ liệu', '', '']]
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      fontSize: 8.5,
+      cellPadding: 2.8,
+      lineWidth: 0.2,
+      lineColor: [180, 190, 205],
+      textColor: [30, 41, 59],
+    },
+    headStyles: {
+      font: 'Roboto',
+      fontStyle: 'bold',
+      fillColor: [241, 245, 249],
+      textColor: [15, 23, 42],
+      lineWidth: 0.2,
+      lineColor: [180, 190, 205],
+    },
+    bodyStyles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      textColor: [30, 41, 59],
+    },
+    columnStyles: {
+      0: { cellWidth: 82, font: 'Roboto', fontStyle: 'normal' },
+      1: { cellWidth: 50, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+      2: { cellWidth: 50, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+    },
+    head: [['Mốc thời gian', 'Số hóa đơn', 'Doanh thu (VND)']],
+    body: summaryRows,
+    rowPageBreak: 'avoid',
+  })
+
+  currentY = (doc as any).lastAutoTable.finalY + 7
+
+  // 5. Section 3: Top Products
+  addSectionTitle('3. TOP SẢN PHẨM BÁN CHẠY', [217, 119, 6])
+
+  const topProductRows =
+    data.topProductsData && data.topProductsData.length > 0
+      ? data.topProductsData.map((p, i) => [
+          String(i + 1),
+          `[${p.sku}] ${p.name}`,
+          p.quantitySold.toLocaleString('vi-VN'),
+          formatVND(p.revenue),
+        ])
+      : [['—', 'Không có dữ liệu', '', '']]
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      fontSize: 8.5,
+      cellPadding: 2.8,
+      lineWidth: 0.2,
+      lineColor: [252, 211, 77],
+      textColor: [30, 41, 59],
+    },
+    headStyles: {
+      font: 'Roboto',
+      fontStyle: 'bold',
+      fillColor: [254, 243, 199],
+      textColor: [146, 64, 14],
+      lineWidth: 0.2,
+      lineColor: [252, 211, 77],
+    },
+    bodyStyles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      textColor: [30, 41, 59],
+    },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center', font: 'Roboto', fontStyle: 'bold', textColor: [217, 119, 6] },
+      1: { cellWidth: 95, font: 'Roboto', fontStyle: 'normal' },
+      2: { cellWidth: 25, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+      3: { cellWidth: 50, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+    },
+    head: [['#', 'Sản phẩm', 'SL', 'Doanh thu']],
+    body: topProductRows,
+    rowPageBreak: 'avoid',
+  })
+
+  currentY = (doc as any).lastAutoTable.finalY + 7
+
+  // 6. Section 4: Top Customers
+  addSectionTitle('4. TOP KHÁCH HÀNG THÂN THIẾT', [5, 150, 105])
+
+  const topCustomerRows =
+    data.topCustomersData && data.topCustomersData.length > 0
+      ? data.topCustomersData.map((c, i) => [
+          String(i + 1),
+          `${c.name} (${c.phone || '—'})`,
+          c.groupPrice === 'S' ? 'Sỉ' : 'Lẻ',
+          formatVND(c.revenue),
+        ])
+      : [['—', 'Không có dữ liệu', '', '']]
+
+  autoTable(doc, {
+    startY: currentY,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      fontSize: 8.5,
+      cellPadding: 2.8,
+      lineWidth: 0.2,
+      lineColor: [134, 239, 172],
+      textColor: [30, 41, 59],
+    },
+    headStyles: {
+      font: 'Roboto',
+      fontStyle: 'bold',
+      fillColor: [220, 252, 231],
+      textColor: [6, 95, 70],
+      lineWidth: 0.2,
+      lineColor: [134, 239, 172],
+    },
+    bodyStyles: {
+      font: 'Roboto',
+      fontStyle: 'normal',
+      textColor: [30, 41, 59],
+    },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center', font: 'Roboto', fontStyle: 'bold', textColor: [5, 150, 105] },
+      1: { cellWidth: 95, font: 'Roboto', fontStyle: 'normal' },
+      2: { cellWidth: 25, halign: 'center', font: 'Roboto', fontStyle: 'normal' },
+      3: { cellWidth: 50, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+    },
+    head: [['#', 'Khách hàng', 'Nhóm', 'Doanh thu']],
+    body: topCustomerRows,
+    rowPageBreak: 'avoid',
+  })
+
+  currentY = (doc as any).lastAutoTable.finalY + 7
+
+  // 7. Section 5: Inventory Flow (if present)
+  if (data.flowData && data.flowData.length > 0) {
+    addSectionTitle('5. LUỒNG NHẬP XUẤT KHO HÀNG HÓA', [2, 132, 199])
+
+    const flowRows = data.flowData.map((r) => [
+      r.date,
+      r.inQuantity.toLocaleString('vi-VN'),
+      formatVND(r.inValue),
+      r.outQuantity.toLocaleString('vi-VN'),
+      formatVND(r.outValue),
+    ])
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 14, right: 14 },
+      theme: 'grid',
+      styles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        fontSize: 8.5,
+        cellPadding: 2.8,
+        lineWidth: 0.2,
+        lineColor: [125, 211, 252],
+        textColor: [30, 41, 59],
+      },
+      headStyles: {
+        font: 'Roboto',
+        fontStyle: 'bold',
+        fillColor: [224, 242, 254],
+        textColor: [7, 89, 133],
+        lineWidth: 0.2,
+        lineColor: [125, 211, 252],
+      },
+      bodyStyles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        textColor: [30, 41, 59],
+      },
+      columnStyles: {
+        0: { cellWidth: 42, font: 'Roboto', fontStyle: 'normal' },
+        1: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'bold', textColor: [2, 132, 199] },
+        2: { cellWidth: 40, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+        3: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'bold', textColor: [225, 29, 72] },
+        4: { cellWidth: 40, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+      },
+      head: [['Ngày giao dịch', 'SL nhập', 'Giá trị nhập', 'SL xuất', 'Giá trị xuất']],
+      body: flowRows,
+      rowPageBreak: 'avoid',
+    })
+
+    currentY = (doc as any).lastAutoTable.finalY + 7
+  }
+
+  // 8. Section 7: Low Stock Warning (if present)
+  if (data.lowStockData && data.lowStockData.length > 0) {
+    addSectionTitle('7. CẢNH BÁO TỒN KHO THẤP', [180, 83, 9])
+
+    const lowStockRows = data.lowStockData.map((r) => [
+      r.sku,
+      r.name,
+      r.inStock.toLocaleString('vi-VN'),
+      r.warningStock.toLocaleString('vi-VN'),
+    ])
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 14, right: 14 },
+      theme: 'grid',
+      styles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        fontSize: 8.5,
+        cellPadding: 2.8,
+        lineWidth: 0.2,
+        lineColor: [253, 230, 138],
+        textColor: [30, 41, 59],
+      },
+      headStyles: {
+        font: 'Roboto',
+        fontStyle: 'bold',
+        fillColor: [254, 243, 199],
+        textColor: [146, 64, 14],
+        lineWidth: 0.2,
+        lineColor: [253, 230, 138],
+      },
+      bodyStyles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        textColor: [30, 41, 59],
+      },
+      columnStyles: {
+        0: { cellWidth: 35, font: 'Roboto', fontStyle: 'bold', textColor: [180, 83, 9] },
+        1: { cellWidth: 87, font: 'Roboto', fontStyle: 'normal' },
+        2: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'bold', textColor: [220, 38, 38] },
+        3: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+      },
+      head: [['Mã SKU', 'Tên sản phẩm', 'Tồn kho hiện tại', 'Ngưỡng cảnh báo']],
+      body: lowStockRows,
+      rowPageBreak: 'avoid',
+    })
+
+    currentY = (doc as any).lastAutoTable.finalY + 7
+  }
+
+  // 9. Section 6: Invoice Details (Landscape A4 Page in SAME PDF)
+  if (data.invoiceDetails && data.invoiceDetails.length > 0) {
+    doc.addPage('a4', 'landscape')
+    doc.setFont('Roboto', 'normal')
+    currentY = 12
+
+    doc.setFont('Roboto', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(124, 58, 237) // #7c3aed
+    doc.text(`6. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)`, 10, currentY + 4)
+    currentY += 8
+
+    const invoiceRows = data.invoiceDetails.map((r) => [
+      r.invoiceId,
+      formatDateTime(r.createdAt),
+      r.customerName,
+      r.sku,
+      r.productName,
+      r.quantity.toLocaleString('vi-VN'),
+      formatVND(r.unitPrice),
+      formatVND(r.subtotal),
+    ])
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 10, right: 10 },
+      theme: 'grid',
+      styles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        fontSize: 7.5,
+        cellPadding: 2,
+        lineWidth: 0.2,
+        lineColor: [192, 132, 252],
+        textColor: [30, 41, 59],
+        overflow: 'ellipsize',
+      },
+      headStyles: {
+        font: 'Roboto',
+        fontStyle: 'bold',
+        fillColor: [243, 232, 255],
+        textColor: [107, 33, 168],
+        lineWidth: 0.2,
+        lineColor: [192, 132, 252],
+      },
+      bodyStyles: {
+        font: 'Roboto',
+        fontStyle: 'normal',
+        textColor: [30, 41, 59],
+      },
+      columnStyles: {
+        0: { cellWidth: 28, font: 'Roboto', fontStyle: 'bold', textColor: [37, 99, 235] },
+        1: { cellWidth: 32, font: 'Roboto', fontStyle: 'normal' },
+        2: { cellWidth: 48, font: 'Roboto', fontStyle: 'normal' },
+        3: { cellWidth: 28, font: 'Roboto', fontStyle: 'normal' },
+        4: { cellWidth: 65, font: 'Roboto', fontStyle: 'normal' },
+        5: { cellWidth: 16, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+        6: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+        7: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+      },
+      head: [['Mã HĐ', 'Ngày tạo', 'Khách hàng', 'Mã SKU', 'Sản phẩm', 'SL', 'Đơn giá', 'Thành tiền']],
+      body: invoiceRows,
+      rowPageBreak: 'avoid',
+    })
+  }
+
+  // Save single PDF file
+  doc.save(fileName)
 }

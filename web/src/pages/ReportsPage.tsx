@@ -486,6 +486,32 @@ export default function ReportsPage() {
 
       {/* Toast Notification */}
       <Snackbar
+        open={isExporting}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{ mt: 2 }}
+      >
+        <Alert
+          icon={<CircularProgress size={22} color="inherit" />}
+          severity="info"
+          variant="filled"
+          sx={{
+            minWidth: 360,
+            alignItems: 'center',
+            borderRadius: '8px',
+            boxShadow: 6,
+            '& .MuiAlert-message': { py: 0.5 },
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Đang tạo file báo cáo…
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
+            Vui lòng không đóng hoặc tải lại trang.
+          </Typography>
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
         open={toastState.open}
         autoHideDuration={4000}
         onClose={() => setToastState({ ...toastState, open: false })}
