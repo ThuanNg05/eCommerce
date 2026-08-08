@@ -198,17 +198,20 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
   const exportTimeStr = formatDateTime(now.toISOString())
   const fileName = getReportFileName(data.filterDescription, 'pdf')
 
-  // Create temporary container element for PDF rendering
+  // Create real-dimension DOM container (position fixed top-left, z-index top, visible to html2canvas)
   const container = document.createElement('div')
-  container.style.position = 'absolute'
-  container.style.left = '-9999px'
-  container.style.top = '-9999px'
-  container.style.width = '1060px' // Optimal for A4 Landscape
+  container.style.position = 'fixed'
+  container.style.left = '0'
+  container.style.top = '0'
+  container.style.width = '1120px' // A4 landscape print width
   container.style.backgroundColor = '#ffffff'
   container.style.color = '#1e293b'
-  container.style.fontFamily = 'Inter, Roboto, sans-serif'
+  container.style.fontFamily = 'Inter, Roboto, Arial, sans-serif'
   container.style.padding = '24px'
   container.style.boxSizing = 'border-box'
+  container.style.zIndex = '999999'
+  container.style.opacity = '1'
+  container.style.pointerEvents = 'none'
 
   container.innerHTML = `
     <div style="margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
@@ -224,7 +227,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     </div>
 
     <!-- Filter Info Section -->
-    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid;">
       <h3 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase;">Bộ lọc áp dụng:</h3>
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; color: #475569;">
         <div><strong>Thời gian:</strong> ${data.filterDescription}</div>
@@ -237,7 +240,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     </div>
 
     <!-- KPI Summary Section -->
-    <div style="margin-bottom: 24px;">
+    <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
       <h3 style="margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: #0f172a;">1. CHỈ SỐ KPI TỔNG QUAN</h3>
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
         <div style="border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 6px; padding: 12px; background: #ffffff;">
@@ -260,7 +263,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     </div>
 
     <!-- Sales Trend Table -->
-    <div style="margin-bottom: 24px; page-break-inside: avoid;">
+    <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
       <h3 style="margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: #0f172a;">2. DOANH THU THEO THỜI GIAN</h3>
       <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
         <thead>
@@ -274,7 +277,6 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
           ${
             data.summaryData && data.summaryData.length > 0
               ? data.summaryData
-                  .slice(0, 15)
                   .map(
                     (row) => `
             <tr>
@@ -292,7 +294,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     </div>
 
     <!-- Side by Side Tables: Top Products & Top Customers -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; page-break-inside: avoid;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
       <div>
         <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #d97706;">3. TOP SẢN PHẨM BÁN CHẠY</h3>
         <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
@@ -362,7 +364,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     ${
       data.invoiceDetails && data.invoiceDetails.length > 0
         ? `
-      <div style="margin-bottom: 24px; page-break-inside: avoid;">
+      <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
         <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #7c3aed;">5. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)</h3>
         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead>
@@ -379,7 +381,6 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
           </thead>
           <tbody>
             ${data.invoiceDetails
-              .slice(0, 40)
               .map(
                 (row) => `
               <tr>
@@ -406,7 +407,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     ${
       data.lowStockData && data.lowStockData.length > 0
         ? `
-      <div style="margin-bottom: 20px; page-break-inside: avoid;">
+      <div style="margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid;">
         <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #b45309;">6. CẢNH BÁO TỒN KHO THẤP</h3>
         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead>
@@ -440,19 +441,48 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
 
   document.body.appendChild(container)
 
+  // Step 2: Wait for DOM layout, fonts ready, and two requestAnimationFrame cycles
+  if (document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready
+    } catch {
+      // Fallback ignore
+    }
+  }
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+
+  // Step 3 & 4: Pagebreak config and pre-save canvas validation
   const opt = {
     margin: [8, 8, 8, 8] as [number, number, number, number],
     filename: fileName,
     image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: 1120,
+    },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+    pagebreak: { mode: ['css', 'legacy'] },
   }
 
   try {
-    await html2pdf().from(container).set(opt).save()
+    const worker = html2pdf().from(container).set(opt).toCanvas()
+    const canvas = (await worker.get('canvas')) as HTMLCanvasElement | null
+
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      throw new Error('Không thể tạo hình ảnh cho file PDF (canvas rỗng). Vui lòng thử lại.')
+    }
+
+    await worker.save()
   } finally {
-    if (document.body.contains(container)) {
+    if (container && document.body.contains(container)) {
       document.body.removeChild(container)
     }
   }
