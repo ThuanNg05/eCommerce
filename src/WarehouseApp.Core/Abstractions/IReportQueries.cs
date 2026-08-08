@@ -9,5 +9,10 @@ namespace WarehouseApp.Core.Abstractions;
 public interface IReportQueries
 {
     Task<IReadOnlyList<LowStockItemDto>> GetLowStockAsync(CancellationToken ct = default);
-    Task<IReadOnlyList<SalesSummaryRowDto>> GetSalesSummaryAsync(DateOnly from, DateOnly to, CancellationToken ct = default);
+    Task<SalesOverviewDto> GetSalesOverviewAsync(SalesReportFilter filter, CancellationToken ct = default);
+    Task<IReadOnlyList<SalesSummaryRowDto>> GetSalesSummaryAsync(SalesReportFilter filter, string groupBy, CancellationToken ct = default);
+    Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(SalesReportFilter filter, int limit, CancellationToken ct = default);
+    Task<IReadOnlyList<TopCustomerDto>> GetTopCustomersAsync(SalesReportFilter filter, int limit, CancellationToken ct = default);
+    Task<IReadOnlyList<InventoryFlowRowDto>> GetInventoryFlowAsync(DateOnly from, DateOnly to, short? transactionType, string? itemType, CancellationToken ct = default);
+    Task<PagedResult<InvoiceReportRowDto>> GetInvoiceDetailsAsync(SalesReportFilter filter, int page, int pageSize, CancellationToken ct = default);
 }
