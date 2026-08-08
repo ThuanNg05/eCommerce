@@ -198,271 +198,394 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
   const exportTimeStr = formatDateTime(now.toISOString())
   const fileName = getReportFileName(data.filterDescription, 'pdf')
 
-  // Create real-dimension DOM container (position fixed top-left, z-index top, visible to html2canvas)
-  const container = document.createElement('div')
-  container.style.position = 'fixed'
-  container.style.left = '0'
-  container.style.top = '0'
-  container.style.width = '1120px' // A4 landscape print width
-  container.style.backgroundColor = '#ffffff'
-  container.style.color = '#1e293b'
-  container.style.fontFamily = 'Inter, Roboto, Arial, sans-serif'
-  container.style.padding = '24px'
-  container.style.boxSizing = 'border-box'
-  container.style.zIndex = '999999'
-  container.style.opacity = '1'
-  container.style.pointerEvents = 'none'
-
-  container.innerHTML = `
-    <div style="margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
-      <div>
-        <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0f172a;">${STORE_INFO.name.toUpperCase()}</h1>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #475569;">Địa chỉ: ${STORE_INFO.address}</p>
-        <p style="margin: 2px 0 0 0; font-size: 12px; color: #475569;">Điện thoại: ${STORE_INFO.phoneDisplay}</p>
-      </div>
-      <div style="text-align: right;">
-        <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #2563eb;">BÁO CÁO THỐNG KÊ TỔNG HỢP</h2>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Thời điểm xuất: <strong>${exportTimeStr}</strong></p>
-      </div>
-    </div>
-
-    <!-- Filter Info Section -->
-    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid;">
-      <h3 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase;">Bộ lọc áp dụng:</h3>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; color: #475569;">
-        <div><strong>Thời gian:</strong> ${data.filterDescription}</div>
-        <div><strong>Nhóm giá:</strong> ${data.filterGroupPriceLabel}</div>
-        <div><strong>Danh mục:</strong> ${data.filterCategoryLabel}</div>
-        <div><strong>Sản phẩm:</strong> ${data.filterProductLabel}</div>
-        <div><strong>Khách hàng:</strong> ${data.filterCustomerLabel}</div>
-        <div><strong>Từ khóa:</strong> ${data.filterSearchLabel}</div>
-      </div>
-    </div>
-
-    <!-- KPI Summary Section -->
-    <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
-      <h3 style="margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: #0f172a;">1. CHỈ SỐ KPI TỔNG QUAN</h3>
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-        <div style="border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-size: 11px; font-weight: 700; color: #64748b;">DOANH THU</div>
-          <div style="font-size: 18px; font-weight: 700; color: #2563eb; margin-top: 4px;">${formatVND(data.overviewData?.revenue)}</div>
-        </div>
-        <div style="border: 1px solid #e2e8f0; border-left: 4px solid #059669; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-size: 11px; font-weight: 700; color: #64748b;">SỐ HÓA ĐƠN</div>
-          <div style="font-size: 18px; font-weight: 700; color: #059669; margin-top: 4px;">${data.overviewData?.invoiceCount ?? 0}</div>
-        </div>
-        <div style="border: 1px solid #e2e8f0; border-left: 4px solid #d97706; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-size: 11px; font-weight: 700; color: #64748b;">SẢN PHẨM ĐÃ BÁN</div>
-          <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-top: 4px;">${data.overviewData?.unitsSold ?? 0}</div>
-        </div>
-        <div style="border: 1px solid #e2e8f0; border-left: 4px solid #7c3aed; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-size: 11px; font-weight: 700; color: #64748b;">GIÁ TRỊ HĐ TRUNG BÌNH</div>
-          <div style="font-size: 18px; font-weight: 700; color: #7c3aed; margin-top: 4px;">${formatVND(data.overviewData?.averageInvoiceValue)}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Sales Trend Table -->
-    <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
-      <h3 style="margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: #0f172a;">2. DOANH THU THEO THỜI GIAN</h3>
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-        <thead>
-          <tr style="background-color: #f1f5f9;">
-            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">Mốc thời gian</th>
-            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">Số hóa đơn</th>
-            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">Doanh thu (VND)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            data.summaryData && data.summaryData.length > 0
-              ? data.summaryData
-                  .map(
-                    (row) => `
-            <tr>
-              <td style="border: 1px solid #e2e8f0; padding: 6px 8px;">${row.date}</td>
-              <td style="border: 1px solid #e2e8f0; padding: 6px 8px; text-align: right;">${row.invoiceCount}</td>
-              <td style="border: 1px solid #e2e8f0; padding: 6px 8px; text-align: right; font-weight: 700;">${formatVND(row.total)}</td>
-            </tr>
-          `,
-                  )
-                  .join('')
-              : '<tr><td colspan="3" style="text-align: center; padding: 12px; color: #94a3b8;">Không có dữ liệu</td></tr>'
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Side by Side Tables: Top Products & Top Customers -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
-      <div>
-        <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #d97706;">3. TOP SẢN PHẨM BÁN CHẠY</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
-          <thead>
-            <tr style="background-color: #fef3c7;">
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: center;">#</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: left;">Sản phẩm</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: right;">SL</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: right;">Doanh thu</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              data.topProductsData && data.topProductsData.length > 0
-                ? data.topProductsData
-                    .map(
-                      (p, i) => `
-              <tr>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: center; font-weight: 700; color: #d97706;">${i + 1}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">[${p.sku}] ${p.name}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700;">${p.quantitySold}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700;">${formatVND(p.revenue)}</td>
-              </tr>
-            `,
-                    )
-                    .join('')
-                : '<tr><td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">Không có dữ liệu</td></tr>'
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #059669;">4. TOP KHÁCH HÀNG THÂN THIẾT</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
-          <thead>
-            <tr style="background-color: #dcfce7;">
-              <th style="border: 1px solid #bbf7d0; padding: 6px; text-align: center;">#</th>
-              <th style="border: 1px solid #bbf7d0; padding: 6px; text-align: left;">Khách hàng</th>
-              <th style="border: 1px solid #bbf7d0; padding: 6px; text-align: center;">Nhóm</th>
-              <th style="border: 1px solid #bbf7d0; padding: 6px; text-align: right;">Doanh thu</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              data.topCustomersData && data.topCustomersData.length > 0
-                ? data.topCustomersData
-                    .map(
-                      (c, i) => `
-              <tr>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: center; font-weight: 700; color: #059669;">${i + 1}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${c.name} (${c.phone || '—'})</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: center;">${c.groupPrice === 'S' ? 'Sỉ' : 'Lẻ'}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700;">${formatVND(c.revenue)}</td>
-              </tr>
-            `,
-                    )
-                    .join('')
-                : '<tr><td colspan="4" style="text-align: center; padding: 10px; color: #94a3b8;">Không có dữ liệu</td></tr>'
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Invoice Details Table -->
-    ${
-      data.invoiceDetails && data.invoiceDetails.length > 0
-        ? `
-      <div style="margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid;">
-        <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #7c3aed;">5. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="background-color: #f3e8ff;">
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: left;">Mã HĐ</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: left;">Ngày tạo</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: left;">Khách hàng</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: left;">SKU</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: left;">Sản phẩm</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: right;">SL</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: right;">Đơn giá</th>
-              <th style="border: 1px solid #e9d5ff; padding: 6px; text-align: right;">Thành tiền</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.invoiceDetails
-              .map(
-                (row) => `
-              <tr>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; font-weight: 600; color: #2563eb;">${row.invoiceId}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${formatDateTime(row.createdAt)}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${row.customerName}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${row.sku}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${row.productName}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700;">${row.quantity}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right;">${formatVND(row.unitPrice)}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700;">${formatVND(row.subtotal)}</td>
-              </tr>
-            `,
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </div>
-    `
-        : ''
-    }
-
-    <!-- Low Stock Table -->
-    ${
-      data.lowStockData && data.lowStockData.length > 0
-        ? `
-      <div style="margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid;">
-        <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #b45309;">6. CẢNH BÁO TỒN KHO THẤP</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="background-color: #fffbeb;">
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: left;">Mã SKU</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: left;">Tên sản phẩm</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: right;">Tồn kho hiện tại</th>
-              <th style="border: 1px solid #fde68a; padding: 6px; text-align: right;">Ngưỡng cảnh báo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.lowStockData
-              .map(
-                (row) => `
-              <tr>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; font-weight: 600; color: #b45309;">${row.sku}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px;">${row.name}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right; font-weight: 700; color: #dc2626;">${row.inStock}</td>
-                <td style="border: 1px solid #e2e8f0; padding: 5px; text-align: right;">${row.warningStock}</td>
-              </tr>
-            `,
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </div>
-    `
-        : ''
-    }
-  `
+  // Create temporary isolated iframe (pure HTML/CSS environment, free from MUI/Lucide SVGs)
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.left = '0'
+  iframe.style.top = '0'
+  iframe.style.width = '1120px'
+  iframe.style.height = '1600px'
+  iframe.style.border = 'none'
+  iframe.style.zIndex = '999999'
+  iframe.style.opacity = '1'
+  iframe.style.pointerEvents = 'none'
+  iframe.style.backgroundColor = '#ffffff'
 
   try {
-    document.body.appendChild(container)
+    document.body.appendChild(iframe)
 
-    // Stage 1: Log container metrics & validate container dimensions
-    const rect = container.getBoundingClientRect()
-    const innerTextLen = container.innerText ? container.innerText.trim().length : 0
-
-    console.log('[PDF Export Stage 1: Container attached]', {
-      rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left },
-      scrollWidth: container.scrollWidth,
-      scrollHeight: container.scrollHeight,
-      innerTextLength: innerTextLen,
-    })
-
-    if (rect.width <= 0 || rect.height <= 0 || innerTextLen === 0) {
-      throw new Error(
-        `Khung nội dung PDF không có kích thước hợp lệ (${rect.width}x${rect.height}) hoặc bị rỗng (độ dài chữ: ${innerTextLen}).`,
-      )
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!iframeDoc) {
+      throw new Error('Không thể khởi tạo tài liệu HTML trong iframe để xuất PDF.')
     }
 
-    // Wait for DOM layout calculation and fonts ready
-    if (document.fonts && document.fonts.ready) {
+    console.log('[PDF Export Stage 1: Iframe attached]', {
+      width: iframe.style.width,
+      height: iframe.style.height,
+    })
+
+    const reportHtml = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8">
+        <title>${fileName}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 24px;
+            background-color: #ffffff;
+            color: #1e293b;
+            font-family: Arial, Roboto, "Helvetica Neue", sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          .header-row {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          .header-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
+          .header-sub { margin: 4px 0 0 0; font-size: 12px; color: #475569; }
+          .report-title { margin: 0; font-size: 20px; font-weight: 700; color: #2563eb; text-align: right; }
+          .filter-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            font-size: 12px;
+            color: #475569;
+          }
+          .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 8px;
+          }
+          .kpi-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            background: #ffffff;
+          }
+          .kpi-title { font-size: 11px; font-weight: 700; color: #64748b; }
+          .kpi-val { font-size: 18px; font-weight: 700; margin-top: 4px; }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11.5px;
+          }
+          th, td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+          }
+          th {
+            background-color: #f1f5f9;
+            font-weight: 700;
+            text-align: left;
+          }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: 700; }
+          .section-block {
+            margin-bottom: 24px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .section-title {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-row">
+          <div>
+            <h1 class="header-title">${STORE_INFO.name.toUpperCase()}</h1>
+            <p class="header-sub">Địa chỉ: ${STORE_INFO.address}</p>
+            <p class="header-sub">Điện thoại: ${STORE_INFO.phoneDisplay}</p>
+          </div>
+          <div>
+            <h2 class="report-title">BÁO CÁO THỐNG KÊ TỔNG HỢP</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b; text-align: right;">Thời điểm xuất: <strong>${exportTimeStr}</strong></p>
+          </div>
+        </div>
+
+        <div class="filter-box">
+          <h3 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase;">Bộ lọc áp dụng:</h3>
+          <div class="filter-grid">
+            <div><strong>Thời gian:</strong> ${data.filterDescription}</div>
+            <div><strong>Nhóm giá:</strong> ${data.filterGroupPriceLabel}</div>
+            <div><strong>Danh mục:</strong> ${data.filterCategoryLabel}</div>
+            <div><strong>Sản phẩm:</strong> ${data.filterProductLabel}</div>
+            <div><strong>Khách hàng:</strong> ${data.filterCustomerLabel}</div>
+            <div><strong>Từ khóa:</strong> ${data.filterSearchLabel}</div>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <h3 class="section-title">1. CHỈ SỐ KPI TỔNG QUAN</h3>
+          <div class="kpi-grid">
+            <div class="kpi-card" style="border-left: 4px solid #2563eb;">
+              <div class="kpi-title">DOANH THU</div>
+              <div class="kpi-val" style="color: #2563eb;">${formatVND(data.overviewData?.revenue)}</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #059669;">
+              <div class="kpi-title">SỐ HÓA ĐƠN</div>
+              <div class="kpi-val" style="color: #059669;">${data.overviewData?.invoiceCount ?? 0}</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #d97706;">
+              <div class="kpi-title">SẢN PHẨM ĐÃ BÁN</div>
+              <div class="kpi-val" style="color: #d97706;">${data.overviewData?.unitsSold ?? 0}</div>
+            </div>
+            <div class="kpi-card" style="border-left: 4px solid #7c3aed;">
+              <div class="kpi-title">GIÁ TRỊ HĐ TRUNG BÌNH</div>
+              <div class="kpi-val" style="color: #7c3aed;">${formatVND(data.overviewData?.averageInvoiceValue)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <h3 class="section-title">2. DOANH THU THEO THỜI GIAN</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Mốc thời gian</th>
+                <th class="text-right">Số hóa đơn</th>
+                <th class="text-right">Doanh thu (VND)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                data.summaryData && data.summaryData.length > 0
+                  ? data.summaryData
+                      .map(
+                        (row) => `
+                <tr>
+                  <td>${row.date}</td>
+                  <td class="text-right">${row.invoiceCount}</td>
+                  <td class="text-right font-bold">${formatVND(row.total)}</td>
+                </tr>
+              `,
+                      )
+                      .join('')
+                  : '<tr><td colspan="3" class="text-center" style="color: #94a3b8; padding: 12px;">Không có dữ liệu</td></tr>'
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;" class="section-block">
+          <div>
+            <h3 class="section-title" style="color: #d97706;">3. TOP SẢN PHẨM BÁN CHẠY</h3>
+            <table>
+              <thead>
+                <tr style="background-color: #fef3c7;">
+                  <th class="text-center">#</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">SL</th>
+                  <th class="text-right">Doanh thu</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  data.topProductsData && data.topProductsData.length > 0
+                    ? data.topProductsData
+                        .map(
+                          (p, i) => `
+                  <tr>
+                    <td class="text-center font-bold" style="color: #d97706;">${i + 1}</td>
+                    <td>[${p.sku}] ${p.name}</td>
+                    <td class="text-right font-bold">${p.quantitySold}</td>
+                    <td class="text-right font-bold">${formatVND(p.revenue)}</td>
+                  </tr>
+                `,
+                        )
+                        .join('')
+                    : '<tr><td colspan="4" class="text-center" style="color: #94a3b8; padding: 10px;">Không có dữ liệu</td></tr>'
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h3 class="section-title" style="color: #059669;">4. TOP KHÁCH HÀNG THÂN THIẾT</h3>
+            <table>
+              <thead>
+                <tr style="background-color: #dcfce7;">
+                  <th class="text-center">#</th>
+                  <th>Khách hàng</th>
+                  <th class="text-center">Nhóm</th>
+                  <th class="text-right">Doanh thu</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${
+                  data.topCustomersData && data.topCustomersData.length > 0
+                    ? data.topCustomersData
+                        .map(
+                          (c, i) => `
+                  <tr>
+                    <td class="text-center font-bold" style="color: #059669;">${i + 1}</td>
+                    <td>${c.name} (${c.phone || '—'})</td>
+                    <td class="text-center">${c.groupPrice === 'S' ? 'Sỉ' : 'Lẻ'}</td>
+                    <td class="text-right font-bold">${formatVND(c.revenue)}</td>
+                  </tr>
+                `,
+                        )
+                        .join('')
+                    : '<tr><td colspan="4" class="text-center" style="color: #94a3b8; padding: 10px;">Không có dữ liệu</td></tr>'
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${
+          data.flowData && data.flowData.length > 0
+            ? `
+          <div class="section-block">
+            <h3 class="section-title" style="color: #0284c7;">5. LUỒNG NHẬP XUẤT KHO HÀNG HÓA</h3>
+            <table>
+              <thead>
+                <tr style="background-color: #e0f2fe;">
+                  <th>Ngày giao dịch</th>
+                  <th class="text-right">Số lượng nhập</th>
+                  <th class="text-right">Giá trị nhập</th>
+                  <th class="text-right">Số lượng xuất</th>
+                  <th class="text-right">Giá trị xuất</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.flowData
+                  .map(
+                    (row) => `
+                  <tr>
+                    <td>${row.date}</td>
+                    <td class="text-right font-bold" style="color: #0284c7;">${row.inQuantity}</td>
+                    <td class="text-right">${formatVND(row.inValue)}</td>
+                    <td class="text-right font-bold" style="color: #e11d48;">${row.outQuantity}</td>
+                    <td class="text-right">${formatVND(row.outValue)}</td>
+                  </tr>
+                `,
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+            : ''
+        }
+
+        ${
+          data.invoiceDetails && data.invoiceDetails.length > 0
+            ? `
+          <div class="section-block">
+            <h3 class="section-title" style="color: #7c3aed;">6. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)</h3>
+            <table>
+              <thead>
+                <tr style="background-color: #f3e8ff;">
+                  <th>Mã HĐ</th>
+                  <th>Ngày tạo</th>
+                  <th>Khách hàng</th>
+                  <th>SKU</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">SL</th>
+                  <th class="text-right">Đơn giá</th>
+                  <th class="text-right">Thành tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.invoiceDetails
+                  .map(
+                    (row) => `
+                  <tr>
+                    <td class="font-bold" style="color: #2563eb;">${row.invoiceId}</td>
+                    <td>${formatDateTime(row.createdAt)}</td>
+                    <td>${row.customerName}</td>
+                    <td>${row.sku}</td>
+                    <td>${row.productName}</td>
+                    <td class="text-right font-bold">${row.quantity}</td>
+                    <td class="text-right">${formatVND(row.unitPrice)}</td>
+                    <td class="text-right font-bold">${formatVND(row.subtotal)}</td>
+                  </tr>
+                `,
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+            : ''
+        }
+
+        ${
+          data.lowStockData && data.lowStockData.length > 0
+            ? `
+          <div class="section-block">
+            <h3 class="section-title" style="color: #b45309;">7. CẢNH BÁO TỒN KHO THẤP</h3>
+            <table>
+              <thead>
+                <tr style="background-color: #fffbeb;">
+                  <th>Mã SKU</th>
+                  <th>Tên sản phẩm</th>
+                  <th class="text-right">Tồn kho hiện tại</th>
+                  <th class="text-right">Ngưỡng cảnh báo</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.lowStockData
+                  .map(
+                    (row) => `
+                  <tr>
+                    <td class="font-bold" style="color: #b45309;">${row.sku}</td>
+                    <td>${row.name}</td>
+                    <td class="text-right font-bold" style="color: #dc2626;">${row.inStock}</td>
+                    <td class="text-right">${row.warningStock}</td>
+                  </tr>
+                `,
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+            : ''
+        }
+      </body>
+      </html>
+    `
+
+    iframeDoc.open()
+    iframeDoc.write(reportHtml)
+    iframeDoc.close()
+
+    // Wait for iframe document ready and layout stabilization
+    await new Promise<void>((resolve) => {
+      if (iframeDoc.readyState === 'complete') {
+        resolve()
+      } else {
+        iframe.onload = () => resolve()
+      }
+    })
+
+    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
       try {
-        await document.fonts.ready
+        await iframeDoc.fonts.ready
       } catch {
         // Fallback ignore font load error
       }
@@ -474,6 +597,26 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
       })
     })
     await new Promise((resolve) => setTimeout(resolve, 150))
+
+    const bodyElem = iframeDoc.body
+    const bodyRect = bodyElem.getBoundingClientRect()
+    const innerTextLen = bodyElem.innerText ? bodyElem.innerText.trim().length : 0
+
+    console.log('[PDF Export Stage 2: Iframe content ready]', {
+      rect: { width: bodyRect.width, height: bodyRect.height },
+      scrollWidth: bodyElem.scrollWidth,
+      scrollHeight: bodyElem.scrollHeight,
+      innerTextLength: innerTextLen,
+    })
+
+    if (bodyRect.width <= 0 || bodyElem.scrollHeight <= 0 || innerTextLen === 0) {
+      throw new Error(
+        `Nội dung báo cáo trong iframe không có kích thước hợp lệ (${bodyRect.width}x${bodyElem.scrollHeight}) hoặc bị rỗng.`,
+      )
+    }
+
+    // Set height of iframe dynamically to match scrollHeight
+    iframe.style.height = `${Math.max(bodyElem.scrollHeight + 50, 1200)}px`
 
     const opt = {
       margin: [8, 8, 8, 8] as [number, number, number, number],
@@ -489,27 +632,24 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
       pagebreak: { mode: ['css', 'legacy'] },
     }
 
-    // Stage 2: Render to canvas
-    console.log('[PDF Export Stage 2: Starting worker toCanvas()]')
-    const worker = html2pdf().from(container).set(opt).toCanvas()
+    // Render canvas from iframeDoc.body (pure HTML/CSS DOM, completely isolated from app SVGs)
+    const worker = html2pdf().from(iframeDoc.body).set(opt).toCanvas()
     const canvas = (await worker.get('canvas')) as HTMLCanvasElement | null
 
-    // Stage 3: Canvas validation
     console.log('[PDF Export Stage 3: Canvas generated]', {
       width: canvas?.width ?? 0,
       height: canvas?.height ?? 0,
     })
 
     if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      throw new Error(`Không thể tạo hình ảnh canvas cho PDF (kích thước: ${canvas?.width ?? 0}x${canvas?.height ?? 0}).`)
+      throw new Error(`Không thể tạo hình ảnh canvas cho PDF từ iframe (kích thước: ${canvas?.width ?? 0}x${canvas?.height ?? 0}).`)
     }
 
-    // Stage 4: Convert canvas to PDF and trigger save
-    console.log('[PDF Export Stage 4: Saving PDF file]', fileName)
+    console.log('[PDF Export Stage 4: PDF saved]', fileName)
     await worker.toPdf().save()
   } finally {
-    if (container && document.body.contains(container)) {
-      document.body.removeChild(container)
+    if (iframe && document.body.contains(iframe)) {
+      document.body.removeChild(iframe)
     }
   }
 }
