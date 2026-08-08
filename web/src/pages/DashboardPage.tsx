@@ -26,7 +26,7 @@ export default function DashboardPage() {
 
   const { data: salesData, isLoading: isSalesLoading } = useQuery({
     queryKey: ['reports', 'sales-summary'],
-    queryFn: () => fetchSalesSummary(),
+    queryFn: () => fetchSalesSummary({}),
   })
 
   const totalSalesRevenue = salesData?.reduce((acc, row) => acc + row.total, 0) || 0

@@ -18,10 +18,10 @@ import SubBackboardsPage from './pages/SubBackboardsPage'
 import FramesPage from './pages/FramesPage'
 import InventoryTransactionsPage from './pages/InventoryTransactionsPage'
 import PricingPage from './pages/PricingPage'
+import ReportsPage from './pages/ReportsPage'
 import AccountsPage from './pages/AccountsPage'
 import SettingsPage from './pages/SettingsPage'
 import AuditLogsPage from './pages/AuditLogsPage'
-import StubPage from './pages/StubPage'
 
 export default function App() {
   return (
@@ -60,7 +60,7 @@ export default function App() {
 
                 {/* Administration Group (Admin Only) */}
                 <Route path="/pricing" element={<PricingPage />} />
-                <Route path="/reports" element={<StubPage title="Báo cáo Doanh thu & Tồn kho" subtitle="Báo cáo tổng hợp tình hình kinh doanh" />} />
+                <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/accounts" element={<AccountsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/audit" element={<AuditLogsPage />} />
