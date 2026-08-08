@@ -334,21 +334,32 @@ export default function InventoryTransactionsPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 120,
+        width: 150,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: InventoryTransactionDto }) => {
           if (!p.data) return null
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-              <Tooltip title="Xem chi tiết phiếu kho">
-                <IconButton
+              <Tooltip title="Xem chi tiết">
+                <Button
                   size="small"
+                  variant="outlined"
                   onClick={() => setSelectedTxId(p.data.id)}
-                  sx={{ color: '#404040' }}
+                  startIcon={<Eye size={14} />}
+                  sx={{
+                    height: 28,
+                    fontSize: 12,
+                    borderColor: '#e0e0e0',
+                    color: '#171717',
+                    whiteSpace: 'nowrap',
+                    textTransform: 'none',
+                    px: 1.25,
+                    '&:hover': { bgcolor: '#f2f2f2', borderColor: '#d4d4d4' },
+                  }}
                 >
-                  <Eye size={16} />
-                </IconButton>
+                  Xem chi tiết
+                </Button>
               </Tooltip>
             </Box>
           )
