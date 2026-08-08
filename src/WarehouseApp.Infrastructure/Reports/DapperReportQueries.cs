@@ -183,7 +183,7 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
         using var conn = factory.Create();
         var rows = (await conn.QueryAsync<InvoiceReportDbRow>(new CommandDefinition(sql, parameters, cancellationToken: ct))).AsList();
         var items = rows.Select(row => new InvoiceReportRowDto(
-            row.InvoiceId, row.CreatedAt, row.CustomerId, row.CustomerName, row.CustomerPhone,
+            row.InvoiceId, new DateTimeOffset(DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc)), row.CustomerId, row.CustomerName, row.CustomerPhone,
             row.GroupPrice, row.ProductId, row.Sku, row.ProductName, row.Quantity,
             row.UnitPrice, row.Subtotal, row.Description)).ToList();
         return new PagedResult<InvoiceReportRowDto>(items, page, pageSize, rows.FirstOrDefault()?.TotalCount ?? 0);
@@ -238,7 +238,7 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
     private sealed record TopCustomerDbRow(long CustomerId, string Name, string Phone, string? GroupPrice, long InvoiceCount, long UnitsSold, decimal Revenue);
     private sealed record InventoryFlowDbRow(DateTime Date, long InQuantity, long OutQuantity, decimal InValue, decimal OutValue);
     private sealed record InvoiceReportDbRow(
-        string InvoiceId, DateTimeOffset CreatedAt, long CustomerId, string CustomerName, string CustomerPhone,
+        string InvoiceId, DateTime CreatedAt, long CustomerId, string CustomerName, string CustomerPhone,
         string? GroupPrice, long ProductId, string Sku, string ProductName, int Quantity,
         decimal UnitPrice, decimal Subtotal, string? Description, long TotalCount);
 }
