@@ -50,3 +50,19 @@ export function createInventoryTransaction(
 ): Promise<InventoryTransactionDto> {
   return apiPost<InventoryTransactionDto>('/api/inventory-transactions', req)
 }
+
+export interface CreateBackboardConversionRequest {
+  backboardId: number
+  frameId: number
+  quantity: number
+  note?: string | null
+}
+
+export function createBackboardConversion(
+  request: CreateBackboardConversionRequest,
+): Promise<InventoryTransactionDto> {
+  return apiPost<InventoryTransactionDto>(
+    '/api/inventory-transactions/backboard-conversions',
+    request,
+  )
+}

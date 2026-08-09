@@ -247,7 +247,7 @@ export default function FramesPage() {
       { field: 'code', headerName: 'MÃ RẬP', width: 150, filter: true, sortable: true },
       { field: 'description', headerName: 'MÔ TẢ RẬP', flex: 1, minWidth: 220 },
       {
-        headerName: 'SỐ THÀNH PHẦN BOM',
+        headerName: 'SỐ THÀNH PHẦN',
         width: 180,
         type: 'rightAligned',
         valueGetter: (p) => p.data?.lines?.length ?? 0,
@@ -262,6 +262,7 @@ export default function FramesPage() {
                 fontSize: 12,
                 fontWeight: 500,
                 borderRadius: '4px',
+                height: 24,
               }}
             />
           </Box>
@@ -272,16 +273,20 @@ export default function FramesPage() {
         headerName: 'TRẠNG THÁI',
         width: 130,
         cellRenderer: (p: { value: number }) => (
-          <Chip
-            label={p.value === 1 ? 'Hoạt động' : 'Ngưng'}
-            size="small"
-            sx={{
-              bgcolor: p.value === 1 ? '#f0fdf4' : '#fef2f2',
-              color: p.value === 1 ? '#15803d' : '#b91c1c',
-              fontSize: 12,
-              borderRadius: '4px',
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Chip
+              label={p.value === 1 ? 'Hoạt động' : 'Ngưng'}
+              size="small"
+              sx={{
+                bgcolor: p.value === 1 ? '#f0fdf4' : '#fef2f2',
+                color: p.value === 1 ? '#15803d' : '#b91c1c',
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: '4px',
+                height: 24,
+              }}
+            />
+          </Box>
         ),
       },
       {

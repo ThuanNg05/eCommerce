@@ -28,22 +28,14 @@ export interface ExportReportsData {
   lowStockData?: LowStockItemDto[]
 }
 
+import { formatDate } from './dateFormat'
+
 const formatVND = (amount?: number | null) => {
   if (amount == null) return '0 ₫'
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount)
 }
 
-const formatDateTime = (dateStr?: string | null) => {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  if (isNaN(date.getTime())) return dateStr
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const mins = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${mins}`
-}
+const formatDateTime = formatDate
 
 export const getReportFileName = (filterLabel: string, ext: 'xlsx' | 'pdf') => {
   const now = new Date()
@@ -366,7 +358,7 @@ export const exportReportsToExcel = async (data: ExportReportsData) => {
     [subtitleStr, '', ''],
     ['', '', ''],
     ['Mốc thời gian', 'Số hóa đơn phát hành', 'Tổng doanh thu (VND)'],
-    ...summaryRows.map((r) => [r.date, r.invoiceCount, r.total]),
+    ...summaryRows.map((r) => [formatDate(r.date), r.invoiceCount, r.total]),
     ...(summaryRows.length > 0 ? [['TỔNG CỘNG', summarySumInvoices, summarySumTotal]] : []),
   ]
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa)
@@ -739,7 +731,7 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
 
   const summaryRows =
     data.summaryData && data.summaryData.length > 0
-      ? data.summaryData.map((r) => [r.date, r.invoiceCount.toLocaleString('vi-VN'), formatVND(r.total)])
+      ? data.summaryData.map((r) => [formatDate(r.date), r.invoiceCount.toLocaleString('vi-VN'), formatVND(r.total)])
       : [['Không có dữ liệu', '', '']]
 
   autoTable(doc, {

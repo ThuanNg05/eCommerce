@@ -20,6 +20,7 @@ import { RefreshCw, Eye, FileText } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import { fetchAuditLogs, type AuditLogDto } from '../api/audit'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { formatDate } from '../utils/dateFormat'
 
 function formatJsonString(raw?: string | null) {
   if (!raw) return '— (Không có dữ liệu)'
@@ -117,14 +118,7 @@ export default function AuditLogsPage() {
         headerName: 'THỜI GIAN',
         width: 190,
         sortable: true,
-        valueFormatter: (p) =>
-          p.value
-            ? new Intl.DateTimeFormat('vi-VN', {
-                timeZone: 'Asia/Ho_Chi_Minh',
-                dateStyle: 'short',
-                timeStyle: 'short',
-              }).format(new Date(p.value))
-            : '—',
+        valueFormatter: (p) => formatDate(p.value),
       },
       {
         headerName: 'CHI TIẾT SNAPSHOT',
@@ -272,7 +266,7 @@ export default function AuditLogsPage() {
               Thao tác: <strong>{selectedAuditLog?.action}</strong>
             </Typography>
             <Typography variant="caption" sx={{ color: '#737373' }}>
-              Thời gian: <strong>{selectedAuditLog?.changedAt ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(selectedAuditLog.changedAt)) : '—'}</strong>
+              Thời gian: <strong>{formatDate(selectedAuditLog?.changedAt)}</strong>
             </Typography>
           </Box>
 

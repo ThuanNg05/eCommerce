@@ -118,34 +118,10 @@ export default function SubBackboardsPage() {
         type: 'rightAligned',
         width: 130,
         sortable: true,
-        cellRenderer: (p: { data?: SubBackboardDto; value: number }) => {
-          if (!p.data) return p.value
-          const isLowStock = p.data.inStock <= (p.data.warningStock ?? 0)
-          return (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, height: '100%' }}>
-              <span>{p.value}</span>
-              {isLowStock && (
-                <Chip
-                  label="Cần nhập"
-                  size="small"
-                  sx={{
-                    bgcolor: '#fffbeb',
-                    color: '#b45309',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    borderRadius: '4px',
-                    height: 20,
-                    px: 0.5,
-                  }}
-                />
-              )}
-            </Box>
-          )
-        },
       },
       {
         field: 'warningStock',
-        headerName: 'TỒN KHO TỐI THIỂU',
+        headerName: 'TỐI THIỂU',
         type: 'rightAligned',
         width: 150,
         sortable: true,
@@ -155,16 +131,20 @@ export default function SubBackboardsPage() {
         headerName: 'TRẠNG THÁI',
         width: 120,
         cellRenderer: (p: { value: number }) => (
-          <Chip
-            label={p.value === 1 ? 'Hoạt động' : 'Ngưng'}
-            size="small"
-            sx={{
-              bgcolor: p.value === 1 ? '#f0fdf4' : '#fef2f2',
-              color: p.value === 1 ? '#15803d' : '#b91c1c',
-              fontSize: 12,
-              borderRadius: '4px',
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Chip
+              label={p.value === 1 ? 'Hoạt động' : 'Ngưng'}
+              size="small"
+              sx={{
+                bgcolor: p.value === 1 ? '#f0fdf4' : '#fef2f2',
+                color: p.value === 1 ? '#15803d' : '#b91c1c',
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: '4px',
+                height: 24,
+              }}
+            />
+          </Box>
         ),
       },
       { field: 'description', headerName: 'MÔ TẢ', flex: 1, minWidth: 180 },
@@ -265,6 +245,10 @@ export default function SubBackboardsPage() {
           <AgGridReact<SubBackboardDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            rowClassRules={{
+              'ag-row-warning-stock': (params) =>
+                Boolean(params.data && params.data.inStock <= (params.data.warningStock ?? 0)),
+            }}
             loading={isLoading}
             quickFilterText={search}
             localeText={AG_GRID_LOCALE_VI}
@@ -320,7 +304,7 @@ export default function SubBackboardsPage() {
 
             <Grid item xs={6}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                TỒN KHO TỐI THIỂU *
+                TỐI THIỂU *
               </Typography>
               <TextField
                 fullWidth
@@ -393,7 +377,7 @@ export default function SubBackboardsPage() {
 
             <Grid item xs={6}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                TỒN KHO TỐI THIỂU *
+                TỐI THIỂU *
               </Typography>
               <TextField
                 fullWidth

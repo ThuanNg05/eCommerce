@@ -21,6 +21,8 @@ import SearchField from '../components/SearchField'
 import { fetchCategories, createCategory, updateCategory, type CategoryDto } from '../api/categories'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
+import { formatDate } from '../utils/dateFormat'
+
 export default function CategoriesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
@@ -109,14 +111,7 @@ export default function CategoriesPage() {
         headerName: 'NGÀY TẠO',
         width: 180,
         sortable: true,
-        valueFormatter: (p) =>
-          p.value
-            ? new Intl.DateTimeFormat('vi-VN', {
-                timeZone: 'Asia/Ho_Chi_Minh',
-                dateStyle: 'short',
-                timeStyle: 'short',
-              }).format(new Date(p.value))
-            : '—',
+        valueFormatter: (p) => formatDate(p.value),
       },
       {
         headerName: 'THAO TÁC',

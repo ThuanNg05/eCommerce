@@ -29,6 +29,7 @@ import {
   type UpsertProductComponentRequest,
 } from '../api/pricing'
 import { fetchInventory, type ProductDto } from '../api/inventory'
+import { formatDate } from '../utils/dateFormat'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -349,7 +350,7 @@ export default function PricingPage() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="caption" sx={{ color: '#a3a3a3' }}>
-                    Cập nhật gần nhất: {rateCardData?.updatedAt ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(rateCardData.updatedAt)) : '—'}
+                    Cập nhật gần nhất: {formatDate(rateCardData?.updatedAt)}
                   </Typography>
 
                   <Box sx={{ display: 'flex', gap: 1.5 }}>

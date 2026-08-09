@@ -59,6 +59,7 @@ import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import SearchField from '../components/SearchField'
 import { exportReportsToExcel, exportReportsToPdf, type ExportReportsData } from '../utils/exportReports'
+import { formatDate } from '../utils/dateFormat'
 
 // Utility formatters
 const formatVND = (amount?: number | null) => {
@@ -66,17 +67,7 @@ const formatVND = (amount?: number | null) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount)
 }
 
-const formatDateTime = (dateStr?: string | null) => {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  if (isNaN(date.getTime())) return dateStr
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const mins = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year} ${hours}:${mins}`
-}
+const formatDateTime = formatDate
 
 const getTodayString = () => {
   const now = new Date()
@@ -594,7 +585,7 @@ export default function ReportsPage() {
         {/* Filter Controls Grid */}
         <Grid container spacing={2} alignItems="center">
           {/* From Date */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
+          <Grid item xs={12} sm={6} md={3} lg={2.5}>
             <TextField
               fullWidth
               size="small"
@@ -611,7 +602,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* To Date */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
+          <Grid item xs={12} sm={6} md={3} lg={2.5}>
             <TextField
               fullWidth
               size="small"
@@ -628,7 +619,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* Customer Group Price */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
+          <Grid item xs={12} sm={6} md={3} lg={2.5}>
             <FormControl fullWidth size="small">
               <InputLabel>Nhóm giá</InputLabel>
               <Select
@@ -647,7 +638,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* GroupBy */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
+          <Grid item xs={12} sm={6} md={3} lg={2.5}>
             <FormControl fullWidth size="small">
               <InputLabel>Gom nhóm thời gian</InputLabel>
               <Select
@@ -662,8 +653,23 @@ export default function ReportsPage() {
             </FormControl>
           </Grid>
 
-          {/* Autocomplete Category */}
+          {/* Reset Filters Button */}
           <Grid item xs={12} sm={6} md={3} lg={2}>
+            <Button
+              fullWidth
+              size="small"
+              variant="outlined"
+              color="inherit"
+              onClick={handleResetFilters}
+              startIcon={<RotateCcw size={14} />}
+              sx={{ height: 38, borderColor: '#cbd5e1', color: '#475569' }}
+            >
+              Xóa bộ lọc
+            </Button>
+          </Grid>
+
+          {/* Autocomplete Category */}
+          <Grid item xs={12} sm={6} md={4} lg={3}>
             <Autocomplete
               size="small"
               options={categoryOptions}
@@ -680,7 +686,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* Autocomplete Product */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
+          <Grid item xs={12} sm={6} md={4} lg={3}>
             <Autocomplete
               size="small"
               options={productOptions}
@@ -697,7 +703,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* Autocomplete Customer */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
+          <Grid item xs={12} sm={6} md={4} lg={3}>
             <Autocomplete
               size="small"
               options={customerOptions}
@@ -714,7 +720,7 @@ export default function ReportsPage() {
           </Grid>
 
           {/* Keyword Search */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
+          <Grid item xs={12} sm={6} md={12} lg={3}>
             <SearchField
               value={search}
               onChange={(e) => {
@@ -728,21 +734,6 @@ export default function ReportsPage() {
               placeholder="Tìm theo từ khóa (Mã HĐ, tên...)"
               width="100%"
             />
-          </Grid>
-
-          {/* Reset Filters Button */}
-          <Grid item xs={12} sm={6} md={3} lg={2}>
-            <Button
-              fullWidth
-              size="small"
-              variant="outlined"
-              color="inherit"
-              onClick={handleResetFilters}
-              startIcon={<RotateCcw size={14} />}
-              sx={{ height: 38, borderColor: '#cbd5e1', color: '#475569' }}
-            >
-              Xóa bộ lọc
-            </Button>
           </Grid>
         </Grid>
       </Paper>
@@ -918,7 +909,7 @@ export default function ReportsPage() {
                     title={
                       <Box sx={{ p: 0.5 }}>
                         <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                          Thời gian: {row.date}
+                          Thời gian: {formatDate(row.date)}
                         </Typography>
                         <Typography variant="caption" sx={{ display: 'block' }}>
                           Doanh thu: {formatVND(row.total)}
@@ -969,7 +960,7 @@ export default function ReportsPage() {
                           transformOrigin: 'top left',
                         }}
                       >
-                        {row.date.length > 10 ? row.date.substring(5) : row.date}
+                        {formatDate(row.date)}
                       </Typography>
                     </Box>
                   </MuiTooltip>
@@ -1182,7 +1173,7 @@ export default function ReportsPage() {
 
           {/* Flow Specific Filters */}
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Loại phiếu kho</InputLabel>
               <Select
                 value={flowTxType}
@@ -1227,7 +1218,7 @@ export default function ReportsPage() {
                     title={
                       <Box sx={{ p: 0.5 }}>
                         <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
-                          Ngày: {row.date}
+                          Ngày: {formatDate(row.date)}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#60a5fa', display: 'block' }}>
                           Nhập: {row.inQuantity} sp ({formatVND(row.inValue)})
@@ -1275,7 +1266,7 @@ export default function ReportsPage() {
                         )}
                       </Box>
                       <Typography variant="caption" sx={{ fontSize: 10, color: '#475569', mt: 1, whiteSpace: 'nowrap' }}>
-                        {row.date.length > 10 ? row.date.substring(5) : row.date}
+                        {formatDate(row.date)}
                       </Typography>
                     </Box>
                   </MuiTooltip>

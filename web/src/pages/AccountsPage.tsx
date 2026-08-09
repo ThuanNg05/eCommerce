@@ -32,6 +32,7 @@ import {
 } from '../api/accounts'
 
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { formatDate } from '../utils/dateFormat'
 
 export default function AccountsPage() {
   const queryClient = useQueryClient()
@@ -124,17 +125,20 @@ export default function AccountsPage() {
         cellRenderer: (p: { value: string }) => {
           const isAdmin = p.value === 'Admin'
           return (
-            <Chip
-              label={p.value}
-              size="small"
-              sx={{
-                bgcolor: isAdmin ? '#eff6ff' : '#f3f4f6',
-                color: isAdmin ? '#1d4ed8' : '#374151',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: '4px',
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <Chip
+                label={p.value}
+                size="small"
+                sx={{
+                  bgcolor: isAdmin ? '#eff6ff' : '#f3f4f6',
+                  color: isAdmin ? '#1d4ed8' : '#374151',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  height: 24,
+                }}
+              />
+            </Box>
           )
         },
       },
@@ -146,17 +150,20 @@ export default function AccountsPage() {
         cellRenderer: (p: { value: number }) => {
           const isActive = p.value === 1
           return (
-            <Chip
-              label={isActive ? 'Đang hoạt động' : 'Đã khóa'}
-              size="small"
-              sx={{
-                bgcolor: isActive ? '#f0fdf4' : '#f3f4f6',
-                color: isActive ? '#15803d' : '#6b7280',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: '4px',
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <Chip
+                label={isActive ? 'Đang hoạt động' : 'Đã khóa'}
+                size="small"
+                sx={{
+                  bgcolor: isActive ? '#f0fdf4' : '#f3f4f6',
+                  color: isActive ? '#15803d' : '#6b7280',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  height: 24,
+                }}
+              />
+            </Box>
           )
         },
       },
@@ -165,14 +172,7 @@ export default function AccountsPage() {
         headerName: 'NGÀY TẠO',
         width: 180,
         sortable: true,
-        valueFormatter: (p) =>
-          p.value
-            ? new Intl.DateTimeFormat('vi-VN', {
-                timeZone: 'Asia/Ho_Chi_Minh',
-                dateStyle: 'short',
-                timeStyle: 'short',
-              }).format(new Date(p.value))
-            : '—',
+        valueFormatter: (p) => formatDate(p.value),
       },
       {
         headerName: 'THAO TÁC',

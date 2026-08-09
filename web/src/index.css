@@ -67,6 +67,19 @@ body {
   --ag-row-height: 44px;
 }
 
+/* AG Grid Low Stock Warning Row Highlighting */
+.ag-theme-quartz .ag-row-warning-stock {
+  background-color: #fffbeb !important;
+}
+
+.ag-theme-quartz .ag-row-warning-stock:hover {
+  background-color: #fef3c7 !important;
+}
+
+.ag-theme-quartz .ag-row-warning-stock.ag-row-selected {
+  background-color: #fde68a !important;
+}
+
 /* Helper class for preventing semantic word breaks */
 .no-break {
   white-space: nowrap !important;

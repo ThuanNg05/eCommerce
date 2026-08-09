@@ -4,11 +4,9 @@ import {
   Typography,
   TextField,
   InputAdornment,
-  Chip,
-  IconButton,
-  Tooltip,
+  Button,
 } from '@mui/material'
-import { Search, LogOut, Shield, User } from 'lucide-react'
+import { Search, LogOut } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_TITLES: Record<string, string> = {
@@ -32,13 +30,13 @@ const PAGE_TITLES: Record<string, string> = {
 export default function TopBar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
 
   const title = PAGE_TITLES[location.pathname] || 'Trang quản trị'
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -86,54 +84,27 @@ export default function TopBar() {
               fontSize: 13,
             },
           }}
-        />
-
-        {/* Role Badge */}
-        {user?.role && (
-          <Chip
-            icon={<Shield size={14} color="#7299ED" />}
-            label={user.role}
-            variant="outlined"
-            size="small"
-            sx={{
-              borderColor: '#e0e0e0',
-              bgcolor: '#ffffff',
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          />
-        )}
-
-        {/* User Chip */}
-        <Chip
-          icon={<User size={14} color="#737373" />}
-          label={user?.username || 'Người dùng'}
-          variant="outlined"
-          size="small"
-          sx={{
-            borderColor: '#e0e0e0',
-            bgcolor: '#ffffff',
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-        />
+        />        
 
         {/* Sign Out Button */}
-        <Tooltip title="Đăng xuất">
-          <IconButton
-            size="small"
-            onClick={handleLogout}
-            sx={{
-              color: '#737373',
-              borderRadius: '6px',
-              border: '1px solid #e0e0e0',
-              p: '6px',
-              '&:hover': { bgcolor: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' },
-            }}
-          >
-            <LogOut size={16} />
-          </IconButton>
-        </Tooltip>
+        <Button
+          size="small"
+          onClick={handleLogout}
+          startIcon={<LogOut size={16} />}
+          sx={{
+            color: '#737373',
+            borderRadius: '6px',
+            border: '1px solid #e0e0e0',
+            px: '12px',
+            py: '5px',
+            fontSize: 13,
+            fontWeight: 500,
+            textTransform: 'none',
+            '&:hover': { bgcolor: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' },
+          }}
+        >
+          Đăng xuất
+        </Button>
       </Box>
     </Box>
   )

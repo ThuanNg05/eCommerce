@@ -32,22 +32,26 @@ import {
   fetchInventoryTransactions,
   fetchInventoryTransactionById,
   createInventoryTransaction,
+  createBackboardConversion,
   type InventoryTransactionDto,
   type TransactionLineDto,
   type CreateInventoryTransactionRequest,
 } from '../api/inventoryTransactions'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { formatDate } from '../utils/dateFormat'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchMaterials, type MaterialDto } from '../api/materials'
 import { fetchBackboards, type BackboardDto } from '../api/backboards'
 import { fetchSubBackboards, type SubBackboardDto } from '../api/subBackboards'
+import { fetchFrames, type FrameDto } from '../api/frames'
 
-type ItemType = 'product' | 'material' | 'backboard' | 'subBackboard'
+type ItemType = 'product' | 'material' | 'backboard' | 'subBackboard' | 'backboardConversion'
 
 interface CreateLineState {
   id: string
   itemType: ItemType
   selectedItem: ProductDto | MaterialDto | BackboardDto | SubBackboardDto | null
+  selectedFrame?: FrameDto | null
   quantity: number | ''
   unitPrice: number | ''
 }
@@ -62,20 +66,6 @@ const createEmptyLine = (): CreateLineState => ({
 
 const formatVND = (v: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v)
-
-const formatDate = (dateStr?: string | null) => {
-  if (!dateStr) return ''
-  try {
-    const d = new Date(dateStr)
-    return new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }).format(d)
-  } catch {
-    return dateStr
-  }
-}
 
 export default function InventoryTransactionsPage() {
   const queryClient = useQueryClient()
@@ -124,10 +114,33 @@ export default function InventoryTransactionsPage() {
     queryFn: () => fetchSubBackboards('', 1, 500),
   })
 
+  const { data: framesData } = useQuery({
+    queryKey: ['frames', 'all'],
+    queryFn: () => fetchFrames('', 1, 500),
+  })
+
   const products = productsData?.items ?? []
   const materials = materialsData?.items ?? []
   const backboards = backboardsData?.items ?? []
   const subBackboards = subBackboardsData?.items ?? []
+  const frames = framesData?.items ?? []
+
+  // Active options for backboard conversion
+  const activeBackboards = useMemo(() => backboards.filter((b) => b.status === 1), [backboards])
+  const activeFrames = useMemo(() => frames.filter((f) => f.status === 1), [frames])
+
+  const getBackboardOptionLabel = (b: BackboardDto) => {
+    const typeLabel = b.type === 1 ? 'MDF' : b.type === 2 ? 'HP' : `Loại ${b.type}`
+    const descLabel = b.description ? ` - ${b.description}` : ''
+    return `Ván ép (${typeLabel}${descLabel}) - Tồn: ${b.inStock}`
+  }
+
+  const getFrameOptionLabel = (f: FrameDto) => {
+    const codeLabel = `Mã rập: ${f.code}`
+    const descLabel = f.description ? ` (${f.description})` : ''
+    const linesLabel = f.lines && f.lines.length > 0 ? ` - ${f.lines.length} loại ván hậu` : ''
+    return `${codeLabel}${descLabel}${linesLabel}`
+  }
 
   // Create Mutation
   const createMutation = useMutation({
@@ -138,6 +151,20 @@ export default function InventoryTransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ['materials'] })
       queryClient.invalidateQueries({ queryKey: ['backboards'] })
       queryClient.invalidateQueries({ queryKey: ['subBackboards'] })
+      setIsCreateOpen(false)
+      resetCreateForm()
+    },
+    onError: (err: Error) => setActionError(err.message),
+  })
+
+  // Conversion Mutation
+  const conversionMutation = useMutation({
+    mutationFn: createBackboardConversion,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventoryTransactions'] })
+      queryClient.invalidateQueries({ queryKey: ['backboards'] })
+      queryClient.invalidateQueries({ queryKey: ['subBackboards'] })
+      queryClient.invalidateQueries({ queryKey: ['frames'] })
       setIsCreateOpen(false)
       resetCreateForm()
     },
@@ -172,11 +199,18 @@ export default function InventoryTransactionsPage() {
               ...l,
               itemType: newType,
               selectedItem: null,
+              selectedFrame: null,
               quantity: 1,
               unitPrice: 0,
             }
           : l,
       ),
+    )
+  }
+
+  const handleFrameSelect = (id: string, frame: FrameDto | null) => {
+    setCreateLines((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, selectedFrame: frame } : l)),
     )
   }
 
@@ -231,7 +265,36 @@ export default function InventoryTransactionsPage() {
       return
     }
 
-    // Validate each line
+    // Check if any line is Backboard Conversion
+    const conversionLine = createLines.find((l) => l.itemType === 'backboardConversion')
+    if (conversionLine) {
+      if (txType !== 2) {
+        setActionError('Loại hàng Rập ván hậu chỉ được sử dụng trong phiếu Xuất kho.')
+        return
+      }
+      if (!conversionLine.selectedItem) {
+        setActionError('Vui lòng chọn ván ép (MDF/HP) đang hoạt động.')
+        return
+      }
+      if (!conversionLine.selectedFrame) {
+        setActionError('Vui lòng chọn rập ván hậu đang hoạt động.')
+        return
+      }
+      if (typeof conversionLine.quantity !== 'number' || conversionLine.quantity <= 0 || !Number.isInteger(conversionLine.quantity)) {
+        setActionError('Số lượng tấm ván ép phải là số nguyên dương.')
+        return
+      }
+
+      conversionMutation.mutate({
+        backboardId: (conversionLine.selectedItem as BackboardDto).id,
+        frameId: conversionLine.selectedFrame.id,
+        quantity: Math.floor(Number(conversionLine.quantity)),
+        note: txNote.trim() || null,
+      })
+      return
+    }
+
+    // Validate each standard line
     for (let i = 0; i < createLines.length; i++) {
       const line = createLines[i]
       if (!line.selectedItem) {
@@ -285,7 +348,10 @@ export default function InventoryTransactionsPage() {
       return sb ? `[Ván hậu] Cỡ ${sb.size}` : `Ván hậu #${line.subBackboardId}`
     }
     if (line.frameId) {
-      return `[Rập] #${line.frameId}`
+      const f = frames.find((x) => x.id === line.frameId)
+      return f
+        ? `[Rập ván hậu] Mã rập #${f.code}${f.description ? ' - ' + f.description : ''}`
+        : `[Rập ván hậu] Mã rập #${line.frameId}`
     }
     return 'Hàng hóa chưa xác định'
   }
@@ -305,22 +371,25 @@ export default function InventoryTransactionsPage() {
         headerName: 'LOẠI PHIẾU',
         width: 140,
         cellRenderer: (p: { value: number }) => (
-          <Chip
-            label={p.value === 1 ? 'Nhập kho' : 'Xuất kho'}
-            size="small"
-            sx={{
-              bgcolor: p.value === 1 ? '#eff6ff' : '#fff1f2',
-              color: p.value === 1 ? '#1d4ed8' : '#be123c',
-              fontWeight: 600,
-              fontSize: 12,
-              borderRadius: '4px',
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+            <Chip
+              label={p.value === 1 ? 'Nhập kho' : 'Xuất kho'}
+              size="small"
+              sx={{
+                bgcolor: p.value === 1 ? '#eff6ff' : '#fff1f2',
+                color: p.value === 1 ? '#1d4ed8' : '#be123c',
+                fontWeight: 600,
+                fontSize: 12,
+                borderRadius: '4px',
+                height: 24,
+              }}
+            />
+          </Box>
         ),
       },
       {
         field: 'transactionDate',
-        headerName: 'NGÀY GIAO DỊCH',
+        headerName: 'NGÀY',
         width: 170,
         sortable: true,
         valueFormatter: (p) => formatDate(p.value),
@@ -481,7 +550,46 @@ export default function InventoryTransactionsPage() {
                 select
                 fullWidth
                 value={txType}
-                onChange={(e) => setTxType(Number(e.target.value) as 1 | 2)}
+                onChange={(e) => {
+                  const newType = Number(e.target.value) as 1 | 2
+                  if (newType === txType) return
+
+                  setTxType(newType)
+                  setCreateLines((prev) =>
+                    prev.map((line) => {
+                      if (newType === 1 && line.itemType === 'backboardConversion') {
+                        return {
+                          ...line,
+                          itemType: 'product',
+                          selectedItem: null,
+                          selectedFrame: null,
+                          quantity: 1,
+                          unitPrice: 0,
+                        }
+                      }
+
+                      let defaultPrice = line.unitPrice
+                      if (line.selectedItem) {
+                        if (line.itemType === 'product') {
+                          const p = line.selectedItem as ProductDto
+                          defaultPrice = newType === 1 ? p.basePrice : p.priceRetail || p.basePrice
+                        } else if (line.itemType === 'material') {
+                          const m = line.selectedItem as MaterialDto
+                          defaultPrice = newType === 1 ? m.importPrice : m.salePrice || m.importPrice
+                        } else if (line.itemType === 'backboard') {
+                          const b = line.selectedItem as BackboardDto
+                          defaultPrice = newType === 1 ? b.importPrice : b.salePrice || b.importPrice
+                        }
+                      }
+
+                      return {
+                        ...line,
+                        quantity: 1,
+                        unitPrice: defaultPrice,
+                      }
+                    }),
+                  )
+                }}
               >
                 <MenuItem value={1}>Nhập kho (+)</MenuItem>
                 <MenuItem value={2}>Xuất kho (-)</MenuItem>
@@ -583,12 +691,15 @@ export default function InventoryTransactionsPage() {
                               <MenuItem value="material">Vật liệu</MenuItem>
                               <MenuItem value="backboard">Ván ép</MenuItem>
                               <MenuItem value="subBackboard">Ván hậu</MenuItem>
+                              {txType === 2 && (
+                                <MenuItem value="backboardConversion">Rập ván hậu</MenuItem>
+                              )}
                             </TextField>
                           </Grid>
 
                           <Grid item xs={9}>
                             <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                              CHỌN HÀNG HÓA *
+                              {line.itemType === 'backboardConversion' ? 'THÔNG TIN QUY ĐỔI (VÁN ÉP & RẬP VÁN HẬU) *' : 'CHỌN HÀNG HÓA *'}
                             </Typography>
                             {line.itemType === 'product' && (
                               <Autocomplete
@@ -620,9 +731,7 @@ export default function InventoryTransactionsPage() {
                               <Autocomplete
                                 size="small"
                                 options={backboards}
-                                getOptionLabel={(b) =>
-                                  `Ván ép (Loại ${b.type})${b.description ? ' - ' + b.description : ''}`
-                                }
+                                getOptionLabel={getBackboardOptionLabel}
                                 value={(line.selectedItem as BackboardDto) || null}
                                 onChange={(_, val) => handleItemSelect(line.id, val)}
                                 renderInput={(params) => (
@@ -644,6 +753,35 @@ export default function InventoryTransactionsPage() {
                                   <TextField {...params} placeholder="Tìm ván hậu..." />
                                 )}
                               />
+                            )}
+
+                            {line.itemType === 'backboardConversion' && (
+                              <Grid container spacing={1.5}>
+                                <Grid item xs={6}>
+                                  <Autocomplete
+                                    size="small"
+                                    options={activeBackboards}
+                                    getOptionLabel={getBackboardOptionLabel}
+                                    value={(line.selectedItem as BackboardDto) || null}
+                                    onChange={(_, val) => handleItemSelect(line.id, val)}
+                                    renderInput={(params) => (
+                                      <TextField {...params} label="Ván ép (MDF/HP) *" placeholder="Chọn ván ép hoạt động..." />
+                                    )}
+                                  />
+                                </Grid>
+                                <Grid item xs={6}>
+                                  <Autocomplete
+                                    size="small"
+                                    options={activeFrames}
+                                    getOptionLabel={getFrameOptionLabel}
+                                    value={line.selectedFrame || null}
+                                    onChange={(_, val) => handleFrameSelect(line.id, val)}
+                                    renderInput={(params) => (
+                                      <TextField {...params} label="Rập ván hậu *" placeholder="Chọn theo Mã Rập..." />
+                                    )}
+                                  />
+                                </Grid>
+                              </Grid>
                             )}
                           </Grid>
 

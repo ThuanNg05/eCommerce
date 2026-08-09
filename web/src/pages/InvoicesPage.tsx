@@ -39,6 +39,7 @@ import {
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, fetchCustomerById, type CustomerDto } from '../api/customers'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { formatDate } from '../utils/dateFormat'
 import { STORE_INFO } from '../constants/storeInfo'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -73,15 +74,7 @@ const formatVND = (value?: number | null) => {
   }).format(value)
 }
 
-const formatDateDDMMYYYY = (dateStr?: string | null) => {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  if (isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
+const formatDateDDMMYYYY = formatDate
 
 const isInvoiceEditable = (createdAtStr?: string | null): boolean => {
   if (!createdAtStr) return false
@@ -725,14 +718,7 @@ export default function InvoicesPage() {
         flex: 1,
         minWidth: 160,
         sortable: true,
-        valueFormatter: (p: ValueFormatterParams<InvoiceSummaryDto, string>) =>
-          p.value
-            ? new Intl.DateTimeFormat('vi-VN', {
-                timeZone: 'Asia/Ho_Chi_Minh',
-                dateStyle: 'short',
-                timeStyle: 'short',
-              }).format(new Date(p.value))
-            : '—',
+        valueFormatter: (p: ValueFormatterParams<InvoiceSummaryDto, string>) => formatDate(p.value),
       },
       {
         field: 'total',

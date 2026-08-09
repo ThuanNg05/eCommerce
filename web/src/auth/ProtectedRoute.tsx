@@ -1,11 +1,20 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import { Box, CircularProgress } from '@mui/material'
 import { useAuth } from './AuthContext'
 
 const ADMIN_ONLY_ROUTES = ['/pricing', '/accounts', '/settings', '/audit', '/reports']
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const location = useLocation()
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <CircularProgress size={32} />
+      </Box>
+    )
+  }
 
   // 1. Not logged in -> Redirect to /login
   if (!user) {

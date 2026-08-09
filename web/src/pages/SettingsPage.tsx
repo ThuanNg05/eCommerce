@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import { Mail, Eye, EyeOff, Save, ShieldCheck, RefreshCw } from 'lucide-react'
 import { fetchSmtpConfig, updateSmtpConfig, type UpdateSmtpConfigRequest } from '../api/settings'
+import { formatDate } from '../utils/dateFormat'
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
@@ -231,7 +232,7 @@ export default function SettingsPage() {
             {/* Footer / Submit */}
             <Grid item xs={12} sx={{ pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="caption" sx={{ color: '#a3a3a3' }}>
-                Cập nhật gần nhất: {smtpData?.updatedAt ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(smtpData.updatedAt)) : '—'}
+                Cập nhật gần nhất: {formatDate(smtpData?.updatedAt)}
               </Typography>
 
               <Button
