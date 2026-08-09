@@ -608,6 +608,8 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
     doc.text(`6. CHI TIẾT DÒNG HÓA ĐƠN (${data.invoiceDetails.length} bản ghi)`, 10, currentY + 4)
     currentY += 8
 
+    const headers = ['Mã HĐ', 'Ngày tạo', 'Khách hàng', 'Mã SKU', 'Sản phẩm', 'SL', 'Đơn giá', 'Thành tiền']
+
     const invoiceRows = data.invoiceDetails.map((r) => [
       r.invoiceId,
       formatDateTime(r.createdAt),
@@ -618,6 +620,64 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
       formatVND(r.unitPrice),
       formatVND(r.subtotal),
     ])
+
+    // Auto-adjust column widths based on longest string in each column for Section 6
+    // Landscape A4 width: 297mm - 20mm margins (10mm left/right) = 277mm available width
+    const availableWidth = 277
+    const fontSize = 7.5
+    const cellPadding = 2
+    const horizontalPadding = cellPadding * 2 // 4mm
+    const buffer = 1.5 // Safety buffer in mm
+
+    // Column indices:
+    // 0: Mã HĐ, 1: Ngày tạo, 2: Khách hàng, 3: Mã SKU, 4: Sản phẩm (Priority), 5: SL, 6: Đơn giá, 7: Thành tiền
+    const priorityColIdx = 4
+
+    const minWidths: { [key: number]: number } = {
+      0: 22, // Mã HĐ
+      1: 26, // Ngày tạo
+      2: 28, // Khách hàng
+      3: 20, // Mã SKU
+      4: 45, // Sản phẩm (Priority)
+      5: 14, // SL
+      6: 22, // Đơn giá
+      7: 22, // Thành tiền
+    }
+
+    const calculatedWidths: number[] = new Array(headers.length).fill(0)
+
+    // Calculate width for each non-priority column using longest string length in mm
+    for (let colIdx = 0; colIdx < headers.length; colIdx++) {
+      if (colIdx === priorityColIdx) continue
+
+      // Measure header length with bold font
+      doc.setFont('Roboto', 'bold')
+      doc.setFontSize(fontSize)
+      let maxTextWidth = doc.getTextWidth(headers[colIdx])
+
+      // Measure body length with normal font
+      doc.setFont('Roboto', 'normal')
+      doc.setFontSize(fontSize)
+      for (const row of invoiceRows) {
+        const text = String(row[colIdx] ?? '')
+        const w = doc.getTextWidth(text)
+        if (w > maxTextWidth) {
+          maxTextWidth = w
+        }
+      }
+
+      const neededWidth = maxTextWidth + horizontalPadding + buffer
+      const minW = minWidths[colIdx] ?? 15
+      calculatedWidths[colIdx] = Math.ceil(Math.max(neededWidth, minW) * 10) / 10
+    }
+
+    // Sum width of non-priority columns
+    const nonPriorityWidthSum = calculatedWidths.reduce((sum, w, idx) => (idx === priorityColIdx ? sum : sum + w), 0)
+
+    // Allocate remaining printable page width to priority column (Product Name)
+    const remainingWidth = availableWidth - nonPriorityWidthSum
+    const prodMinWidth = minWidths[priorityColIdx] ?? 45
+    calculatedWidths[priorityColIdx] = Math.ceil(Math.max(remainingWidth, prodMinWidth) * 10) / 10
 
     autoTable(doc, {
       startY: currentY,
@@ -647,16 +707,16 @@ export const exportReportsToPdf = async (data: ExportReportsData) => {
         textColor: [30, 41, 59],
       },
       columnStyles: {
-        0: { cellWidth: 28, font: 'Roboto', fontStyle: 'bold', textColor: [37, 99, 235] },
-        1: { cellWidth: 32, font: 'Roboto', fontStyle: 'normal' },
-        2: { cellWidth: 48, font: 'Roboto', fontStyle: 'normal' },
-        3: { cellWidth: 28, font: 'Roboto', fontStyle: 'normal' },
-        4: { cellWidth: 65, font: 'Roboto', fontStyle: 'normal' },
-        5: { cellWidth: 16, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
-        6: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'normal' },
-        7: { cellWidth: 30, halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+        0: { cellWidth: calculatedWidths[0], font: 'Roboto', fontStyle: 'bold', textColor: [37, 99, 235] },
+        1: { cellWidth: calculatedWidths[1], font: 'Roboto', fontStyle: 'normal' },
+        2: { cellWidth: calculatedWidths[2], font: 'Roboto', fontStyle: 'normal' },
+        3: { cellWidth: calculatedWidths[3], font: 'Roboto', fontStyle: 'normal' },
+        4: { cellWidth: calculatedWidths[4], font: 'Roboto', fontStyle: 'normal' },
+        5: { cellWidth: calculatedWidths[5], halign: 'right', font: 'Roboto', fontStyle: 'bold' },
+        6: { cellWidth: calculatedWidths[6], halign: 'right', font: 'Roboto', fontStyle: 'normal' },
+        7: { cellWidth: calculatedWidths[7], halign: 'right', font: 'Roboto', fontStyle: 'bold' },
       },
-      head: [['Mã HĐ', 'Ngày tạo', 'Khách hàng', 'Mã SKU', 'Sản phẩm', 'SL', 'Đơn giá', 'Thành tiền']],
+      head: [headers],
       body: invoiceRows,
       rowPageBreak: 'avoid',
     })
