@@ -76,15 +76,26 @@ public class AccountService(AppDbContext db) : IAccountService
         if (!Roles.IsValid(r.RoleId))
             throw new DomainValidationException("Vai trò phải là 1 (Quản trị viên) hoặc 2 (Nhân viên).");
 
+        var passwordChanged = !string.IsNullOrWhiteSpace(r.Password);
+        var securityIdentityChanged = account.RoleId != r.RoleId || account.Status != r.Status || passwordChanged;
         account.RoleId = r.RoleId;
         account.Status = r.Status;
-        if (!string.IsNullOrWhiteSpace(r.Password))
+        if (passwordChanged)
         {
-            if (r.Password.Length < MinPasswordLength)
+            if (r.Password!.Length < MinPasswordLength)
                 throw new DomainValidationException($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
             account.Password = BCrypt.Net.BCrypt.HashPassword(r.Password);
         }
         account.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // Existing JWT claims become stale after role/status/password changes.
+        if (securityIdentityChanged)
+        {
+            var now = DateTimeOffset.UtcNow;
+            await db.AuthSessions
+                .Where(s => s.AccountId == account.Id && s.RevokedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now), ct);
+        }
 
         await db.SaveChangesAsync(ct);
         return ToDto(account);

@@ -76,7 +76,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
             if (quantity <= 0)
                 throw new DomainValidationException($"Số lượng của sản phẩm '{p.Sku}' phải lớn hơn 0.");
             if (p.InStock < quantity)
-                throw new DomainValidationException($"Sản phẩm '{p.Sku}' không đủ tồn kho (còn {p.InStock}, yêu cầu {quantity}).");
+                throw DomainErrors.InsufficientStock();
 
             p.InStock -= quantity;
             p.UpdatedAt = DateTimeOffset.UtcNow;
@@ -177,7 +177,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
             if (line.Quantity <= 0)
                 throw new DomainValidationException($"Số lượng của sản phẩm '{product.Sku}' phải lớn hơn 0.");
             if (product.InStock < line.Quantity)
-                throw new DomainValidationException($"Sản phẩm '{product.Sku}' không đủ tồn kho (còn {product.InStock}, yêu cầu {line.Quantity}).");
+                throw DomainErrors.InsufficientStock();
 
             var unitPrice = line.UnitPrice ?? DefaultUnitPrice(invoice.Customer!, product);
             if (unitPrice < 0)

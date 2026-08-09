@@ -6,6 +6,7 @@ namespace WarehouseApp.Infrastructure.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Material> Materials => Set<Material>();

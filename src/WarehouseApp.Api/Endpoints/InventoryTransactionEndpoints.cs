@@ -21,6 +21,15 @@ public static class InventoryTransactionEndpoints
             return Results.Created($"/api/inventory-transactions/{dto.Id}", dto);
         });
 
+        g.MapPost("/backboard-conversions", async (
+            CreateBackboardConversionRequest req,
+            IInventoryTransactionService svc,
+            CancellationToken ct) =>
+        {
+            var dto = await svc.CreateBackboardConversionAsync(req, ct);
+            return Results.Created($"/api/inventory-transactions/{dto.Id}", dto);
+        });
+
         return api;
     }
 }

@@ -14,6 +14,22 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
     }
 }
 
+public class AuthSessionConfiguration : IEntityTypeConfiguration<AuthSession>
+{
+    public void Configure(EntityTypeBuilder<AuthSession> b)
+    {
+        b.ToTable("auth_session", t => t.ExcludeFromMigrations());
+        b.HasKey(s => s.Id);
+        b.Property(s => s.RefreshTokenHash).HasMaxLength(64).IsFixedLength();
+        b.HasIndex(s => s.AccountId);
+        b.HasIndex(s => s.ExpiresAt);
+        b.HasOne(s => s.Account)
+            .WithMany(a => a.AuthSessions)
+            .HasForeignKey(s => s.AccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class SmtpConfigConfiguration : IEntityTypeConfiguration<SmtpConfig>
 {
     public void Configure(EntityTypeBuilder<SmtpConfig> b)

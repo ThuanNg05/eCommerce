@@ -1,3 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using WarehouseApp.Api.Security;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Dtos;
 
@@ -9,11 +12,57 @@ public static class AuthEndpoints
     {
         var g = api.MapGroup("/auth").WithTags("Auth");
 
-        g.MapPost("/login", async (LoginRequest req, IAuthService svc, CancellationToken ct) =>
-            await svc.LoginAsync(req, ct) is { } res
-                ? Results.Ok(res)
+        g.MapPost("/login", async (
+            LoginRequest req,
+            IAuthService auth,
+            IJwtTokenService tokens,
+            CancellationToken ct) =>
+            await auth.LoginAsync(req, ct) is { } session
+                ? Results.Ok(tokens.Issue(session))
                 : Results.Problem(detail: "Tên đăng nhập hoặc mật khẩu không đúng.", statusCode: 401));
 
+        g.MapPost("/refresh", async (
+            RefreshRequest req,
+            IAuthService auth,
+            IJwtTokenService tokens,
+            CancellationToken ct) =>
+            await auth.RefreshAsync(req.RefreshToken, ct) is { } session
+                ? Results.Ok(tokens.Issue(session))
+                : Results.Problem(detail: "Phiên đăng nhập không còn hợp lệ.", statusCode: 401));
+
+        g.MapPost("/logout", async (
+            ClaimsPrincipal user,
+            IAuthService auth,
+            CancellationToken ct) =>
+        {
+            if (!TryGetSessionIdentity(user, out var sessionId, out var accountId))
+                return Results.Unauthorized();
+
+            await auth.RevokeSessionAsync(sessionId, accountId, ct);
+            return Results.NoContent();
+        }).RequireAuthorization();
+
+        g.MapGet("/me", (ClaimsPrincipal user) =>
+        {
+            if (!long.TryParse(user.FindFirstValue(JwtRegisteredClaimNames.Sub), out var accountId) ||
+                !short.TryParse(user.FindFirstValue("role_id"), out var roleId))
+                return Results.Unauthorized();
+
+            return Results.Ok(new CurrentUserResponse(
+                accountId,
+                user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? user.Identity?.Name ?? string.Empty,
+                roleId,
+                user.FindFirstValue(ClaimTypes.Role) ?? string.Empty));
+        }).RequireAuthorization();
+
         return api;
+    }
+
+    private static bool TryGetSessionIdentity(ClaimsPrincipal user, out Guid sessionId, out long accountId)
+    {
+        sessionId = default;
+        accountId = default;
+        return Guid.TryParse(user.FindFirstValue("sid"), out sessionId) &&
+               long.TryParse(user.FindFirstValue(JwtRegisteredClaimNames.Sub), out accountId);
     }
 }

@@ -114,6 +114,140 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
         return ToDto(entity);
     }
 
+    /// <summary>
+    /// Converts full backboard sheets into the sub-backboard quantities configured on a
+    /// frame/template. The outbound sheet, frame marker, generated inbound lines, and all
+    /// stock changes commit atomically as one issue transaction.
+    /// </summary>
+    public async Task<InventoryTransactionDto> CreateBackboardConversionAsync(
+        CreateBackboardConversionRequest request,
+        CancellationToken ct = default)
+    {
+        if (request.BackboardId <= 0)
+            throw new DomainValidationException("Vui lòng chọn loại ván ép MDF hoặc HP.");
+        if (request.FrameId <= 0)
+            throw new DomainValidationException("Vui lòng chọn mã rập.");
+        if (request.Quantity <= 0)
+            throw new DomainValidationException("Số lượng ván ép xuất theo rập phải lớn hơn 0.");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Share the same lock as normal receipts/issues so stock and transaction codes
+        // cannot race between two workstations.
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(hashtext('warehouse.inventory-transactions.create'))", ct);
+
+        var backboard = await db.Backboards.FirstOrDefaultAsync(b => b.Id == request.BackboardId, ct);
+        if (backboard is null)
+            throw new DomainValidationException($"Không tìm thấy loại ván ép có mã {request.BackboardId}.");
+        if (backboard.Status != 1)
+            throw new DomainValidationException("Loại ván ép đã ngừng sử dụng.");
+
+        var frame = await db.Frames.AsNoTracking().FirstOrDefaultAsync(f => f.Id == request.FrameId, ct);
+        if (frame is null)
+            throw new DomainValidationException($"Không tìm thấy rập có mã nội bộ {request.FrameId}.");
+        if (frame.Status != 1)
+            throw new DomainValidationException($"Rập mã {frame.Code} đã ngừng sử dụng.");
+
+        var recipe = await db.FrameDetails.AsNoTracking()
+            .Where(d => d.FrameId == frame.Id && d.Quantity > 0)
+            .GroupBy(d => d.SubBackboardId)
+            .Select(g => new { SubBackboardId = g.Key, QuantityPerSheet = g.Sum(x => x.Quantity) })
+            .ToListAsync(ct);
+
+        if (recipe.Count == 0)
+            throw new DomainValidationException($"Rập mã {frame.Code} chưa thiết lập số lượng ván hậu nhỏ.");
+
+        var subIds = recipe.Select(x => x.SubBackboardId).ToList();
+        var subBackboards = await db.SubBackboards.Where(s => subIds.Contains(s.Id)).ToListAsync(ct);
+        EnsureAllFound(subIds, subBackboards.Select(s => s.Id), "ván hậu nhỏ");
+
+        var inactive = subBackboards.Where(s => s.Status != 1).Select(s => s.Size).ToList();
+        if (inactive.Count > 0)
+            throw new DomainValidationException(
+                $"Rập mã {frame.Code} đang dùng ván hậu nhỏ đã ngừng sử dụng: {string.Join(", ", inactive)}.");
+
+        backboard.InStock = NextStock(
+            backboard.InStock,
+            -request.Quantity,
+            $"ván ép loại {backboard.Type}");
+        backboard.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var producedBySubId = new Dictionary<long, int>();
+        try
+        {
+            foreach (var line in recipe)
+                producedBySubId[line.SubBackboardId] = checked(line.QuantityPerSheet * request.Quantity);
+        }
+        catch (OverflowException)
+        {
+            throw new DomainValidationException("Số lượng ván hậu nhỏ sau quy đổi vượt giới hạn cho phép.");
+        }
+
+        foreach (var sub in subBackboards)
+        {
+            sub.InStock = NextStock(
+                sub.InStock,
+                producedBySubId[sub.Id],
+                $"ván hậu nhỏ '{sub.Size}'");
+            sub.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        var entity = new InventoryTransaction
+        {
+            TransactionCode = await NextCodeAsync(ct),
+            Type = TypeIssue,
+            TransactionDate = VietnamBusinessTime.Today,
+            Note = string.IsNullOrWhiteSpace(request.Note)
+                ? $"Rập ván hậu mã {frame.Code}"
+                : request.Note.Trim(),
+        };
+
+        // Marker line preserves which frame/template was used without treating Frame as stock.
+        entity.Details.Add(new InventoryTransactionDetail
+        {
+            FrameId = frame.Id,
+            Quantity = request.Quantity,
+            UnitPrice = 0,
+            TotalPrice = 0,
+            Direction = DirectionOut,
+        });
+        entity.Details.Add(new InventoryTransactionDetail
+        {
+            BackboardId = backboard.Id,
+            Quantity = request.Quantity,
+            UnitPrice = backboard.ImportPrice,
+            TotalPrice = backboard.ImportPrice * request.Quantity,
+            Direction = DirectionOut,
+        });
+        foreach (var sub in subBackboards.OrderBy(s => s.Id))
+        {
+            entity.Details.Add(new InventoryTransactionDetail
+            {
+                SubBackboardId = sub.Id,
+                Quantity = producedBySubId[sub.Id],
+                UnitPrice = 0,
+                TotalPrice = 0,
+                Direction = DirectionIn,
+            });
+        }
+
+        db.InventoryTransactions.Add(entity);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await tx.RollbackAsync(ct);
+            throw new ConcurrencyConflictException(
+                "Tồn kho đã thay đổi ở máy khác trong lúc rập ván hậu. Vui lòng thử lại.");
+        }
+
+        return ToDto(entity);
+    }
+
     // ----- stock movement -----
 
     /// <summary>Sums signed deltas per item and applies them to the four stockable kinds,
@@ -171,9 +305,17 @@ public class InventoryTransactionService(AppDbContext db) : IInventoryTransactio
 
     private static int NextStock(int current, int delta, string label)
     {
-        var next = current + delta;
+        int next;
+        try
+        {
+            next = checked(current + delta);
+        }
+        catch (OverflowException)
+        {
+            throw new DomainValidationException($"Tồn kho {label} vượt giới hạn cho phép.");
+        }
         if (next < 0)
-            throw new DomainValidationException($"Giao dịch sẽ làm tồn kho {label} âm (hiện còn {current}, thay đổi {delta}).");
+            throw DomainErrors.InsufficientStock();
         return next;
     }
 

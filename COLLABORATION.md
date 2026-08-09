@@ -82,6 +82,9 @@ is binding for everything under `web/**`.
 - `POST /api/inventory` (`CreateProductRequest`) → `ProductDto`
 - `PUT  /api/inventory/{id:long}` (`UpdateProductRequest`) → `ProductDto`
 - `POST /api/inventory/{id:long}/adjust` (`StockAdjustmentRequest`) → `ProductDto`
+- `POST /api/inventory-transactions/backboard-conversions` (`CreateBackboardConversionRequest`) → `InventoryTransactionDto`
+  - body: `{ backboardId, frameId, quantity, note? }`
+  - effect: issue `quantity` full backboards and receive each configured frame-detail quantity multiplied by `quantity`
 - `GET  /api/invoices?page&pageSize` → `InvoiceSummaryDto[]`
 - `GET  /api/invoices/{id}` → `InvoiceDto`   (id is a string business code, e.g. `INV-20260805-0001`)
 - `POST /api/invoices` (`CreateInvoiceRequest`) → `InvoiceDto`

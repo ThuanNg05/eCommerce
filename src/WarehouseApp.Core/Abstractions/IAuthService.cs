@@ -4,7 +4,8 @@ namespace WarehouseApp.Core.Abstractions;
 
 public interface IAuthService
 {
-    /// <summary>Verifies credentials against the account store. Returns null for unknown
-    /// username, inactive account, or wrong password (callers must not distinguish which).</summary>
-    Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken ct = default);
+    Task<AuthenticatedSession?> LoginAsync(LoginRequest request, CancellationToken ct = default);
+    Task<AuthenticatedSession?> RefreshAsync(string refreshToken, CancellationToken ct = default);
+    Task<bool> ValidateSessionAsync(Guid sessionId, long accountId, CancellationToken ct = default);
+    Task RevokeSessionAsync(Guid sessionId, long accountId, CancellationToken ct = default);
 }

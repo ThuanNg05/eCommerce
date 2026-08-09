@@ -40,3 +40,14 @@ public record CreateInventoryTransactionRequest(
     short Type,
     string? Note,
     IReadOnlyList<CreateTransactionLineRequest> Details);
+
+/// <summary>
+/// Cuts full backboard sheets with a configured frame/template. Each sheet is issued
+/// from <c>backboard</c>; the frame's detail quantities are multiplied by
+/// <see cref="Quantity"/> and received into <c>sub_backboard</c> stock.
+/// </summary>
+public record CreateBackboardConversionRequest(
+    long BackboardId,
+    long FrameId,
+    int Quantity,
+    string? Note);

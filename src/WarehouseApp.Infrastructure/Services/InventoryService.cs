@@ -121,11 +121,13 @@ public class InventoryService(AppDbContext db) : IInventoryService
         var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (p is null) return null;
 
-        var newQty = p.InStock + r.Delta;
+        var newQty = (long)p.InStock + r.Delta;
         if (newQty < 0)
-            throw new DomainValidationException($"Điều chỉnh {r.Delta} sẽ làm tồn kho của '{p.Sku}' âm (hiện còn {p.InStock}).");
+            throw DomainErrors.InsufficientStock();
+        if (newQty > int.MaxValue)
+            throw new DomainValidationException("Tồn kho sản phẩm vượt giới hạn cho phép.");
 
-        p.InStock = newQty;
+        p.InStock = (int)newQty;
         p.UpdatedAt = DateTimeOffset.UtcNow;
 
         try { await db.SaveChangesAsync(ct); }

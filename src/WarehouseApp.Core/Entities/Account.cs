@@ -11,4 +11,6 @@ public class Account
     public short Status { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public ICollection<AuthSession> AuthSessions { get; set; } = [];
 }
