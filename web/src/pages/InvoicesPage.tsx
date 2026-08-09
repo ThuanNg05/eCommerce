@@ -1119,13 +1119,17 @@ export default function InvoicesPage() {
           </Box>
         </DialogTitle>
         <Divider />
-        <DialogContent id="printable-invoice-content">
+        <DialogContent id="printable-invoice-content" sx={{ position: 'relative', overflow: 'hidden' }}>
+          {/* Print Watermark */}
+          <div className="invoice-watermark" aria-hidden="true">
+            www.tranhkienghoathuan.com
+          </div>
           {isDetailLoading ? (
             <Typography variant="body2" sx={{ py: 4, textAlign: 'center', color: '#737373' }}>
               Đang tải chi tiết hóa đơn...
             </Typography>
           ) : invoiceDetail ? (
-            <Box sx={{ p: 1 }}>
+            <Box sx={{ p: 1, position: 'relative', zIndex: 1 }}>
               {/* Header: Store Info (Left) | Title & Code (Right) */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
                 {/* Logo & Store Information */}

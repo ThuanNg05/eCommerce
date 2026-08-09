@@ -74,6 +74,27 @@ body {
   overflow-wrap: normal !important;
 }
 
+/* Print-Only / Invoice Preview Watermark */
+.invoice-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-25deg);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #000000;
+  opacity: 0.1;
+  filter: blur(0.6px);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 0;
+  letter-spacing: 0.04em;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
 /* Professional Print Stylesheet for Invoices */
 @media print {
   @page {
@@ -131,6 +152,24 @@ body {
     border: none !important;
     color: #000000 !important;
     font-size: 13px !important;
+  }
+
+  .invoice-watermark {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 45% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) rotate(-25deg) !important;
+    font-size: 2.8rem !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
+    opacity: 0.1 !important;
+    filter: blur(0.6px) !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
   .MuiDialog-paper {
