@@ -10,9 +10,12 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 let refreshPromise: Promise<boolean> | null = null
 
 async function parseError(res: Response): Promise<string> {
+  if (res.status === 429) {
+    return 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau một phút.'
+  }
   try {
     const problem = await res.json()
-    return problem?.detail ?? problem?.title ?? `Lỗi hệ thống (${res.status}: ${res.statusText})`
+    return problem?.detail ?? problem?.title ?? problem?.message ?? `Lỗi hệ thống (${res.status}: ${res.statusText})`
   } catch {
     return `Lỗi hệ thống (${res.status}: ${res.statusText})`
   }
@@ -61,6 +64,10 @@ async function request<T>(method: string, path: string, body?: unknown, allowRef
   if (res.status === 401 && allowRefresh && path !== '/api/auth/login' && path !== '/api/auth/refresh') {
     if (await refreshAccessToken()) return request<T>(method, path, body, false)
     notifyAuthInvalidated()
+  }
+
+  if (res.status === 403 && session?.mustChangePassword && window.location.pathname !== '/change-password') {
+    window.location.href = '/change-password'
   }
 
   if (!res.ok) throw new Error(await parseError(res))

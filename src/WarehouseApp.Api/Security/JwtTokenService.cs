@@ -34,6 +34,7 @@ public sealed class JwtTokenService(
             new Claim(ClaimTypes.Name, session.Username),
             new Claim(ClaimTypes.Role, session.Role),
             new Claim("role_id", session.RoleId.ToString()),
+            new Claim("must_change_password", session.MustChangePassword ? "true" : "false"),
             new Claim("sid", session.SessionId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
@@ -53,6 +54,7 @@ public sealed class JwtTokenService(
             session.Role,
             new JwtSecurityTokenHandler().WriteToken(token),
             session.RefreshToken,
+            session.MustChangePassword,
             expiresAt,
             session.SessionExpiresAt);
     }

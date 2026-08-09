@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -16,7 +16,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { user, login } = useAuth()
   const navigate = useNavigate()
 
   const [username, setUsername] = useState('')
@@ -24,6 +24,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      if (user.mustChangePassword) {
+        navigate('/change-password', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    }
+  }, [user, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,8 +50,12 @@ export default function LoginPage() {
 
     setIsSubmitting(true)
     try {
-      await login(username.trim(), password.trim())
-      navigate('/dashboard')
+      const authUser = await login(username.trim(), password.trim())
+      if (authUser.mustChangePassword) {
+        navigate('/change-password', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     } catch (err: unknown) {
       setErrorMsg((err as Error).message || 'Sai tên đăng nhập hoặc mật khẩu')
     } finally {

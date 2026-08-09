@@ -8,14 +8,20 @@ export interface CurrentUserResponse {
   username: string
   roleId: number
   role: 'Admin' | 'Staff'
+  mustChangePassword: boolean
 }
 
-export async function login(username: string, password: string): Promise<LoginResponse> {
-  try {
-    return await apiPost<LoginResponse>('/api/auth/login', { username, password })
-  } catch {
-    throw new Error('Sai tên đăng nhập hoặc mật khẩu')
-  }
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}
+
+export function login(username: string, password: string): Promise<LoginResponse> {
+  return apiPost<LoginResponse>('/api/auth/login', { username, password })
+}
+
+export function changePassword(req: ChangePasswordRequest): Promise<LoginResponse> {
+  return apiPost<LoginResponse>('/api/auth/change-password', req)
 }
 
 export function getCurrentUser(): Promise<CurrentUserResponse> {

@@ -3,6 +3,7 @@ using WarehouseApp.Core;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Dtos;
 using WarehouseApp.Core.Entities;
+using WarehouseApp.Core.Security;
 using WarehouseApp.Infrastructure.Data;
 
 namespace WarehouseApp.Infrastructure.Services;
@@ -14,8 +15,6 @@ namespace WarehouseApp.Infrastructure.Services;
 /// </summary>
 public class AccountService(AppDbContext db) : IAccountService
 {
-    private const int MinPasswordLength = 6;
-
     public async Task<PagedResult<AccountDto>> ListAsync(int page, int pageSize, string? search, CancellationToken ct = default)
     {
         page = page < 1 ? 1 : page;
@@ -49,8 +48,7 @@ public class AccountService(AppDbContext db) : IAccountService
         var username = r.Username?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(username))
             throw new DomainValidationException("Tên đăng nhập là bắt buộc.");
-        if (string.IsNullOrEmpty(r.Password) || r.Password.Length < MinPasswordLength)
-            throw new DomainValidationException($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
+        PasswordPolicy.EnsureValid(r.Password, username);
         if (!Roles.IsValid(r.RoleId))
             throw new DomainValidationException("Vai trò phải là 1 (Quản trị viên) hoặc 2 (Nhân viên).");
         if (await db.Accounts.AnyAsync(a => a.Username == username, ct))
@@ -59,9 +57,10 @@ public class AccountService(AppDbContext db) : IAccountService
         var account = new Account
         {
             Username = username,
-            Password = BCrypt.Net.BCrypt.HashPassword(r.Password),
+            Password = BCrypt.Net.BCrypt.HashPassword(r.Password, workFactor: 12),
             RoleId = r.RoleId,
             Status = 1,
+            MustChangePassword = true,
         };
         db.Accounts.Add(account);
         await db.SaveChangesAsync(ct);
@@ -82,9 +81,12 @@ public class AccountService(AppDbContext db) : IAccountService
         account.Status = r.Status;
         if (passwordChanged)
         {
-            if (r.Password!.Length < MinPasswordLength)
-                throw new DomainValidationException($"Mật khẩu phải có ít nhất {MinPasswordLength} ký tự.");
-            account.Password = BCrypt.Net.BCrypt.HashPassword(r.Password);
+            PasswordPolicy.EnsureValid(r.Password, account.Username);
+            account.Password = BCrypt.Net.BCrypt.HashPassword(r.Password!, workFactor: 12);
+            account.MustChangePassword = true;
+            account.PasswordChangedAt = null;
+            account.FailedLoginAttempts = 0;
+            account.LockedUntil = null;
         }
         account.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -102,5 +104,14 @@ public class AccountService(AppDbContext db) : IAccountService
     }
 
     private static AccountDto ToDto(Account a) =>
-        new(a.Id, a.Username, a.RoleId, Roles.Name(a.RoleId), a.Status, a.CreatedAt, a.UpdatedAt);
+        new(
+            a.Id,
+            a.Username,
+            a.RoleId,
+            Roles.Name(a.RoleId),
+            a.Status,
+            a.MustChangePassword,
+            a.LockedUntil,
+            a.CreatedAt,
+            a.UpdatedAt);
 }

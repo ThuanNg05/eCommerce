@@ -145,18 +145,39 @@ export default function AccountsPage() {
       {
         field: 'status',
         headerName: 'TRẠNG THÁI',
-        width: 150,
+        width: 170,
         sortable: true,
-        cellRenderer: (p: { value: number }) => {
-          const isActive = p.value === 1
+        cellRenderer: (p: { data?: AccountDto; value: number }) => {
+          if (!p.data) return null
+          const isLocked = Boolean(p.data.lockedUntil && new Date(p.data.lockedUntil) > new Date())
+          const mustChange = p.data.mustChangePassword
+
+          let label = 'Đã khóa'
+          let bgcolor = '#f3f4f6'
+          let color = '#6b7280'
+
+          if (isLocked) {
+            label = 'Đang khóa'
+            bgcolor = '#fef2f2'
+            color = '#b91c1c'
+          } else if (mustChange) {
+            label = 'Chờ đổi mật khẩu'
+            bgcolor = '#fffbeb'
+            color = '#b45309'
+          } else if (p.data.status === 1) {
+            label = 'Đang hoạt động'
+            bgcolor = '#f0fdf4'
+            color = '#15803d'
+          }
+
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
               <Chip
-                label={isActive ? 'Đang hoạt động' : 'Đã khóa'}
+                label={label}
                 size="small"
                 sx={{
-                  bgcolor: isActive ? '#f0fdf4' : '#f3f4f6',
-                  color: isActive ? '#15803d' : '#6b7280',
+                  bgcolor,
+                  color,
                   fontSize: 12,
                   fontWeight: 600,
                   borderRadius: '4px',

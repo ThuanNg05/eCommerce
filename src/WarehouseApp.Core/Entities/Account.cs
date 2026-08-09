@@ -9,6 +9,10 @@ public class Account
     public string Password { get; set; } = string.Empty;
     public short RoleId { get; set; }
     public short Status { get; set; } = 1;
+    public int FailedLoginAttempts { get; set; }
+    public DateTimeOffset? LockedUntil { get; set; }
+    public bool MustChangePassword { get; set; }
+    public DateTimeOffset? PasswordChangedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

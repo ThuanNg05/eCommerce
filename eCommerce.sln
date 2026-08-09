@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarehouseApp.Api", "src\War
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarehouseApp.Desktop", "src\WarehouseApp.Desktop\WarehouseApp.Desktop.csproj", "{424C20E0-FFBE-4135-A1EF-3F5DE1A42C4C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarehouseApp.Security.Tests", "tests\WarehouseApp.Security.Tests\WarehouseApp.Security.Tests.csproj", "{D21BFB8F-7D3F-4D56-9F35-2D0E3B20F021}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{424C20E0-FFBE-4135-A1EF-3F5DE1A42C4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{424C20E0-FFBE-4135-A1EF-3F5DE1A42C4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{424C20E0-FFBE-4135-A1EF-3F5DE1A42C4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D21BFB8F-7D3F-4D56-9F35-2D0E3B20F021}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D21BFB8F-7D3F-4D56-9F35-2D0E3B20F021}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D21BFB8F-7D3F-4D56-9F35-2D0E3B20F021}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D21BFB8F-7D3F-4D56-9F35-2D0E3B20F021}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FE83CBE0-6C07-49E4-8418-E97CC3318422} = {92C95C92-F7AB-4A27-BEF2-2558734926A1}

@@ -21,7 +21,20 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return <Navigate to="/login" replace />
   }
 
-  // 2. Staff user attempting to access Admin-only route -> Redirect to /dashboard
+  // 2. user.mustChangePassword === true -> Locked to /change-password
+  if (user.mustChangePassword) {
+    if (location.pathname !== '/change-password') {
+      return <Navigate to="/change-password" replace />
+    }
+    return <>{children}</>
+  }
+
+  // 3. user.mustChangePassword === false -> Cannot access /change-password
+  if (location.pathname === '/change-password') {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  // 4. Staff user attempting to access Admin-only route -> Redirect to /dashboard
   if (user.role === 'Staff' && ADMIN_ONLY_ROUTES.some((path) => location.pathname.startsWith(path))) {
     return <Navigate to="/dashboard" replace />
   }

@@ -8,6 +8,8 @@ public record AccountDto(
     short RoleId,
     string Role,
     short Status,
+    bool MustChangePassword,
+    DateTimeOffset? LockedUntil,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 

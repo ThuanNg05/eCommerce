@@ -3,6 +3,7 @@ export interface AuthSessionData {
   username: string
   roleId: number
   role: 'Admin' | 'Staff'
+  mustChangePassword: boolean
   accessToken: string
   refreshToken: string
   accessTokenExpiresAt: string

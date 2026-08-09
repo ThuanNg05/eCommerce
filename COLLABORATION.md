@@ -77,6 +77,15 @@ is binding for everything under `web/**`.
 
 ## Current contract (as of this writing)
 
+- `POST /api/auth/login` (`LoginRequest`) → `LoginResponse`
+  - rate limited to 10 requests/minute/IP; account locks for 15 minutes after 5 failed attempts
+  - response adds `mustChangePassword`
+- `POST /api/auth/change-password` (`ChangePasswordRequest`) → `LoginResponse`
+  - body: `{ currentPassword, newPassword }`
+  - revokes the old session and returns a replacement access/refresh token pair
+- `GET /api/auth/me` → `CurrentUserResponse` (adds `mustChangePassword`)
+- All business endpoints reject a JWT whose `must_change_password` claim is `true`.
+- `AccountDto` adds `mustChangePassword` and `lockedUntil`; admin-created/reset passwords are temporary.
 - `GET  /api/inventory?page&pageSize&search` → `PagedResult<ProductDto>`
 - `GET  /api/inventory/{id:long}` → `ProductDto`
 - `POST /api/inventory` (`CreateProductRequest`) → `ProductDto`

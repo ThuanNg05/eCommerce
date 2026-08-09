@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './components/LoginPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
 import InvoicesPage from './pages/InvoicesPage'
@@ -33,6 +34,14 @@ export default function App() {
             <Routes>
               {/* Entry Screen */}
               <Route path="/login" element={<LoginPage />} />
+              <Route
+                path="/change-password"
+                element={
+                  <ProtectedRoute>
+                    <ChangePasswordPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected App Shell & Nav Routes */}
               <Route

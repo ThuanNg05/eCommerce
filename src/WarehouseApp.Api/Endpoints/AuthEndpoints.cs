@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 using WarehouseApp.Api.Security;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Dtos;
@@ -19,7 +20,8 @@ public static class AuthEndpoints
             CancellationToken ct) =>
             await auth.LoginAsync(req, ct) is { } session
                 ? Results.Ok(tokens.Issue(session))
-                : Results.Problem(detail: "Tên đăng nhập hoặc mật khẩu không đúng.", statusCode: 401));
+                : Results.Problem(detail: "Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản đang bị khóa tạm thời.", statusCode: 401))
+            .RequireRateLimiting("AuthLogin");
 
         g.MapPost("/refresh", async (
             RefreshRequest req,
@@ -42,6 +44,20 @@ public static class AuthEndpoints
             return Results.NoContent();
         }).RequireAuthorization();
 
+        g.MapPost("/change-password", async (
+            ChangePasswordRequest req,
+            ClaimsPrincipal user,
+            IAuthService auth,
+            IJwtTokenService tokens,
+            CancellationToken ct) =>
+        {
+            if (!TryGetSessionIdentity(user, out var sessionId, out var accountId))
+                return Results.Unauthorized();
+
+            var session = await auth.ChangePasswordAsync(sessionId, accountId, req, ct);
+            return Results.Ok(tokens.Issue(session));
+        }).RequireAuthorization();
+
         g.MapGet("/me", (ClaimsPrincipal user) =>
         {
             if (!long.TryParse(user.FindFirstValue(JwtRegisteredClaimNames.Sub), out var accountId) ||
@@ -52,7 +68,8 @@ public static class AuthEndpoints
                 accountId,
                 user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? user.Identity?.Name ?? string.Empty,
                 roleId,
-                user.FindFirstValue(ClaimTypes.Role) ?? string.Empty));
+                user.FindFirstValue(ClaimTypes.Role) ?? string.Empty,
+                string.Equals(user.FindFirstValue("must_change_password"), "true", StringComparison.Ordinal)));
         }).RequireAuthorization();
 
         return api;

@@ -8,4 +8,6 @@ public sealed class AuthSettings
     public string Audience { get; set; } = "WarehouseApp.Client";
     public int AccessTokenMinutes { get; set; } = 15;
     public int SessionHours { get; set; } = 8;
+    public int MaxFailedLoginAttempts { get; set; } = 5;
+    public int LockoutMinutes { get; set; } = 15;
 }

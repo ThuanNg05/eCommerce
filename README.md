@@ -158,6 +158,21 @@ The WPF window opens, starts the API in-process, and loads the React bundle from
 
 Domain errors map to ProblemDetails: 400 (validation), 404 (not found), 409 (concurrency).
 
+## Authentication security
+
+- Access JWT lifetime: 15 minutes; server-side session lifetime: 8 hours.
+- Only one active session is allowed per account. A successful login revokes the old device.
+- Login is limited to 10 requests/minute/IP. Five incorrect passwords lock the account for
+  15 minutes across all devices.
+- New and administrator-reset passwords are temporary. A temporary-password JWT can only
+  call `/api/auth/me`, `/api/auth/logout`, and `/api/auth/change-password`.
+- New passwords require at least 10 characters, upper/lowercase letters and a number; common
+  passwords and passwords containing the username are rejected.
+- When `Authentication__SigningKey` is not configured, a stable 256-bit key is generated at
+  `%LOCALAPPDATA%/WarehouseApp/security/jwt-signing-key.bin` and protected with Windows DPAPI.
+- Apply `supabase/migrations/20260809141212_harden_authentication.sql` only after the React
+  change-password screen has been integrated.
+
 ## Concurrency
 
 Stock is guarded by optimistic concurrency via the Postgres `xmin` system column

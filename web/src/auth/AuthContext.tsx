@@ -11,6 +11,7 @@ import {
   clearSession,
   readSession,
   writeSession,
+  type AuthSessionData,
 } from './sessionStore'
 
 interface AuthContextType {
@@ -18,6 +19,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (username: string, password: string) => Promise<CurrentUserResponse>
   logout: () => Promise<void>
+  updateSession: (session: AuthSessionData) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -31,12 +33,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const syncUserFromStoredSession = () => {
       const session = readSession()
-      setUser(session ? {
-        id: session.id,
-        username: session.username,
-        roleId: session.roleId,
-        role: session.role,
-      } : null)
+      setUser(
+        session
+          ? {
+              id: session.id,
+              username: session.username,
+              roleId: session.roleId,
+              role: session.role,
+              mustChangePassword: session.mustChangePassword,
+            }
+          : null,
+      )
     }
 
     const invalidate = () => setUser(null)
@@ -82,14 +89,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (username: string, password: string): Promise<CurrentUserResponse> => {
-    const session = await apiLogin(username, password)
+  const updateSession = (session: AuthSessionData) => {
     writeSession(session)
-    const current = {
+    setUser({
       id: session.id,
       username: session.username,
       roleId: session.roleId,
       role: session.role,
+      mustChangePassword: session.mustChangePassword,
+    })
+  }
+
+  const login = async (username: string, password: string): Promise<CurrentUserResponse> => {
+    const session = await apiLogin(username, password)
+    writeSession(session)
+    const current: CurrentUserResponse = {
+      id: session.id,
+      username: session.username,
+      roleId: session.roleId,
+      role: session.role,
+      mustChangePassword: session.mustChangePassword,
     }
     setUser(current)
     return current
@@ -104,7 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout, updateSession }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

@@ -1,7 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Cryptography;
-using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,14 +38,12 @@ public static class ApiBootstrap
             throw new InvalidOperationException("Authentication:AccessTokenMinutes phải từ 1 đến 60.");
         if (authSettings.SessionHours is < 1 or > 168)
             throw new InvalidOperationException("Authentication:SessionHours phải từ 1 đến 168.");
+        if (authSettings.MaxFailedLoginAttempts is < 3 or > 20)
+            throw new InvalidOperationException("Authentication:MaxFailedLoginAttempts phải từ 3 đến 20.");
+        if (authSettings.LockoutMinutes is < 1 or > 1440)
+            throw new InvalidOperationException("Authentication:LockoutMinutes phải từ 1 đến 1440.");
 
-        var configuredKey = config[$"{AuthSettings.SectionName}:SigningKey"];
-        var keyBytes = string.IsNullOrWhiteSpace(configuredKey)
-            ? RandomNumberGenerator.GetBytes(32)
-            : Encoding.UTF8.GetBytes(configuredKey);
-        if (keyBytes.Length < 32)
-            throw new InvalidOperationException("Authentication:SigningKey phải có ít nhất 32 bytes.");
-
+        var keyBytes = JwtSigningKeyStore.Resolve(config);
         var signingKey = new SymmetricSecurityKey(keyBytes);
         services.AddSingleton(new JwtSigningKey(signingKey));
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -86,7 +85,40 @@ public static class ApiBootstrap
             });
 
         services.AddAuthorization(options =>
-            options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
+        {
+            options.AddPolicy("PasswordChanged", policy =>
+                policy.RequireClaim("must_change_password", "false"));
+            options.AddPolicy("AdminOnly", policy =>
+            {
+                policy.RequireRole("Admin");
+                policy.RequireClaim("must_change_password", "false");
+            });
+        });
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, ct) =>
+            {
+                context.HttpContext.Response.ContentType = "application/problem+json";
+                await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Title = "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau một phút.",
+                    Type = "https://httpstatuses.io/429",
+                }, ct);
+            };
+            options.AddPolicy("AuthLogin", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "local",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    }));
+        });
 
         services.AddProblemDetails();
         services.AddExceptionHandler<DomainExceptionHandler>();
@@ -104,6 +136,7 @@ public static class ApiBootstrap
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseCors(CorsPolicy);
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -112,7 +145,7 @@ public static class ApiBootstrap
         var api = app.MapGroup("/api");
         api.MapAuthEndpoints();
 
-        var secured = api.MapGroup(string.Empty).RequireAuthorization();
+        var secured = api.MapGroup(string.Empty).RequireAuthorization("PasswordChanged");
         secured.MapInventoryEndpoints();
         secured.MapInvoiceEndpoints();
         secured.MapCustomerEndpoints();

@@ -11,6 +11,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         b.ToTable("account", t => t.ExcludeFromMigrations());
         b.HasKey(a => a.Id);
         b.HasIndex(a => a.Username).IsUnique();
+        b.HasIndex(a => a.LockedUntil);
     }
 }
 

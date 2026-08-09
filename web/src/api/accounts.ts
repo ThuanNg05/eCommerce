@@ -7,6 +7,8 @@ export interface AccountDto {
   roleId: number
   role: string
   status: number
+  mustChangePassword: boolean
+  lockedUntil: string | null
   createdAt: string
   updatedAt: string
 }
