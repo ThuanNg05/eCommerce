@@ -59,7 +59,7 @@ ADR cần xác định: trust boundary, số máy dự kiến, yêu cầu offlin
 
 #### 4.1. Database và Supabase security
 
-- [ ] Tạo migration sửa `search_path` cho 7 function:
+- [x] Kiểm tra và xóa bằng migration 7 function của schema dự án cũ; các function này không có caller/dependency và tham chiếu các bảng plural đã loại bỏ:
   - `calculate_product_base_price`
   - `delete_invoice_and_revert`
   - `process_frame_to_planks`
@@ -67,8 +67,8 @@ ADR cần xác định: trust boundary, số máy dự kiến, yêu cầu offlin
   - `update_all_products_on_price_change`
   - `create_full_invoice`
   - `get_annual_report`
-- [ ] Trong function, ưu tiên `SET search_path = ''` và schema-qualify toàn bộ object; nếu không khả thi, dùng search path cố định tối thiểu.
-- [ ] Kiểm tra function nào là `SECURITY DEFINER`; thu hồi `EXECUTE` khỏi `PUBLIC`, `anon`, `authenticated` nếu không có nhu cầu rõ ràng.
+- [x] Đối chiếu source, live catalog, trigger/dependency và chạy thử `DROP ... RESTRICT` trong transaction có `ROLLBACK` trước khi tạo migration.
+- [x] Kiểm tra `SECURITY DEFINER` và quyền `EXECUTE`: 7 function cũ là `SECURITY INVOKER` nhưng từng mở cho `PUBLIC`, `anon`, `authenticated`; việc xóa loại bỏ luôn RPC dư thừa. Giữ `fn_audit_log` vì 4 trigger đang sử dụng; function này là `SECURITY DEFINER`, có search path cố định và đã thu hồi quyền gọi công khai.
 - [ ] Lập inventory cho toàn bộ table/view/function trong exposed schema: RLS, policy, owner và `GRANT` thực tế.
 - [ ] Chốt mô hình truy cập:
   - Backend-only: cân nhắc tắt Data API hoặc revoke quyền `anon`/`authenticated`.
