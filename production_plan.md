@@ -37,7 +37,7 @@
 | Supabase migrations | Đạt | 10 migration local/remote khớp nhau. |
 | Supabase performance advisor | Đạt | Không có issue tại thời điểm kiểm tra. |
 | Supabase security advisor | Chưa đạt | Còn 7 cảnh báo `function_search_path_mutable`. |
-| CI/CD | Chưa có | Repository chưa có `.github/workflows`. |
+| CI/CD | Cơ bản | GitHub Actions đã build/test .NET 10, build React, audit dependency, kiểm tra migration, scan secret và xuất artifact. |
 | Observability | Chưa đủ | Chưa có structured logging, metrics, tracing hoặc error monitoring tập trung. |
 | Test coverage nghiệp vụ | Chưa đủ | Chưa có integration/E2E tests cho kho, hóa đơn, pricing và concurrency. |
 | Đóng gói Windows | Chưa đủ | Chưa có installer, code signing, auto-update và production certificate lifecycle. |
@@ -126,15 +126,16 @@ Tham khảo [Supabase Production Checklist](https://supabase.com/docs/guides/dep
 
 #### 4.5. GitHub Actions
 
-- [ ] Tạo workflow cho pull request và `main`:
+- [x] Tạo workflow cho pull request và `main`:
   1. `dotnet restore` + Release build.
   2. `dotnet test` và xuất test report/coverage.
   3. `npm ci` + TypeScript/Vite build.
   4. NuGet/npm vulnerability audit.
   5. Kiểm tra migration naming/history và SQL lint.
-  6. Secret scanning và dependency review.
+  6. Secret scanning bằng Gitleaks; dependency review sẽ bổ sung khi repository đủ điều kiện GitHub Advanced Security.
+- [ ] Secret scanning đã dùng Gitleaks; dependency review còn chờ repository public hoặc GitHub Advanced Security vì repository hiện là private cá nhân.
 - [ ] Bật branch protection cho `main`: CI bắt buộc pass, không force-push, ít nhất một approval khi có nhiều thành viên.
-- [ ] Build artifact phải tái lập từ commit/tag; không đóng gói trực tiếp từ working tree cá nhân.
+- [x] Build artifact được tạo trực tiếp từ commit bằng workflow, không đóng gói từ working tree cá nhân.
 - [ ] Database deployment tách khỏi application deployment, có staging check và manual approval cho production.
 
 ### P2 — Observability, performance và UX chịu lỗi
@@ -258,7 +259,7 @@ Không chạy `supabase db push` trực tiếp vào production từ máy cá nh�
 1. [x] Chốt ADR dùng API in-process cho pilot ba thiết bị.
 2. [ ] Hoàn tất database security: function/RLS/grants/group role đã xong; login riêng từng thiết bị tạm hoãn đến khi chốt các tính năng còn lại, vẫn còn TLS validation và tắt Data API trong Dashboard.
 3. [x] Thêm correlation ID, liveness/readiness và startup fail-closed.
-4. [ ] Thiết lập GitHub Actions cơ bản cho build, test, audit và migration consistency.
+4. [x] Thiết lập GitHub Actions cơ bản cho build, test, audit và migration consistency.
 5. [ ] Tạo staging, backup/restore runbook và production secret/certificate strategy.
 6. [ ] Bổ sung integration/E2E tests cho các giao dịch tồn kho và hóa đơn.
 7. [ ] Nâng .NET 10 LTS đã xong; còn chạy regression trên staging.

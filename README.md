@@ -1,5 +1,7 @@
 # Warehouse & Invoicing App
 
+[![CI](https://github.com/ThuanNg05/eCommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/ThuanNg05/eCommerce/actions/workflows/ci.yml)
+
 Inventory management + invoice issuing for a multi-station warehouse floor.
 Offline-capable Windows desktop app built on the migrated stack (away from WinUI 3).
 

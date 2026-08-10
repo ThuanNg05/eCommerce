@@ -5,6 +5,7 @@ obj/
 *.suo
 .vs/
 artifacts/
+TestResults/
 
 # ---- Node / front-end ----
 web/node_modules/
