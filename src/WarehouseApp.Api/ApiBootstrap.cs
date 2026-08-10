@@ -31,7 +31,9 @@ public static class ApiBootstrap
     public static void AddApiServices(IServiceCollection services, IConfiguration config)
     {
         services.Configure<AuthSettings>(config.GetSection(AuthSettings.SectionName));
+        services.Configure<DatabaseReadinessOptions>(config.GetSection(DatabaseReadinessOptions.SectionName));
         services.AddInfrastructure(config);
+        services.AddScoped<DatabaseReadinessChecker>();
 
         var authSettings = config.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
         if (authSettings.AccessTokenMinutes is < 1 or > 60)
@@ -120,7 +122,11 @@ public static class ApiBootstrap
                     }));
         });
 
-        services.AddProblemDetails();
+        services.AddProblemDetails(options =>
+        {
+            options.CustomizeProblemDetails = context =>
+                context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.TraceIdentifier;
+        });
         services.AddExceptionHandler<DomainExceptionHandler>();
 
         services.AddCors(o => o.AddPolicy(CorsPolicy, p =>
@@ -133,6 +139,12 @@ public static class ApiBootstrap
 
     public static void UseApiPipeline(WebApplication app)
     {
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;
+            await next();
+        });
+
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseCors(CorsPolicy);
@@ -141,6 +153,29 @@ public static class ApiBootstrap
         app.UseAuthorization();
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+        app.MapGet("/health/live", () => Results.Ok(new { status = "alive" }));
+        app.MapGet("/health/ready", async (
+            DatabaseReadinessChecker checker,
+            HttpContext context,
+            CancellationToken ct) =>
+        {
+            var result = await checker.CheckAsync(ct);
+            return result.IsReady
+                ? Results.Ok(new
+                {
+                    status = "ready",
+                    schemaVersion = result.ActualSchemaVersion,
+                    correlationId = context.TraceIdentifier,
+                })
+                : Results.Problem(
+                    statusCode: StatusCodes.Status503ServiceUnavailable,
+                    title: "Ứng dụng chưa sẵn sàng kết nối cơ sở dữ liệu.",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["code"] = result.Code,
+                        ["correlationId"] = context.TraceIdentifier,
+                    });
+        });
 
         var api = app.MapGroup("/api");
         api.MapAuthEndpoints();

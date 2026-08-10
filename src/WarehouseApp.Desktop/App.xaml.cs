@@ -1,6 +1,7 @@
 using System.Windows;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using WarehouseApp.Api;
 
 namespace WarehouseApp.Desktop;
@@ -24,20 +25,51 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        try
+        while (true)
         {
-            _api = BuildInProcessApi();
-            await _api.StartAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"Không thể khởi động API tích hợp.\n\n{ex.Message}\n\n" +
-                "Set the ConnectionStrings__Default environment variable (see README) and restart.",
-                "Warehouse App — startup", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+            var correlationId = Guid.NewGuid().ToString("N");
+            WebApplication? candidate = null;
 
-        new MainWindow().Show();
+            try
+            {
+                candidate = BuildInProcessApi();
+
+                await using (var scope = candidate.Services.CreateAsyncScope())
+                {
+                    var readiness = scope.ServiceProvider.GetRequiredService<DatabaseReadinessChecker>();
+                    var result = await readiness.CheckAsync();
+                    if (!result.IsReady)
+                        throw new StartupReadinessException(result.Code);
+                }
+
+                await candidate.StartAsync();
+                new MainWindow().Show();
+                _api = candidate;
+                return;
+            }
+            catch
+            {
+                _api = null;
+                if (candidate is not null)
+                    await candidate.DisposeAsync();
+
+                var choice = MessageBox.Show(
+                    "Không thể khởi động ứng dụng vì API hoặc cơ sở dữ liệu chưa sẵn sàng.\n\n" +
+                    $"Mã hỗ trợ: {correlationId}\n\n" +
+                    "Kiểm tra kết nối mạng và cấu hình ứng dụng. Chọn Có để thử lại, " +
+                    "hoặc Không để thoát. " +
+                    "Ứng dụng sẽ không mở màn hình nghiệp vụ khi kết nối chưa an toàn.",
+                    "Warehouse App — startup",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Error);
+
+                if (choice != MessageBoxResult.Yes)
+                {
+                    Shutdown(-1);
+                    return;
+                }
+            }
+        }
     }
 
     private static WebApplication BuildInProcessApi()
@@ -62,4 +94,7 @@ public partial class App : Application
 
         base.OnExit(e);
     }
+
+    private sealed class StartupReadinessException(string code)
+        : Exception($"Startup readiness failed: {code}");
 }

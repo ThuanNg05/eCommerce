@@ -25,7 +25,8 @@ public sealed class DomainExceptionHandler : IExceptionHandler
         {
             Status = status,
             Title = title,
-            Type = $"https://httpstatuses.io/{status}"
+            Type = $"https://httpstatuses.io/{status}",
+            Extensions = { ["correlationId"] = ctx.TraceIdentifier }
         }, ct);
 
         return true;
