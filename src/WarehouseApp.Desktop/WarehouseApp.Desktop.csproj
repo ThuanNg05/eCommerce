@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -15,7 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WarehouseApp.Api\WarehouseApp.Api.csproj" />
+    <ProjectReference Include="..\WarehouseApp.Api\WarehouseApp.Api.csproj"
+                      AdditionalProperties="ExcludeApiAppSettingsFromPublish=true" />
   </ItemGroup>
 
   <ItemGroup>

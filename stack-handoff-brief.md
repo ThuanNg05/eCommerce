@@ -13,7 +13,7 @@ Warehouse (inventory) management + invoice issuing app. **Migrating away from Wi
 | **UI libs** | **AG Grid** (data grid) + MUI or Ant Design (forms/dashboard) + TanStack Query (state/cache) + Tailwind | AG Grid handles 100k+ inventory rows, inline edit, export |
 | **Desktop shell** | **WPF + WebView2** (primary) or **Photino.NET** (lightweight alt) | WPF chosen for smoother Win32 device integration (thermal printer, barcode scanner, scale) |
 | **Back-end** | **ASP.NET Core, .NET 8 (LTS)**, Minimal API, **in-process** | Top managed throughput, async multi-core; no Rust needed |
-| **Data** | **EF Core 8** (compiled queries, CRUD) + **Dapper** (report hot-paths) | Bulk/report aggregation via Dapper |
+| **Data** | **EF Core 10** (compiled queries, CRUD) + **Dapper** (report hot-paths) | Bulk/report aggregation via Dapper |
 | **DB** | PostgreSQL / SQL Server (multi-station) or SQLite (single machine) | Row-lock on stock quantity for concurrency |
 | **Perf** | **ReadyToRun** (NOT Native AOT — EF Core AOT still limited on .NET 8), `System.Threading.Channels` for print/invoice queue, full-core, tuned ThreadPool min-threads | |
 
@@ -32,12 +32,12 @@ Warehouse (inventory) management + invoice issuing app. **Migrating away from Wi
 - **Blazor Hybrid:** all-C# but MudBlazor grid weaker than React/AG Grid.
 
 ## Open Items / Constraints
-- **.NET 8 LTS ends ~Nov 2026.** Start on 8, plan a low-cost bump to **.NET 10 (LTS)** once stable (mostly `TargetFramework` + package updates).
+- The solution targets **.NET 10 LTS**. Update ASP.NET Core, EF Core and Npgsql patch versions together after regression testing.
 - `vite.config.ts` `base` must match the WebView2 virtual host path.
 - Use `https` scheme in `SetVirtualHostNameToFolderMapping` to satisfy browser APIs requiring a secure origin.
 - Confirm hardware integration path: thermal printer / barcode scanner / scale → via WPF Win32 host, exposed to React through the back-end.
 
 ## Next-Session Starting Point (requested but not yet built)
-- Back-end **.NET 8 skeleton**: layered DI, Minimal API endpoints (inventory + invoicing), EF Core + Dapper wiring.
+- Back-end **.NET 10 skeleton**: layered DI, Minimal API endpoints (inventory + invoicing), EF Core + Dapper wiring.
 - **WebView2 config** mapping React static bundle + matching `vite.config.ts`.
 - Directory skeleton + WebView2 ↔ ASP.NET Core in-process wiring + DI layering.

@@ -7,10 +7,10 @@ Offline-capable Windows desktop app built on the migrated stack (away from WinUI
 
 | Layer | Choice |
 |---|---|
-| Desktop shell | **WPF + WebView2** (`net8.0-windows`) — hosts everything in one process |
+| Desktop shell | **WPF + WebView2** (`net10.0-windows`) — hosts everything in one process |
 | Front-end | **React + TypeScript** (Vite) in WebView2 — AG Grid + MUI + TanStack Query + Tailwind |
-| Back-end | **ASP.NET Core (.NET 8, LTS) Minimal API**, hosted **in-process** by the WPF shell |
-| Data | **EF Core 8** (Npgsql, snake_case) for CRUD + **Dapper** for report hot-paths |
+| Back-end | **ASP.NET Core (.NET 10, LTS) Minimal API**, hosted **in-process** by the WPF shell |
+| Data | **EF Core 10** (Npgsql, snake_case) for CRUD + **Dapper** for report hot-paths |
 | DB | **PostgreSQL (Supabase)** |
 
 ## Solution layout
@@ -61,7 +61,8 @@ Three values must stay consistent:
 
 ## Prerequisites
 
-- .NET SDK **8.0** (`global.json` pins it)
+- .NET SDK **10.0.302** (`global.json` pins it)
+- Restore the repository-local EF Core tool once: `dotnet tool restore`
 - Node.js 18+ / npm
 - WebView2 Runtime (ships with modern Windows; otherwise install the Evergreen runtime)
 - Trust the ASP.NET Core dev cert (once): `dotnet dev-certs https --trust`
@@ -184,8 +185,8 @@ edits from another station surface as HTTP 409.
 - **Retry-on-failure is off** on the DbContext. If you enable `EnableRetryOnFailure`,
   wrap the invoice-creation transaction in `CreateExecutionStrategy().ExecuteAsync(...)`
   and keep it idempotent (see the comment in `InvoiceService.CreateAsync`).
-- **.NET 8 LTS ends ~Nov 2026.** Plan a low-cost bump to **.NET 10 (LTS)** — mostly
-  `TargetFramework` + package version updates (the .NET 10 SDK is already installed here).
+- **.NET lifecycle:** The solution targets **.NET 10 LTS**. Keep the SDK and
+  ASP.NET Core/EF Core/Npgsql patch versions aligned after regression testing.
 - **Hardware integration** (thermal printer / barcode scanner / scale): implement in the
   WPF Win32 host and expose to React through the back-end. Not yet scaffolded.
 - **Production HTTPS cert:** dev uses the ASP.NET Core dev cert; a packaged installer

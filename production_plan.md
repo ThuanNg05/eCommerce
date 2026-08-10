@@ -171,7 +171,7 @@ Tham khảo [Supabase Production Checklist](https://supabase.com/docs/guides/dep
 
 #### 4.9. Nâng cấp .NET và dependency lifecycle
 
-- [ ] Nâng từ .NET 8 lên .NET 10 LTS trước 10/11/2026; .NET 8 đang ở maintenance và hết hỗ trợ vào ngày này.
+- [x] Nâng từ .NET 8 lên .NET 10 LTS; SDK được pin bằng `global.json` và toàn bộ project dùng TFM .NET 10.
 - [ ] Nâng đồng bộ ASP.NET Core, EF Core/Npgsql và test trên staging trước khi phát hành.
 - [ ] Thiết lập cập nhật dependency định kỳ, lockfile bắt buộc, SBOM và kiểm tra license package.
 - [ ] Không dùng version range thiếu kiểm soát trong release build; chỉ cập nhật sau khi CI và regression tests pass.
@@ -256,12 +256,12 @@ Không chạy `supabase db push` trực tiếp vào production từ máy cá nh�
 ## 8. Thứ tự triển khai khuyến nghị
 
 1. [x] Chốt ADR dùng API in-process cho pilot ba thiết bị.
-2. [ ] Hoàn tất database security: function/RLS/grants/group role đã xong; còn login riêng từng thiết bị, TLS validation và tắt Data API trong Dashboard.
+2. [ ] Hoàn tất database security: function/RLS/grants/group role đã xong; login riêng từng thiết bị tạm hoãn đến khi chốt các tính năng còn lại, vẫn còn TLS validation và tắt Data API trong Dashboard.
 3. [x] Thêm correlation ID, liveness/readiness và startup fail-closed.
 4. [ ] Thiết lập GitHub Actions cơ bản cho build, test, audit và migration consistency.
 5. [ ] Tạo staging, backup/restore runbook và production secret/certificate strategy.
 6. [ ] Bổ sung integration/E2E tests cho các giao dịch tồn kho và hóa đơn.
-7. [ ] Nâng .NET 10 LTS và chạy regression trên staging.
+7. [ ] Nâng .NET 10 LTS đã xong; còn chạy regression trên staging.
 8. [ ] Load test đúng quy mô 3–5 thiết bị, tối ưu query/bundle và chạy UAT.
 9. [ ] Đóng gói signed installer, pilot 1–2 máy, theo dõi 5 ngày rồi mới rollout rộng.
 
