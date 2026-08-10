@@ -44,14 +44,14 @@
 
 ## 3. Quyết định kiến trúc phải chốt trước pilot (P0)
 
-Hiện mỗi máy Windows chạy API in-process và giữ connection string tới Supabase. Cần lập ADR và chọn một trong hai mô hình:
+Đã chốt [ADR-001](docs/adr/ADR-001-in-process-api-for-three-device-pilot.md): dùng API in-process cho pilot tối đa ba thiết bị do doanh nghiệp quản lý; đánh giá lại khi vượt năm thiết bị, triển khai nhiều địa điểm hoặc cần SLA/observability tập trung.
 
 | Mô hình | Ưu điểm | Rủi ro/chi phí | Khuyến nghị |
 |---|---|---|---|
 | A. API in-process trên từng máy | Giữ nguyên kiến trúc, triển khai nhanh | Database credential tồn tại trên máy trạm; khó rotate, giám sát và giới hạn network; JWT signing key khác nhau theo máy | Chỉ dùng cho pilot trên máy do doanh nghiệp quản lý chặt. |
 | B. API trung tâm, desktop chỉ gọi HTTPS API | Không phát credential DB xuống client; logging, rate limit, key rotation và deployment tập trung | Cần host API, domain/TLS, CI/CD và giám sát server | **Khuyến nghị cho production nhiều thiết bị.** |
 
-ADR cần xác định: trust boundary, số máy dự kiến, yêu cầu offline, SLA, chi phí hạ tầng, cách rotate secret và phương án khi mất mạng.
+ADR đã xác định trust boundary, giới hạn pilot, cách ly Data API, least-privilege database role, startup fail-closed và điều kiện chuyển sang API trung tâm.
 
 ## 4. Roadmap ưu tiên
 
@@ -69,27 +69,26 @@ ADR cần xác định: trust boundary, số máy dự kiến, yêu cầu offlin
   - `get_annual_report`
 - [x] Đối chiếu source, live catalog, trigger/dependency và chạy thử `DROP ... RESTRICT` trong transaction có `ROLLBACK` trước khi tạo migration.
 - [x] Kiểm tra `SECURITY DEFINER` và quyền `EXECUTE`: 7 function cũ là `SECURITY INVOKER` nhưng từng mở cho `PUBLIC`, `anon`, `authenticated`; việc xóa loại bỏ luôn RPC dư thừa. Giữ `fn_audit_log` vì 4 trigger đang sử dụng; function này là `SECURITY DEFINER`, có search path cố định và đã thu hồi quyền gọi công khai.
-- [ ] Lập inventory cho toàn bộ table/view/function trong exposed schema: RLS, policy, owner và `GRANT` thực tế.
-- [ ] Chốt mô hình truy cập:
-  - Backend-only: cân nhắc tắt Data API hoặc revoke quyền `anon`/`authenticated`.
-  - Data API: bật RLS và policy theo least privilege cho từng table, không chỉ `TO authenticated` chung chung.
-- [ ] Tạo database role riêng cho ứng dụng với quyền tối thiểu; không dùng owner/superuser trên máy trạm.
+- [x] Lập inventory live cho toàn bộ table/view/function trong exposed schema: 20/20 table bật RLS và có backend policy; không có view; chỉ giữ `fn_audit_log`; owner và `GRANT` được ghi tại `docs/security/DATABASE_ACCESS_INVENTORY.md`.
+- [x] Chốt mô hình backend-only và revoke toàn bộ table/sequence/function grant của `anon`/`authenticated`, gồm default privileges tương lai của role `postgres`.
+- [x] Tạo group role `warehouse_app` dạng `NOLOGIN`, không có quyền elevated, với CRUD theo nhu cầu backend và không có quyền tạo object.
+- [ ] Tạo login/password riêng cho từng thiết bị, grant membership `warehouse_app`, chuyển connection string khỏi role `postgres` và diễn tập revoke một thiết bị.
 - [ ] Dùng TLS validation đầy đủ cho kết nối production; loại bỏ cấu hình tin cậy chứng thư một cách mù quáng.
-- [ ] Chạy lại `supabase db advisors --linked --type security`; mục tiêu không còn warning chưa được phê duyệt.
+- [x] Chạy lại `supabase db advisors --linked --type security`; Security Advisor và Performance Advisor không còn issue.
 
 Lưu ý: từ 30/10/2026, bảng mới không còn tự động được expose qua Data/GraphQL API; migration phải khai báo `GRANT` có chủ đích nếu ứng dụng thực sự dùng Data API. Tham khảo [Supabase breaking change](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically) và [RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
 #### 4.2. Secret, certificate và startup safety
 
-- [ ] Không hard-code connection string, JWT key, Supabase secret hoặc password vào Git/bundle React.
+- [x] Không hard-code connection string, JWT key, Supabase secret hoặc password vào Git/bundle React.
 - [ ] Chọn cơ chế phân phối và rotate secret:
   - Mô hình API trung tâm: secret manager/environment của server.
   - Mô hình in-process: Windows Credential Manager/DPAPI và giới hạn ACL theo user/machine.
 - [ ] Lập quy trình rotate DB password/JWT signing key có thời gian chuyển tiếp và thu hồi session.
 - [ ] Cấp certificate localhost tin cậy cho bản đóng gói hoặc chuyển sang API trung tâm với certificate công khai; không phụ thuộc development certificate.
-- [ ] Sửa startup theo hướng fail-closed: nếu API/database không sẵn sàng thì không mở UI như thể ứng dụng hoạt động bình thường.
-- [ ] Hiển thị màn hình lỗi có `correlationId`, nút thử lại và hướng dẫn hỗ trợ; không hiển thị stack trace/secret.
-- [ ] Tách health checks:
+- [x] Sửa startup theo hướng fail-closed: chỉ mở UI sau khi database kết nối được và schema version khớp application build.
+- [x] Hiển thị màn hình lỗi có `correlationId`, lựa chọn thử lại/thoát và hướng dẫn hỗ trợ; không hiển thị stack trace/secret.
+- [x] Tách health checks:
   - Liveness: process còn sống.
   - Readiness: database kết nối được, migration/schema đúng, dịch vụ bắt buộc sẵn sàng.
 
@@ -256,14 +255,14 @@ Không chạy `supabase db push` trực tiếp vào production từ máy cá nh�
 
 ## 8. Thứ tự triển khai khuyến nghị
 
-1. Chốt ADR API in-process hay API trung tâm.
-2. Sửa 7 Supabase function, audit RLS/grants và database role.
-3. Tạo staging, backup/restore runbook và production secret/certificate strategy.
-4. Bổ sung integration/E2E tests cho các giao dịch tồn kho và hóa đơn.
-5. Thiết lập GitHub Actions và release artifact.
-6. Thêm observability, readiness và startup fail-closed.
-7. Load test, tối ưu query/bundle và chạy UAT.
-8. Đóng gói signed installer, pilot 1–2 máy, theo dõi 5 ngày rồi mới rollout rộng.
-9. Nâng .NET 10 LTS trước khi .NET 8 hết hỗ trợ.
+1. [x] Chốt ADR dùng API in-process cho pilot ba thiết bị.
+2. [ ] Hoàn tất database security: function/RLS/grants/group role đã xong; còn login riêng từng thiết bị, TLS validation và tắt Data API trong Dashboard.
+3. [x] Thêm correlation ID, liveness/readiness và startup fail-closed.
+4. [ ] Thiết lập GitHub Actions cơ bản cho build, test, audit và migration consistency.
+5. [ ] Tạo staging, backup/restore runbook và production secret/certificate strategy.
+6. [ ] Bổ sung integration/E2E tests cho các giao dịch tồn kho và hóa đơn.
+7. [ ] Nâng .NET 10 LTS và chạy regression trên staging.
+8. [ ] Load test đúng quy mô 3–5 thiết bị, tối ưu query/bundle và chạy UAT.
+9. [ ] Đóng gói signed installer, pilot 1–2 máy, theo dõi 5 ngày rồi mới rollout rộng.
 
 Khi tất cả P0 và quality gate P1 đã đạt, dự án mới nên chuyển trạng thái từ “feature complete” sang “production candidate”.
