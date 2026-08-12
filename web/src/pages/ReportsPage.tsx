@@ -58,7 +58,7 @@ import { fetchCategories, type CategoryDto } from '../api/categories'
 import { fetchInventory, type ProductDto } from '../api/inventory'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import SearchField from '../components/SearchField'
-import { exportReportsToExcel, exportReportsToPdf, type ExportReportsData } from '../utils/exportReports'
+import type { ExportReportsData } from '../utils/exportReports'
 import { formatDate } from '../utils/dateFormat'
 
 // Utility formatters
@@ -380,6 +380,7 @@ export default function ReportsPage() {
     setIsExporting(true)
     try {
       const exportData = await buildExportData()
+      const { exportReportsToExcel } = await import('../utils/exportReports')
       await exportReportsToExcel(exportData)
       setToastState({ open: true, message: 'Đã xuất báo cáo Excel thành công.', severity: 'success' })
     } catch (err) {
@@ -396,6 +397,7 @@ export default function ReportsPage() {
     setIsExporting(true)
     try {
       const exportData = await buildExportData()
+      const { exportReportsToPdf } = await import('../utils/exportReports')
       await exportReportsToPdf(exportData)
       setToastState({ open: true, message: 'Đã xuất báo cáo PDF thành công.', severity: 'success' })
     } catch (error) {

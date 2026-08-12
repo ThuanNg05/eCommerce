@@ -38,6 +38,7 @@ public class SmtpConfigConfiguration : IEntityTypeConfiguration<SmtpConfig>
         b.ToTable("smtp_config", t => t.ExcludeFromMigrations());
         b.HasKey(s => s.Id);
         b.Property(s => s.Id).ValueGeneratedNever(); // singleton (id = 1)
+        b.Property(s => s.ProtectedPassApp).HasMaxLength(2048);
     }
 }
 
