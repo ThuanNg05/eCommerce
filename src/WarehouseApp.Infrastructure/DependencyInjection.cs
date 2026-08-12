@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Infrastructure.Data;
 using WarehouseApp.Infrastructure.Reports;
+using WarehouseApp.Infrastructure.Security;
 using WarehouseApp.Infrastructure.Services;
 
 namespace WarehouseApp.Infrastructure;
@@ -37,6 +38,8 @@ public static class DependencyInjection
             opt.UseNpgsql(cs).UseSnakeCaseNamingConvention());
 
         services.AddSingleton<IDbConnectionFactory>(_ => new NpgsqlConnectionFactory(cs));
+        services.AddSingleton<ISmtpPasswordProtector>(
+            _ => new SmtpPasswordProtector(config[SmtpPasswordProtector.ConfigurationKey]));
 
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IInvoiceService, InvoiceService>();

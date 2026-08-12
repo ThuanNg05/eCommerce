@@ -68,7 +68,7 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
 
         using var conn = factory.Create();
         var rows = await conn.QueryAsync<SalesSummaryDbRow>(new CommandDefinition(sql, parameters, cancellationToken: ct));
-        return rows.Select(row => new SalesSummaryRowDto(DateOnly.FromDateTime(row.Date), checked((int)row.InvoiceCount), row.Total)).ToList();
+        return rows.Select(row => new SalesSummaryRowDto(row.Date, checked((int)row.InvoiceCount), row.Total)).ToList();
     }
 
     public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(SalesReportFilter filter, int limit, CancellationToken ct = default)
@@ -156,7 +156,7 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
 
         using var conn = factory.Create();
         var rows = await conn.QueryAsync<InventoryFlowDbRow>(new CommandDefinition(sql, parameters, cancellationToken: ct));
-        return rows.Select(row => new InventoryFlowRowDto(DateOnly.FromDateTime(row.Date), checked((int)row.InQuantity), checked((int)row.OutQuantity), row.InValue, row.OutValue)).ToList();
+        return rows.Select(row => new InventoryFlowRowDto(row.Date, checked((int)row.InQuantity), checked((int)row.OutQuantity), row.InValue, row.OutValue)).ToList();
     }
 
     public async Task<PagedResult<InvoiceReportRowDto>> GetInvoiceDetailsAsync(SalesReportFilter filter, int page, int pageSize, CancellationToken ct = default)
@@ -233,10 +233,10 @@ public class DapperReportQueries(IDbConnectionFactory factory) : IReportQueries
     }
 
     private sealed record SalesOverviewDbRow(decimal Revenue, long InvoiceCount, long UnitsSold, decimal AverageInvoiceValue);
-    private sealed record SalesSummaryDbRow(DateTime Date, long InvoiceCount, decimal Total);
+    private sealed record SalesSummaryDbRow(DateOnly Date, long InvoiceCount, decimal Total);
     private sealed record TopProductDbRow(long ProductId, string Sku, string Name, long QuantitySold, long InvoiceCount, decimal Revenue);
     private sealed record TopCustomerDbRow(long CustomerId, string Name, string Phone, string? GroupPrice, long InvoiceCount, long UnitsSold, decimal Revenue);
-    private sealed record InventoryFlowDbRow(DateTime Date, long InQuantity, long OutQuantity, decimal InValue, decimal OutValue);
+    private sealed record InventoryFlowDbRow(DateOnly Date, long InQuantity, long OutQuantity, decimal InValue, decimal OutValue);
     private sealed record InvoiceReportDbRow(
         string InvoiceId, DateTime CreatedAt, long CustomerId, string CustomerName, string CustomerPhone,
         string? GroupPrice, long ProductId, string Sku, string ProductName, int Quantity,

@@ -7,11 +7,11 @@ using WarehouseApp.Infrastructure.Data;
 namespace WarehouseApp.Infrastructure.Services;
 
 /// <summary>
-/// Reads/writes the singleton SMTP config (id = 1). The stored app password is never
+/// Reads/writes the singleton SMTP config (id = 1). The encrypted app password is never
 /// returned to callers; an empty <see cref="UpdateSmtpConfigRequest.AppPassword"/> leaves
 /// the existing secret untouched so editing the address/duration doesn't wipe it.
 /// </summary>
-public class SettingsService(AppDbContext db) : ISettingsService
+public class SettingsService(AppDbContext db, ISmtpPasswordProtector passwordProtector) : ISettingsService
 {
     public async Task<SmtpConfigDto> GetSmtpAsync(CancellationToken ct = default)
     {
@@ -32,7 +32,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
 
         s.Address = r.Address?.Trim() ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(r.AppPassword))
-            s.HashedPassApp = r.AppPassword; // stored as provided — the app needs it to authenticate
+            s.ProtectedPassApp = passwordProtector.Protect(r.AppPassword);
         s.Duration = r.Duration;
         s.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -41,5 +41,5 @@ public class SettingsService(AppDbContext db) : ISettingsService
     }
 
     private static SmtpConfigDto ToDto(SmtpConfig s) =>
-        new(s.Address, !string.IsNullOrEmpty(s.HashedPassApp), s.Duration, s.UpdatedAt);
+        new(s.Address, !string.IsNullOrEmpty(s.ProtectedPassApp), s.Duration, s.UpdatedAt);
 }

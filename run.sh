@@ -6,6 +6,18 @@ BACKEND_PORT=5080
 FRONTEND_DIR="./web"
 BACKEND_DIR="./src/WarehouseApp.Api"
 
+# Install frontend dependencies on a fresh clone before starting either server.
+if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+  echo -e "\033[1;33m[*] $FRONTEND_DIR/node_modules was not found. Installing frontend dependencies...\033[0m"
+  if ! (cd "$FRONTEND_DIR" && npm install); then
+    echo -e "\033[1;31m[!] npm install failed. The applications were not started.\033[0m"
+    exit 1
+  fi
+  echo -e "\033[1;32m[✓] Frontend dependencies installed successfully.\033[0m"
+else
+  echo -e "\033[1;32m[✓] Frontend dependencies are already installed.\033[0m"
+fi
+
 # Function to find and kill process on a specified port
 kill_port() {
   local port=$1
