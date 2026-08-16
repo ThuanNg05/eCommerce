@@ -20,6 +20,9 @@ public static class WooCommerceEndpoints
         g.MapPost("/orders/sync", async (IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.SyncOrdersAsync(ct))).RequireAuthorization("AdminOnly");
 
+        g.MapPost("/products/sync", async (IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.SyncCatalogAsync(ct))).RequireAuthorization("AdminOnly");
+
         g.MapPost("/orders/{wooCommerceOrderId:long}/confirm", async (
             long wooCommerceOrderId, ConfirmWooCommerceOrderRequest request, IWooCommerceService service, CancellationToken ct) =>
             await service.ConfirmAsync(wooCommerceOrderId, request, ct) is { } order

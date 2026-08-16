@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -40,6 +41,18 @@ public sealed class WooCommerceRestClient(HttpClient httpClient, IOptions<WooCom
     public WooCommerceRemoteOrder ParseOrder(ReadOnlySpan<byte> payload) =>
         JsonSerializer.Deserialize<WooCommerceRemoteOrder>(payload, JsonOptions)
         ?? throw new InvalidOperationException("Webhook WooCommerce không chứa đơn hàng hợp lệ.");
+
+    public async Task UpdateProductAsync(long productId, long? variationId, WooCommerceCatalogUpdate update, CancellationToken ct)
+    {
+        EnsureConfigured();
+        var path = variationId is > 0
+            ? $"products/{productId}/variations/{variationId.Value}"
+            : $"products/{productId}";
+        using var request = CreateRequest(HttpMethod.Put, path);
+        request.Content = JsonContent.Create(update, options: JsonOptions);
+        using var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+    }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string path)
     {
@@ -91,3 +104,13 @@ public sealed record WooCommerceRemoteOrderItem(
     int Quantity,
     string? Price,
     string? Subtotal);
+
+public sealed record WooCommerceCatalogUpdate(
+    string Name,
+    string RegularPrice,
+    bool ManageStock,
+    int StockQuantity,
+    string StockStatus,
+    IReadOnlyList<WooCommerceImageUpdate>? Images);
+
+public sealed record WooCommerceImageUpdate(string Src);

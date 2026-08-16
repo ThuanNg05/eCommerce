@@ -43,6 +43,22 @@ public sealed class WooCommerceService(
         return new WooCommerceSyncResult(remoteOrders.Count, 0, DateTimeOffset.UtcNow);
     }
 
+    public async Task<WooCommerceCatalogSyncResult> SyncCatalogAsync(CancellationToken ct = default)
+    {
+        var links = await db.WooCommerceProductLinks.AsNoTracking().Include(x => x.Product)
+            .Where(x => x.Product != null && x.Product.Status == 1).ToListAsync(ct);
+        foreach (var link in links)
+        {
+            var product = link.Product!;
+            var price = product.PriceRetail ?? product.BasePrice;
+            var images = string.IsNullOrWhiteSpace(product.ImageUrl) ? null : new[] { new WooCommerceImageUpdate(product.ImageUrl) };
+            await client.UpdateProductAsync(link.WooCommerceProductId, link.WooCommerceVariationId,
+                new WooCommerceCatalogUpdate(product.Name, price.ToString("0.###", CultureInfo.InvariantCulture), true,
+                    product.InStock, product.InStock > 0 ? "instock" : "outofstock", images), ct);
+        }
+        return new WooCommerceCatalogSyncResult(links.Count, DateTimeOffset.UtcNow);
+    }
+
     public async Task<WooCommerceProductLinkDto> LinkProductAsync(long wooCommerceProductId, LinkWooCommerceProductRequest request, CancellationToken ct = default)
     {
         if (wooCommerceProductId <= 0 || request.ProductId <= 0)

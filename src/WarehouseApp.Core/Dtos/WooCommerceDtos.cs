@@ -38,3 +38,5 @@ public record LinkWooCommerceProductRequest(long ProductId, long? WooCommerceVar
 public record ConfirmWooCommerceOrderRequest(long CustomerId);
 
 public record WooCommerceSyncResult(int ImportedOrders, int ImportedProducts, DateTimeOffset CompletedAt);
+
+public record WooCommerceCatalogSyncResult(int UpdatedProducts, DateTimeOffset CompletedAt);
