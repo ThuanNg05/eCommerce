@@ -116,6 +116,26 @@ public class InventoryService(AppDbContext db) : IInventoryService
         return ToDto(p, categories ?? await CategoriesOfAsync(id, ct));
     }
 
+    public async Task<ProductDto?> SetImageUrlAsync(long id, string? imageUrl, CancellationToken ct = default)
+    {
+        var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (p is null) return null;
+
+        p.ImageUrl = imageUrl;
+        p.UpdatedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException("Sản phẩm đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
+        }
+
+        return ToDto(p, await CategoriesOfAsync(id, ct));
+    }
+
     public async Task<ProductDto?> AdjustStockAsync(long id, StockAdjustmentRequest r, CancellationToken ct = default)
     {
         var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -187,5 +207,5 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
     private static ProductDto ToDto(Product p, IReadOnlyList<CategoryRefDto> categories) =>
         new(p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt, categories);
+            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt, p.ImageUrl, categories);
 }
