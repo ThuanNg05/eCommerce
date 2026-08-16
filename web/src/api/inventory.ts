@@ -18,6 +18,7 @@ export interface ProductDto {
   warningStock: number
   status: number
   updatedAt: string
+  imageUrl?: string | null
   categories?: CategoryCategoryDto[]
 }
 
@@ -31,6 +32,7 @@ export interface CreateProductRequest {
   subBackboardId?: number | null
   inStock: number
   warningStock: number
+  imageUrl?: string | null
   categoryIds?: number[]
 }
 
@@ -43,6 +45,7 @@ export interface UpdateProductRequest {
   subBackboardId?: number | null
   warningStock: number
   status: number
+  imageUrl?: string | null
   categoryIds?: number[]
 }
 
