@@ -11,6 +11,7 @@ import ChangePasswordPage from './pages/ChangePasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
 import InvoicesPage from './pages/InvoicesPage'
+import WooCommerceOrdersPage from './pages/WooCommerceOrdersPage'
 import CustomersPage from './pages/CustomersPage'
 import CategoriesPage from './pages/CategoriesPage'
 import MaterialsPage from './pages/MaterialsPage'
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="/inventory" element={<InventoryTransactionsPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/invoices" element={<InvoicesPage />} />
+                <Route path="/woocommerce-orders" element={<WooCommerceOrdersPage />} />
 
                 {/* Administration Group (Admin Only) */}
                 <Route path="/pricing" element={<PricingPage />} />
