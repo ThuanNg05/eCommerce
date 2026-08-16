@@ -8,5 +8,6 @@ public interface IInventoryService
     Task<ProductDto?> GetAsync(long id, CancellationToken ct = default);
     Task<ProductDto> CreateAsync(CreateProductRequest request, CancellationToken ct = default);
     Task<ProductDto?> UpdateAsync(long id, UpdateProductRequest request, CancellationToken ct = default);
+    Task<ProductDto?> SetImageUrlAsync(long id, string? imageUrl, CancellationToken ct = default);
     Task<ProductDto?> AdjustStockAsync(long id, StockAdjustmentRequest request, CancellationToken ct = default);
 }
