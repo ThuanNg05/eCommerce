@@ -16,6 +16,7 @@ public record ProductDto(
     int WarningStock,
     short Status,
     DateTimeOffset UpdatedAt,
+    string? ImageUrl,
     IReadOnlyList<CategoryRefDto> Categories);
 
 public record CreateProductRequest(

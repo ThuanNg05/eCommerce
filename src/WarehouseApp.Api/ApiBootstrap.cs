@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WarehouseApp.Api.Endpoints;
 using WarehouseApp.Api.Security;
+using WarehouseApp.Api.Services;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Security;
 using WarehouseApp.Infrastructure;
@@ -34,6 +35,8 @@ public static class ApiBootstrap
         services.Configure<DatabaseReadinessOptions>(config.GetSection(DatabaseReadinessOptions.SectionName));
         services.AddInfrastructure(config);
         services.AddScoped<DatabaseReadinessChecker>();
+        services.Configure<SupabaseStorageOptions>(config.GetSection(SupabaseStorageOptions.SectionName));
+        services.AddHttpClient<ProductImageStorage>();
 
         var authSettings = config.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
         if (authSettings.AccessTokenMinutes is < 1 or > 60)

@@ -21,6 +21,8 @@ public class Product
     public int WarningStock { get; set; }
     public short Status { get; set; } = 1;
     public string? Description { get; set; }
+    /// <summary>Application-managed relative URL of the product image, stored as WebP.</summary>
+    public string? ImageUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

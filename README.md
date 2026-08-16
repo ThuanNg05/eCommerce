@@ -20,6 +20,7 @@ desktop Windows dùng WPF + WebView2.
 - Báo cáo doanh thu, sản phẩm, khách hàng và luồng tồn kho.
 - Phân quyền người dùng, quản lý phiên đăng nhập và nhật ký kiểm toán.
 - Cấu hình SMTP; app password được mã hóa trước khi lưu vào database.
+- Upload ảnh sản phẩm, chuyển đổi sang WebP và lưu trên Supabase Storage.
 - Chạy dưới dạng web development environment hoặc ứng dụng desktop Windows.
 
 ## Kiến trúc
@@ -60,7 +61,7 @@ không hỗ trợ thao tác database khi offline.
 ## Yêu cầu môi trường
 
 - Windows 10/11 nếu chạy ứng dụng WPF.
-- [.NET SDK 10.0.302](https://dotnet.microsoft.com/download/dotnet/10.0), được
+- [.NET SDK 10.0.400](https://dotnet.microsoft.com/download/dotnet/10.0), được
   cố định trong [`global.json`](global.json).
 - Node.js `^20.19.0` hoặc `>=22.12.0` và npm.
 - PostgreSQL/Supabase project đã được cấu hình schema.
@@ -208,6 +209,9 @@ Desktop yêu cầu `ConnectionStrings__Default` và
 | Key | Bắt buộc | Mục đích | Nơi lưu khuyến nghị |
 |---|---:|---|---|
 | `ConnectionStrings:Default` | Có | Kết nối PostgreSQL | User Secrets hoặc managed secret store |
+| `SupabaseStorage:Url` | Khi dùng ảnh sản phẩm | Project URL của Supabase Storage | Environment variable trên backend |
+| `SupabaseStorage:ServiceRoleKey` | Khi dùng ảnh sản phẩm | Secret key để API upload/xóa object | Environment variable hoặc managed secret store |
+| `SupabaseStorage:Bucket` | Không | Bucket ảnh sản phẩm, mặc định `product-images` | `appsettings.json` không chứa secret |
 | `SmtpPasswordEncryption:Key` | Khi dùng SMTP | Mã hóa/giải mã SMTP app password | User Secrets hoặc managed secret store |
 | `Authentication:SigningKey` | Production | Ký JWT giữa các lần chạy/instance | Managed secret store |
 | `DatabaseReadiness:RequiredSchemaVersion` | Có | Kiểm tra database đúng schema | `appsettings.json`, không chứa secret |
@@ -218,6 +222,10 @@ Trong environment variable, thay dấu `:` bằng `__`, ví dụ
 Nếu không cấu hình JWT signing key trên Windows, ứng dụng tạo một key 256-bit tại
 `%LOCALAPPDATA%/WarehouseApp/security/jwt-signing-key.bin` và bảo vệ bằng DPAPI.
 Production nhiều instance phải dùng một signing key chung từ secret store.
+
+Ảnh sản phẩm được API chuyển sang WebP và upload vào bucket public
+`product-images`. Chỉ backend được dùng `SupabaseStorage:ServiceRoleKey`; không
+đặt key này trong `web/`, biến `VITE_*` hoặc source code.
 
 ## API và phân quyền
 

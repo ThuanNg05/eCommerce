@@ -17,6 +17,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasIndex(p => p.Sku).IsUnique();
         b.Property(p => p.PriceRetail).HasPrecision(18, 0);
         b.Property(p => p.PriceWholesale).HasPrecision(18, 0);
+        b.Property(p => p.ImageUrl).HasMaxLength(512);
         // Optimistic concurrency via the Postgres xmin system column (no stored column).
         b.Property(p => p.Version).IsRowVersion();
         b.HasIndex(p => p.InStock); // supports low-stock scans
