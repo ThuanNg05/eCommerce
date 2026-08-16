@@ -42,7 +42,9 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         // A single transaction covers stock decrement + invoice insert so a failure
         // leaves neither applied. Retry-on-failure is intentionally NOT enabled on the
         // DbContext; if it is turned on, wrap this block in an execution strategy.
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var tx = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
 
         // Serialize invoice-code allocation across stations. The lock is automatically
         // released at commit/rollback and does not require a schema-side sequence.
@@ -106,11 +108,11 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         try
         {
             await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            if (tx is not null) await tx.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
-            await tx.RollbackAsync(ct);
+            if (tx is not null) await tx.RollbackAsync(ct);
             throw new ConcurrencyConflictException("Tồn kho đã thay đổi trong lúc tạo hóa đơn. Vui lòng thử lại.");
         }
 
@@ -122,7 +124,9 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         if (r.Lines is null || r.Lines.Count == 0)
             throw new DomainValidationException("Hóa đơn phải có ít nhất một dòng sản phẩm.");
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var tx = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtext({"warehouse.invoices.update:" + id}))", ct);
 
@@ -160,7 +164,7 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         }
         catch (DbUpdateConcurrencyException)
         {
-            await tx.RollbackAsync(ct);
+            if (tx is not null) await tx.RollbackAsync(ct);
             throw new ConcurrencyConflictException("Hóa đơn hoặc tồn kho đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
         }
 
@@ -205,11 +209,11 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         try
         {
             await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            if (tx is not null) await tx.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException)
         {
-            await tx.RollbackAsync(ct);
+            if (tx is not null) await tx.RollbackAsync(ct);
             throw new ConcurrencyConflictException("Hóa đơn hoặc tồn kho đã được cập nhật ở máy khác. Vui lòng tải lại và thử lại.");
         }
 

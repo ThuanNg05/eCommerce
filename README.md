@@ -21,6 +21,7 @@ desktop Windows dùng WPF + WebView2.
 - Phân quyền người dùng, quản lý phiên đăng nhập và nhật ký kiểm toán.
 - Cấu hình SMTP; app password được mã hóa trước khi lưu vào database.
 - Upload ảnh sản phẩm, chuyển đổi sang WebP và lưu trên Supabase Storage.
+- Đồng bộ đơn WooCommerce để nhân viên kiểm tra tồn và xác nhận xuất kho thủ công.
 - Chạy dưới dạng web development environment hoặc ứng dụng desktop Windows.
 
 ## Kiến trúc
@@ -212,6 +213,10 @@ Desktop yêu cầu `ConnectionStrings__Default` và
 | `SupabaseStorage:Url` | Khi dùng ảnh sản phẩm | Project URL của Supabase Storage | Environment variable trên backend |
 | `SupabaseStorage:ServiceRoleKey` | Khi dùng ảnh sản phẩm | Secret key để API upload/xóa object | Environment variable hoặc managed secret store |
 | `SupabaseStorage:Bucket` | Không | Bucket ảnh sản phẩm, mặc định `product-images` | `appsettings.json` không chứa secret |
+| `WooCommerce:BaseUrl` | Khi đồng bộ WooCommerce | URL HTTPS của cửa hàng WooCommerce | Environment variable trên backend |
+| `WooCommerce:ConsumerKey` | Khi đồng bộ WooCommerce | REST API consumer key | Managed secret store |
+| `WooCommerce:ConsumerSecret` | Khi đồng bộ WooCommerce | REST API consumer secret | Managed secret store |
+| `WooCommerce:WebhookSecret` | Khi nhận webhook | Xác minh chữ ký HMAC-SHA256 | Managed secret store |
 | `SmtpPasswordEncryption:Key` | Khi dùng SMTP | Mã hóa/giải mã SMTP app password | User Secrets hoặc managed secret store |
 | `Authentication:SigningKey` | Production | Ký JWT giữa các lần chạy/instance | Managed secret store |
 | `DatabaseReadiness:RequiredSchemaVersion` | Có | Kiểm tra database đúng schema | `appsettings.json`, không chứa secret |
@@ -227,6 +232,13 @@ Production nhiều instance phải dùng một signing key chung từ secret sto
 `product-images`. Chỉ backend được dùng `SupabaseStorage:ServiceRoleKey`; không
 đặt key này trong `web/`, biến `VITE_*` hoặc source code.
 
+WooCommerce dùng REST API `wc/v3` hoàn toàn từ backend. Không dùng Legacy API,
+không đặt Consumer Key/Secret vào React. Sau khi cấu hình secret, tạo webhook
+`order.created` và `order.updated` với delivery URL
+`https://<api-host>/api/webhooks/woocommerce`; nhập cùng secret ở hai bên.
+Đơn chỉ có thể xác nhận xuất kho khi WooCommerce ở `processing` hoặc `completed`,
+mọi dòng đã liên kết sản phẩm kho và tồn hiện tại đủ số lượng.
+
 ## API và phân quyền
 
 | Nhóm route | Quyền truy cập | Nội dung |
@@ -237,6 +249,9 @@ Production nhiều instance phải dùng một signing key chung từ secret sto
 | `/api/inventory`, `/api/invoices`, `/api/customers` | Đã đăng nhập và đã đổi mật khẩu | Nghiệp vụ kho, hóa đơn, khách hàng |
 | `/api/categories`, `/api/materials`, `/api/backboards`, `/api/sub-backboards`, `/api/frames` | Đã đăng nhập và đã đổi mật khẩu | Dữ liệu danh mục và nguyên vật liệu |
 | `/api/inventory-transactions` | Đã đăng nhập và đã đổi mật khẩu | Giao dịch kho và chuyển đổi |
+| `/api/woocommerce/orders` | Đã đăng nhập và đã đổi mật khẩu | Đơn WooCommerce, kiểm tra tồn và xác nhận thủ công |
+| `/api/woocommerce/orders/sync`, `/api/woocommerce/products/*/link` | Admin | Đồng bộ và liên kết catalog WooCommerce |
+| `/api/webhooks/woocommerce` | Public, xác minh chữ ký | Nhận webhook từ WooCommerce |
 | `/api/accounts`, `/api/audit`, `/api/pricing`, `/api/reports`, `/api/settings` | Admin | Quản trị, báo cáo và cấu hình |
 
 API trả lỗi nghiệp vụ theo `ProblemDetails`; các trường hợp phổ biến gồm `400`

@@ -12,6 +12,7 @@ using WarehouseApp.Api.Services;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Security;
 using WarehouseApp.Infrastructure;
+using WarehouseApp.Infrastructure.Services;
 
 namespace WarehouseApp.Api;
 
@@ -37,6 +38,8 @@ public static class ApiBootstrap
         services.AddScoped<DatabaseReadinessChecker>();
         services.Configure<SupabaseStorageOptions>(config.GetSection(SupabaseStorageOptions.SectionName));
         services.AddHttpClient<ProductImageStorage>();
+        services.Configure<WooCommerceOptions>(config.GetSection(WooCommerceOptions.SectionName));
+        services.AddHttpClient<WooCommerceRestClient>();
 
         var authSettings = config.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
         if (authSettings.AccessTokenMinutes is < 1 or > 60)
@@ -193,6 +196,9 @@ public static class ApiBootstrap
         secured.MapSubBackboardEndpoints();
         secured.MapFrameEndpoints();
         secured.MapInventoryTransactionEndpoints();
+        secured.MapWooCommerceEndpoints();
+
+        api.MapWooCommerceWebhookEndpoint();
 
         var admin = api.MapGroup(string.Empty).RequireAuthorization("AdminOnly");
         admin.MapPricingEndpoints();
