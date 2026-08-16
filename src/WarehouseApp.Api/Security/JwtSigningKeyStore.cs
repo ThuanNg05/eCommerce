@@ -16,6 +16,10 @@ public static class JwtSigningKeyStore
         if (!string.IsNullOrWhiteSpace(configured))
             return Validate(Encoding.UTF8.GetBytes(configured));
 
+        if (config.GetValue<bool>("Authentication:RequireSigningKey"))
+            throw new InvalidOperationException(
+                "Production deployment yêu cầu Authentication:SigningKey từ environment hoặc managed secret store.");
+
         var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(root))
             root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

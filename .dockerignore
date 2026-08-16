@@ -1,0 +1,12 @@
+.git
+.github
+.vs
+**/bin
+**/obj
+web/node_modules
+web/dist
+TestResults
+*.user
+*.suo
+**/appsettings.Development.json
+*.env.local

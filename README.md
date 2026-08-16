@@ -21,6 +21,7 @@ desktop Windows dùng WPF + WebView2.
 - Phân quyền người dùng, quản lý phiên đăng nhập và nhật ký kiểm toán.
 - Cấu hình SMTP; app password được mã hóa trước khi lưu vào database.
 - Upload ảnh sản phẩm, chuyển đổi sang WebP và lưu trên Supabase Storage.
+- Đồng bộ đơn WooCommerce để nhân viên kiểm tra tồn và xác nhận xuất kho thủ công.
 - Chạy dưới dạng web development environment hoặc ứng dụng desktop Windows.
 
 ## Kiến trúc
@@ -212,12 +213,64 @@ Desktop yêu cầu `ConnectionStrings__Default` và
 | `SupabaseStorage:Url` | Khi dùng ảnh sản phẩm | Project URL của Supabase Storage | Environment variable trên backend |
 | `SupabaseStorage:ServiceRoleKey` | Khi dùng ảnh sản phẩm | Secret key để API upload/xóa object | Environment variable hoặc managed secret store |
 | `SupabaseStorage:Bucket` | Không | Bucket ảnh sản phẩm, mặc định `product-images` | `appsettings.json` không chứa secret |
+| `WooCommerce:BaseUrl` | Khi đồng bộ WooCommerce | URL HTTPS của cửa hàng WooCommerce | Environment variable trên backend |
+| `WooCommerce:ConsumerKey` | Khi đồng bộ WooCommerce | REST API consumer key | Managed secret store |
+| `WooCommerce:ConsumerSecret` | Khi đồng bộ WooCommerce | REST API consumer secret | Managed secret store |
+| `WooCommerce:WebhookSecret` | Khi nhận webhook | Xác minh chữ ký HMAC-SHA256 | Managed secret store |
 | `SmtpPasswordEncryption:Key` | Khi dùng SMTP | Mã hóa/giải mã SMTP app password | User Secrets hoặc managed secret store |
 | `Authentication:SigningKey` | Production | Ký JWT giữa các lần chạy/instance | Managed secret store |
 | `DatabaseReadiness:RequiredSchemaVersion` | Có | Kiểm tra database đúng schema | `appsettings.json`, không chứa secret |
+| `Cors:AdditionalAllowedOrigins` | Khi deploy web tách API | Các origin frontend được phép, ngăn cách bởi dấu phẩy | Environment variable backend |
 
 Trong environment variable, thay dấu `:` bằng `__`, ví dụ
 `Authentication__SigningKey`.
+
+## Deploy Vercel + Render
+
+Triển khai tách frontend và API không cần domain riêng:
+
+```text
+Vercel (React)  -> https://<vercel-project>.vercel.app
+                         |
+                         v
+Render (.NET API) -> https://<render-service>.onrender.com
+                         |
+                         +-> Supabase / WooCommerce
+```
+
+Backend có [`Dockerfile`](Dockerfile) và [`render.yaml`](render.yaml) để tạo
+Render Web Service. Import repository vào Render bằng Blueprint, sau đó điền các
+biến có `sync: false` trong Dashboard. Không commit giá trị secret.
+
+Các biến bắt buộc ở Render:
+
+```text
+Authentication__SigningKey=<chuoi-ngau-nhien-it-nhat-32-bytes>
+ConnectionStrings__Default=<Supabase-Postgres-connection-string>
+SupabaseStorage__Url=https://<project-ref>.supabase.co
+SupabaseStorage__ServiceRoleKey=<Supabase-server-secret>
+WooCommerce__BaseUrl=https://tranhkienghoathuan.com
+WooCommerce__ConsumerKey=<consumer-key>
+WooCommerce__ConsumerSecret=<consumer-secret>
+WooCommerce__WebhookSecret=<secret-rieng-cho-webhook>
+Cors__AdditionalAllowedOrigins=https://<vercel-project>.vercel.app
+```
+
+Render tự đặt biến `PORT`; Docker entrypoint đã bind Kestrel vào
+`http://0.0.0.0:$PORT`. Đặt health check là `/health/live`. Sau khi deploy API,
+đặt WooCommerce webhook delivery URL thành:
+
+```text
+https://<render-service>.onrender.com/api/webhooks/woocommerce
+```
+
+Antigravity triển khai Vercel chỉ trong `web/**`: đặt biến build-time
+`VITE_API_BASE=https://<render-service>.onrender.com`, build `npm run build`,
+output `dist`. Giá trị `VITE_*` là public; không đưa bất cứ secret nào vào đó.
+
+Render Free có thể sleep sau 15 phút không có request, vì vậy chỉ phù hợp demo
+hoặc MVP; webhook đầu tiên sau khi sleep có thể chậm và cần kiểm tra delivery log
+trên WooCommerce.
 
 Nếu không cấu hình JWT signing key trên Windows, ứng dụng tạo một key 256-bit tại
 `%LOCALAPPDATA%/WarehouseApp/security/jwt-signing-key.bin` và bảo vệ bằng DPAPI.
@@ -226,6 +279,15 @@ Production nhiều instance phải dùng một signing key chung từ secret sto
 Ảnh sản phẩm được API chuyển sang WebP và upload vào bucket public
 `product-images`. Chỉ backend được dùng `SupabaseStorage:ServiceRoleKey`; không
 đặt key này trong `web/`, biến `VITE_*` hoặc source code.
+
+WooCommerce dùng REST API `wc/v3` hoàn toàn từ backend. Không dùng Legacy API,
+không đặt Consumer Key/Secret vào React. Sau khi cấu hình secret, tạo webhook
+`order.created` và `order.updated` với delivery URL
+`https://<api-host>/api/webhooks/woocommerce`; nhập cùng secret ở hai bên.
+Đơn chỉ có thể xác nhận xuất kho khi WooCommerce ở `processing` hoặc `completed`,
+mọi dòng đã liên kết sản phẩm kho và tồn hiện tại đủ số lượng.
+Catalog kho là nguồn chính: quản trị viên liên kết từng sản phẩm, rồi gọi đồng bộ
+để đẩy tên, giá bán lẻ, tồn kho và URL ảnh WebP (nếu có) lên WooCommerce.
 
 ## API và phân quyền
 
@@ -237,6 +299,9 @@ Production nhiều instance phải dùng một signing key chung từ secret sto
 | `/api/inventory`, `/api/invoices`, `/api/customers` | Đã đăng nhập và đã đổi mật khẩu | Nghiệp vụ kho, hóa đơn, khách hàng |
 | `/api/categories`, `/api/materials`, `/api/backboards`, `/api/sub-backboards`, `/api/frames` | Đã đăng nhập và đã đổi mật khẩu | Dữ liệu danh mục và nguyên vật liệu |
 | `/api/inventory-transactions` | Đã đăng nhập và đã đổi mật khẩu | Giao dịch kho và chuyển đổi |
+| `/api/woocommerce/orders` | Đã đăng nhập và đã đổi mật khẩu | Đơn WooCommerce, kiểm tra tồn và xác nhận thủ công |
+| `/api/woocommerce/orders/sync`, `/api/woocommerce/products/*/link`, `/api/woocommerce/products/sync` | Admin | Đồng bộ đơn và đẩy catalog kho sang WooCommerce |
+| `/api/webhooks/woocommerce` | Public, xác minh chữ ký | Nhận webhook từ WooCommerce |
 | `/api/accounts`, `/api/audit`, `/api/pricing`, `/api/reports`, `/api/settings` | Admin | Quản trị, báo cáo và cấu hình |
 
 API trả lỗi nghiệp vụ theo `ProblemDetails`; các trường hợp phổ biến gồm `400`

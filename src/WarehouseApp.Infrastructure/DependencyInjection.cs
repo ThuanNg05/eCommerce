@@ -56,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IReportQueries, DapperReportQueries>();
+        services.AddScoped<IWooCommerceService, WooCommerceService>();
 
         return services;
     }

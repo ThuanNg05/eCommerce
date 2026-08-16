@@ -12,6 +12,7 @@ using WarehouseApp.Api.Services;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Security;
 using WarehouseApp.Infrastructure;
+using WarehouseApp.Infrastructure.Services;
 
 namespace WarehouseApp.Api;
 
@@ -27,7 +28,7 @@ public static class ApiBootstrap
 
     /// <summary>Origins allowed to call the API: the packaged React app (WebView2 virtual
     /// host) and the Vite dev server.</summary>
-    public static readonly string[] AllowedOrigins = ["https://app.local", "http://localhost:5173"];
+    public static readonly string[] DefaultAllowedOrigins = ["https://app.local", "http://localhost:5173"];
 
     public static void AddApiServices(IServiceCollection services, IConfiguration config)
     {
@@ -37,6 +38,8 @@ public static class ApiBootstrap
         services.AddScoped<DatabaseReadinessChecker>();
         services.Configure<SupabaseStorageOptions>(config.GetSection(SupabaseStorageOptions.SectionName));
         services.AddHttpClient<ProductImageStorage>();
+        services.Configure<WooCommerceOptions>(config.GetSection(WooCommerceOptions.SectionName));
+        services.AddHttpClient<WooCommerceRestClient>();
 
         var authSettings = config.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
         if (authSettings.AccessTokenMinutes is < 1 or > 60)
@@ -133,11 +136,24 @@ public static class ApiBootstrap
         services.AddExceptionHandler<DomainExceptionHandler>();
 
         services.AddCors(o => o.AddPolicy(CorsPolicy, p =>
-            p.WithOrigins(AllowedOrigins)
+            p.WithOrigins(ResolveAllowedOrigins(config))
              .AllowAnyHeader()
              .AllowAnyMethod()));
 
         services.AddEndpointsApiExplorer();
+    }
+
+    /// <summary>Combines safe local origins with the explicit production origin(s).
+    /// Render accepts this as <c>Cors__AdditionalAllowedOrigins</c>, comma-separated.</summary>
+    public static string[] ResolveAllowedOrigins(IConfiguration config)
+    {
+        var configured = (config["Cors:AdditionalAllowedOrigins"] ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) &&
+                             string.IsNullOrEmpty(uri.PathAndQuery.Trim('/')))
+            .Select(origin => origin.TrimEnd('/'));
+        return [.. DefaultAllowedOrigins.Concat(configured).Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     public static void UseApiPipeline(WebApplication app)
@@ -193,6 +209,9 @@ public static class ApiBootstrap
         secured.MapSubBackboardEndpoints();
         secured.MapFrameEndpoints();
         secured.MapInventoryTransactionEndpoints();
+        secured.MapWooCommerceEndpoints();
+
+        api.MapWooCommerceWebhookEndpoint();
 
         var admin = api.MapGroup(string.Empty).RequireAuthorization("AdminOnly");
         admin.MapPricingEndpoints();
