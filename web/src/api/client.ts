@@ -6,7 +6,7 @@ import {
   type AuthSessionData,
 } from '../auth/sessionStore'
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 let refreshPromise: Promise<boolean> | null = null
 
 async function parseError(res: Response): Promise<string> {
