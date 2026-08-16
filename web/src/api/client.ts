@@ -52,13 +52,14 @@ async function refreshAccessToken(): Promise<boolean> {
 async function request<T>(method: string, path: string, body?: unknown, allowRefresh = true): Promise<T> {
   const session = readSession()
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   })
 
   if (res.status === 401 && allowRefresh && path !== '/api/auth/login' && path !== '/api/auth/refresh') {
@@ -89,4 +90,23 @@ export function apiPost<T>(path: string, body?: unknown): Promise<T> {
 
 export function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return apiSend<T>('PUT', path, body)
+}
+
+export function apiDelete<T>(path: string, body?: unknown): Promise<T> {
+  return apiSend<T>('DELETE', path, body)
+}
+
+export function resolveApiUrl(path?: string | null): string {
+  if (!path) return ''
+  if (
+    path.startsWith('http://') ||
+    path.startsWith('https://') ||
+    path.startsWith('blob:') ||
+    path.startsWith('data:')
+  ) {
+    return path
+  }
+  const base = (API_BASE ?? '').replace(/\/+$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${base}${normalizedPath}`
 }
