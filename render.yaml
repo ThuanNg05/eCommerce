@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: warehouse-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Authentication__RequireSigningKey
+        value: "true"
+      - key: Authentication__SigningKey
+        sync: false
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: SupabaseStorage__Url
+        sync: false
+      - key: SupabaseStorage__ServiceRoleKey
+        sync: false
+      - key: SupabaseStorage__Bucket
+        value: product-images
+      - key: WooCommerce__BaseUrl
+        sync: false
+      - key: WooCommerce__ConsumerKey
+        sync: false
+      - key: WooCommerce__ConsumerSecret
+        sync: false
+      - key: WooCommerce__WebhookSecret
+        sync: false
+      - key: Cors__AdditionalAllowedOrigins
+        sync: false

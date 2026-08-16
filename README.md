@@ -220,9 +220,57 @@ Desktop yêu cầu `ConnectionStrings__Default` và
 | `SmtpPasswordEncryption:Key` | Khi dùng SMTP | Mã hóa/giải mã SMTP app password | User Secrets hoặc managed secret store |
 | `Authentication:SigningKey` | Production | Ký JWT giữa các lần chạy/instance | Managed secret store |
 | `DatabaseReadiness:RequiredSchemaVersion` | Có | Kiểm tra database đúng schema | `appsettings.json`, không chứa secret |
+| `Cors:AdditionalAllowedOrigins` | Khi deploy web tách API | Các origin frontend được phép, ngăn cách bởi dấu phẩy | Environment variable backend |
 
 Trong environment variable, thay dấu `:` bằng `__`, ví dụ
 `Authentication__SigningKey`.
+
+## Deploy Vercel + Render
+
+Triển khai tách frontend và API không cần domain riêng:
+
+```text
+Vercel (React)  -> https://<vercel-project>.vercel.app
+                         |
+                         v
+Render (.NET API) -> https://<render-service>.onrender.com
+                         |
+                         +-> Supabase / WooCommerce
+```
+
+Backend có [`Dockerfile`](Dockerfile) và [`render.yaml`](render.yaml) để tạo
+Render Web Service. Import repository vào Render bằng Blueprint, sau đó điền các
+biến có `sync: false` trong Dashboard. Không commit giá trị secret.
+
+Các biến bắt buộc ở Render:
+
+```text
+Authentication__SigningKey=<chuoi-ngau-nhien-it-nhat-32-bytes>
+ConnectionStrings__Default=<Supabase-Postgres-connection-string>
+SupabaseStorage__Url=https://<project-ref>.supabase.co
+SupabaseStorage__ServiceRoleKey=<Supabase-server-secret>
+WooCommerce__BaseUrl=https://tranhkienghoathuan.com
+WooCommerce__ConsumerKey=<consumer-key>
+WooCommerce__ConsumerSecret=<consumer-secret>
+WooCommerce__WebhookSecret=<secret-rieng-cho-webhook>
+Cors__AdditionalAllowedOrigins=https://<vercel-project>.vercel.app
+```
+
+Render tự đặt biến `PORT`; Docker entrypoint đã bind Kestrel vào
+`http://0.0.0.0:$PORT`. Đặt health check là `/health/live`. Sau khi deploy API,
+đặt WooCommerce webhook delivery URL thành:
+
+```text
+https://<render-service>.onrender.com/api/webhooks/woocommerce
+```
+
+Antigravity triển khai Vercel chỉ trong `web/**`: đặt biến build-time
+`VITE_API_BASE=https://<render-service>.onrender.com`, build `npm run build`,
+output `dist`. Giá trị `VITE_*` là public; không đưa bất cứ secret nào vào đó.
+
+Render Free có thể sleep sau 15 phút không có request, vì vậy chỉ phù hợp demo
+hoặc MVP; webhook đầu tiên sau khi sleep có thể chậm và cần kiểm tra delivery log
+trên WooCommerce.
 
 Nếu không cấu hình JWT signing key trên Windows, ứng dụng tạo một key 256-bit tại
 `%LOCALAPPDATA%/WarehouseApp/security/jwt-signing-key.bin` và bảo vệ bằng DPAPI.
