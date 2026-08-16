@@ -44,6 +44,26 @@ public class ProductImageStorageTests
         }
     }
 
+    [Fact]
+    public void EnsureUploadDirectory_CreatesStaticFileRootBeforeAnyUpload()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "WarehouseApp-tests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var environment = new TestWebHostEnvironment { ContentRootPath = root };
+
+            var directory = ProductImageStorage.EnsureUploadDirectory(environment);
+
+            Assert.True(Directory.Exists(directory));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private sealed class TestWebHostEnvironment : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = "WarehouseApp.Tests";

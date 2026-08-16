@@ -152,7 +152,7 @@ public static class ApiBootstrap
         app.UseStatusCodePages();
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(ProductImageStorage.GetUploadDirectory(app.Environment)),
+            FileProvider = new PhysicalFileProvider(ProductImageStorage.EnsureUploadDirectory(app.Environment)),
             RequestPath = ProductImageStorage.PublicPathPrefix,
             OnPrepareResponse = context =>
                 context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
