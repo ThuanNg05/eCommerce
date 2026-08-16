@@ -55,6 +55,9 @@ public static class InventoryEndpoints
                 throw;
             }
         })
+        // This API authenticates with an Authorization: Bearer header, not cookies.
+        // A multipart IFormFile endpoint otherwise gets anti-forgery metadata by default.
+        .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data")
         .Produces<ProductDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
