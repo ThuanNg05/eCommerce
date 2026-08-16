@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
 using WarehouseApp.Api.Endpoints;
 using WarehouseApp.Api.Security;
 using WarehouseApp.Api.Services;
@@ -36,7 +35,8 @@ public static class ApiBootstrap
         services.Configure<DatabaseReadinessOptions>(config.GetSection(DatabaseReadinessOptions.SectionName));
         services.AddInfrastructure(config);
         services.AddScoped<DatabaseReadinessChecker>();
-        services.AddSingleton<ProductImageStorage>();
+        services.Configure<SupabaseStorageOptions>(config.GetSection(SupabaseStorageOptions.SectionName));
+        services.AddHttpClient<ProductImageStorage>();
 
         var authSettings = config.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
         if (authSettings.AccessTokenMinutes is < 1 or > 60)
@@ -150,13 +150,6 @@ public static class ApiBootstrap
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new PhysicalFileProvider(ProductImageStorage.EnsureUploadDirectory(app.Environment)),
-            RequestPath = ProductImageStorage.PublicPathPrefix,
-            OnPrepareResponse = context =>
-                context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
-        });
         app.UseCors(CorsPolicy);
         app.UseRateLimiter();
         app.UseAuthentication();

@@ -1,12 +1,22 @@
+using System.Net.Http.Headers;
 using ImageMagick;
+using Microsoft.Extensions.Options;
 using WarehouseApp.Core;
 
 namespace WarehouseApp.Api.Services;
 
-/// <summary>Validates and converts product image uploads to application-managed WebP files.</summary>
-public sealed class ProductImageStorage(IWebHostEnvironment environment)
+public sealed class SupabaseStorageOptions
 {
-    public const string PublicPathPrefix = "/uploads/products";
+    public const string SectionName = "SupabaseStorage";
+
+    public string Url { get; set; } = string.Empty;
+    public string ServiceRoleKey { get; set; } = string.Empty;
+    public string Bucket { get; set; } = "product-images";
+}
+
+/// <summary>Converts product uploads to WebP and persists them in Supabase Storage.</summary>
+public sealed class ProductImageStorage(HttpClient httpClient, IOptions<SupabaseStorageOptions> options)
+{
     private const long MaxUploadBytes = 5 * 1024 * 1024;
     private const ulong MaxPixels = 20_000_000;
     private const uint MaxDimension = 2048;
@@ -22,26 +32,16 @@ public sealed class ProductImageStorage(IWebHostEnvironment environment)
         MagickFormat.Svg,
     ];
 
-    private readonly string _uploadDirectory = GetUploadDirectory(environment);
-
-    public static string GetUploadDirectory(IWebHostEnvironment environment) =>
-        Path.Combine(environment.ContentRootPath, "uploads", "products");
-
-    /// <summary>Ensures the static-file provider's root exists before API startup.</summary>
-    public static string EnsureUploadDirectory(IWebHostEnvironment environment)
+    public async Task<string> SaveAsWebpAsync(long productId, IFormFile file, CancellationToken ct)
     {
-        var directory = GetUploadDirectory(environment);
-        Directory.CreateDirectory(directory);
-        return directory;
-    }
-
-    public async Task<string> SaveAsWebpAsync(IFormFile file, CancellationToken ct)
-    {
+        if (productId <= 0)
+            throw new DomainValidationException("Mã sản phẩm không hợp lệ.");
         if (file is null || file.Length == 0)
             throw new DomainValidationException("Vui lòng chọn một file ảnh.");
         if (file.Length > MaxUploadBytes)
             throw new DomainValidationException("Ảnh không được vượt quá 5 MB.");
 
+        byte[] webp;
         try
         {
             await using var input = file.OpenReadStream();
@@ -58,13 +58,9 @@ public sealed class ProductImageStorage(IWebHostEnvironment environment)
             image.Resize(new MagickGeometry(MaxDimension, MaxDimension) { Greater = true });
             image.Format = MagickFormat.WebP;
             image.Quality = 82;
-
-            Directory.CreateDirectory(_uploadDirectory);
-            var fileName = $"{Guid.NewGuid():N}.webp";
-            var outputPath = Path.Combine(_uploadDirectory, fileName);
-            image.Write(outputPath);
-
-            return $"{PublicPathPrefix}/{fileName}";
+            await using var output = new MemoryStream();
+            image.Write(output);
+            webp = output.ToArray();
         }
         catch (DomainValidationException)
         {
@@ -74,32 +70,71 @@ public sealed class ProductImageStorage(IWebHostEnvironment environment)
         {
             throw new DomainValidationException("File tải lên không phải ảnh hợp lệ hoặc không thể chuyển đổi sang WebP.");
         }
+
+        var config = GetConfiguration();
+        var objectPath = $"products/{productId}/{Guid.NewGuid():N}.webp";
+        using var request = CreateRequest(HttpMethod.Post, config, $"storage/v1/object/{config.Bucket}/{objectPath}");
+        request.Headers.TryAddWithoutValidation("x-upsert", "false");
+        request.Headers.CacheControl = new CacheControlHeaderValue { Public = true, MaxAge = TimeSpan.FromDays(365) };
+        request.Content = new ByteArrayContent(webp);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("image/webp");
+
+        using var response = await httpClient.SendAsync(request, ct);
+        EnsureSuccess(response, "tải ảnh lên Supabase Storage");
+        return BuildPublicUrl(config, objectPath);
     }
 
-    public Task DeleteAsync(string? imageUrl)
+    public async Task DeleteAsync(string? imageUrl, CancellationToken ct)
     {
-        if (!TryGetManagedFileName(imageUrl, out var fileName))
-            return Task.CompletedTask;
+        var config = GetConfiguration();
+        if (!TryGetManagedObjectPath(config, imageUrl, out var objectPath))
+            return;
 
-        var path = Path.Combine(_uploadDirectory, fileName);
-        if (File.Exists(path))
-            File.Delete(path);
-
-        return Task.CompletedTask;
+        using var request = CreateRequest(HttpMethod.Delete, config, $"storage/v1/object/{config.Bucket}/{objectPath}");
+        using var response = await httpClient.SendAsync(request, ct);
+        EnsureSuccess(response, "xóa ảnh trên Supabase Storage");
     }
 
-    private static bool TryGetManagedFileName(string? imageUrl, out string fileName)
+    private static void EnsureSuccess(HttpResponseMessage response, string action)
     {
-        fileName = string.Empty;
-        if (string.IsNullOrWhiteSpace(imageUrl) || !imageUrl.StartsWith($"{PublicPathPrefix}/", StringComparison.Ordinal))
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Không thể {action} (HTTP {(int)response.StatusCode}).");
+    }
+
+    private static HttpRequestMessage CreateRequest(HttpMethod method, SupabaseStorageOptions config, string path)
+    {
+        var request = new HttpRequestMessage(method, new Uri(new Uri(config.Url.TrimEnd('/') + "/"), path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ServiceRoleKey);
+        request.Headers.Add("apikey", config.ServiceRoleKey);
+        return request;
+    }
+
+    private SupabaseStorageOptions GetConfiguration()
+    {
+        var config = options.Value;
+        if (!Uri.TryCreate(config.Url, UriKind.Absolute, out _) || string.IsNullOrWhiteSpace(config.ServiceRoleKey))
+            throw new InvalidOperationException("SupabaseStorage chưa được cấu hình trên máy chủ.");
+        if (string.IsNullOrWhiteSpace(config.Bucket))
+            throw new InvalidOperationException("SupabaseStorage:Bucket chưa được cấu hình.");
+        return config;
+    }
+
+    private static string BuildPublicUrl(SupabaseStorageOptions config, string objectPath) =>
+        $"{config.Url.TrimEnd('/')}/storage/v1/object/public/{config.Bucket}/{objectPath}";
+
+    private static bool TryGetManagedObjectPath(SupabaseStorageOptions config, string? imageUrl, out string objectPath)
+    {
+        objectPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(imageUrl)) return false;
+
+        var publicPrefix = $"{config.Url.TrimEnd('/')}/storage/v1/object/public/{config.Bucket}/";
+        if (!imageUrl.StartsWith(publicPrefix, StringComparison.Ordinal)) return false;
+
+        var candidate = imageUrl[publicPrefix.Length..];
+        if (!candidate.StartsWith("products/", StringComparison.Ordinal) || candidate.Contains("..", StringComparison.Ordinal))
             return false;
 
-        var candidate = imageUrl[($"{PublicPathPrefix}/").Length..];
-        if (!candidate.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
-            candidate.Contains('/') || candidate.Contains('\\') || Path.GetFileName(candidate) != candidate)
-            return false;
-
-        fileName = candidate;
+        objectPath = candidate;
         return true;
     }
 }
