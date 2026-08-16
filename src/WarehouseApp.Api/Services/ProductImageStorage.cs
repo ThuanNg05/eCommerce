@@ -27,6 +27,14 @@ public sealed class ProductImageStorage(IWebHostEnvironment environment)
     public static string GetUploadDirectory(IWebHostEnvironment environment) =>
         Path.Combine(environment.ContentRootPath, "uploads", "products");
 
+    /// <summary>Ensures the static-file provider's root exists before API startup.</summary>
+    public static string EnsureUploadDirectory(IWebHostEnvironment environment)
+    {
+        var directory = GetUploadDirectory(environment);
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
     public async Task<string> SaveAsWebpAsync(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
