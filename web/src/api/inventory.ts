@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './client'
+import { apiGet, apiPost, apiPut, apiDelete } from './client'
 
 export interface CategoryCategoryDto {
   id: number
@@ -32,7 +32,6 @@ export interface CreateProductRequest {
   subBackboardId?: number | null
   inStock: number
   warningStock: number
-  imageUrl?: string | null
   categoryIds?: number[]
 }
 
@@ -45,7 +44,6 @@ export interface UpdateProductRequest {
   subBackboardId?: number | null
   warningStock: number
   status: number
-  imageUrl?: string | null
   categoryIds?: number[]
 }
 
@@ -77,6 +75,16 @@ export function createProduct(req: CreateProductRequest): Promise<ProductDto> {
 
 export function updateProduct(id: number, req: UpdateProductRequest): Promise<ProductDto> {
   return apiPut<ProductDto>(`/api/inventory/${id}`, req)
+}
+
+export function uploadProductImage(id: number, file: File): Promise<ProductDto> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiPost<ProductDto>(`/api/inventory/${id}/image`, formData)
+}
+
+export function deleteProductImage(id: number): Promise<ProductDto> {
+  return apiDelete<ProductDto>(`/api/inventory/${id}/image`)
 }
 
 export function adjustStock(id: number, req: StockAdjustmentRequest): Promise<ProductDto> {

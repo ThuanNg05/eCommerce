@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, ValueFormatterParams } from 'ag-grid-community'
@@ -37,11 +37,14 @@ import {
   createProduct,
   updateProduct,
   adjustStock,
+  uploadProductImage,
+  deleteProductImage,
   type ProductDto,
   type CreateProductRequest,
   type UpdateProductRequest,
 } from '../api/inventory'
 import { fetchCategories, type CategoryDto } from '../api/categories'
+import { resolveApiUrl } from '../api/client'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 
 const formatVND = (value?: number | null) => {
@@ -105,13 +108,22 @@ export default function ProductsPage() {
 
   // Image states for Create Dialog
   const [createImageFile, setCreateImageFile] = useState<File | null>(null)
-  const [createImagePreview, setCreateImagePreview] = useState<string | null>(null)
+  const [createPreviewUrl, setCreatePreviewUrl] = useState<string | null>(null)
   const [createImageError, setCreateImageError] = useState<string | null>(null)
 
   // Image states for Edit Dialog
   const [editImageFile, setEditImageFile] = useState<File | null>(null)
-  const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
+  const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null)
+  const [hasRemovedEditImage, setHasRemovedEditImage] = useState(false)
   const [editImageError, setEditImageError] = useState<string | null>(null)
+
+  // Submitting States
+  const [isSavingCreate, setIsSavingCreate] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [pageNotification, setPageNotification] = useState<{
+    type: 'success' | 'warning' | 'error'
+    message: string
+  } | null>(null)
 
   // Form States
   const [createForm, setCreateForm] = useState<CreateProductRequest>({
@@ -125,7 +137,6 @@ export default function ProductsPage() {
     inStock: 0,
     warningStock: 0,
     categoryIds: [],
-    imageUrl: null,
   })
 
   const [editForm, setEditForm] = useState<UpdateProductRequest>({
@@ -138,7 +149,6 @@ export default function ProductsPage() {
     warningStock: 0,
     status: 1,
     categoryIds: [],
-    imageUrl: null,
   })
 
   const [adjustForm, setAdjustForm] = useState({
@@ -147,6 +157,14 @@ export default function ProductsPage() {
   })
 
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Clean up object URLs when unmounting
+  useEffect(() => {
+    return () => {
+      if (createPreviewUrl) URL.revokeObjectURL(createPreviewUrl)
+      if (editPreviewUrl) URL.revokeObjectURL(editPreviewUrl)
+    }
+  }, [createPreviewUrl, editPreviewUrl])
 
   // Query Data
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -161,26 +179,7 @@ export default function ProductsPage() {
   })
   const allCategories = categoriesData?.items ?? []
 
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: createProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] })
-      setIsCreateOpen(false)
-      resetCreateForm()
-    },
-    onError: (err: Error) => setActionError(err.message),
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, req }: { id: number; req: UpdateProductRequest }) => updateProduct(id, req),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] })
-      setEditProduct(null)
-    },
-    onError: (err: Error) => setActionError(err.message),
-  })
-
+  // Adjust Mutation
   const adjustMutation = useMutation({
     mutationFn: ({ id, delta, reason }: { id: number; delta: number; reason: string }) =>
       adjustStock(id, { delta, reason }),
@@ -203,10 +202,12 @@ export default function ProductsPage() {
       inStock: 0,
       warningStock: 0,
       categoryIds: [],
-      imageUrl: null,
     })
+    if (createPreviewUrl) {
+      URL.revokeObjectURL(createPreviewUrl)
+    }
     setCreateImageFile(null)
-    setCreateImagePreview(null)
+    setCreatePreviewUrl(null)
     setCreateImageError(null)
     if (createFileInputRef.current) {
       createFileInputRef.current.value = ''
@@ -226,10 +227,13 @@ export default function ProductsPage() {
       warningStock: p.warningStock || 0,
       status: p.status,
       categoryIds: p.categories ? p.categories.map((c) => c.id) : [],
-      imageUrl: p.imageUrl || null,
     })
+    if (editPreviewUrl) {
+      URL.revokeObjectURL(editPreviewUrl)
+    }
     setEditImageFile(null)
-    setEditImagePreview(p.imageUrl || null)
+    setEditPreviewUrl(null)
+    setHasRemovedEditImage(false)
     setEditImageError(null)
     if (editFileInputRef.current) {
       editFileInputRef.current.value = ''
@@ -258,17 +262,20 @@ export default function ProductsPage() {
     }
 
     setCreateImageError(null)
+    if (createPreviewUrl) {
+      URL.revokeObjectURL(createPreviewUrl)
+    }
     setCreateImageFile(file)
-    const previewUrl = URL.createObjectURL(file)
-    setCreateImagePreview(previewUrl)
-    setCreateForm((prev) => ({ ...prev, imageUrl: previewUrl }))
+    setCreatePreviewUrl(URL.createObjectURL(file))
   }
 
   const handleRemoveCreateImage = () => {
+    if (createPreviewUrl) {
+      URL.revokeObjectURL(createPreviewUrl)
+    }
     setCreateImageFile(null)
-    setCreateImagePreview(null)
+    setCreatePreviewUrl(null)
     setCreateImageError(null)
-    setCreateForm((prev) => ({ ...prev, imageUrl: null }))
     if (createFileInputRef.current) {
       createFileInputRef.current.value = ''
     }
@@ -289,21 +296,118 @@ export default function ProductsPage() {
     }
 
     setEditImageError(null)
+    if (editPreviewUrl) {
+      URL.revokeObjectURL(editPreviewUrl)
+    }
     setEditImageFile(file)
-    const previewUrl = URL.createObjectURL(file)
-    setEditImagePreview(previewUrl)
-    setEditForm((prev) => ({ ...prev, imageUrl: previewUrl }))
+    setEditPreviewUrl(URL.createObjectURL(file))
+    setHasRemovedEditImage(false)
   }
 
   const handleRemoveEditImage = () => {
+    if (editPreviewUrl) {
+      URL.revokeObjectURL(editPreviewUrl)
+    }
     setEditImageFile(null)
-    setEditImagePreview(null)
+    setEditPreviewUrl(null)
+    setHasRemovedEditImage(true)
     setEditImageError(null)
-    setEditForm((prev) => ({ ...prev, imageUrl: null }))
     if (editFileInputRef.current) {
       editFileInputRef.current.value = ''
     }
   }
+
+  // Submission handler for Create Product
+  const handleCreateSubmit = async () => {
+    setActionError(null)
+    if (!createForm.sku.trim()) {
+      setActionError('Mã SKU là bắt buộc.')
+      return
+    }
+    if (!createForm.name.trim()) {
+      setActionError('Tên sản phẩm là bắt buộc.')
+      return
+    }
+
+    setIsSavingCreate(true)
+    try {
+      const createdProduct = await createProduct(createForm)
+
+      if (createImageFile) {
+        try {
+          await uploadProductImage(createdProduct.id, createImageFile)
+        } catch (imgErr) {
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          setIsCreateOpen(false)
+          resetCreateForm()
+          setPageNotification({
+            type: 'warning',
+            message: `Sản phẩm "${createdProduct.name}" (SKU: ${createdProduct.sku}) đã được tạo, nhưng tải ảnh lên thất bại: ${(imgErr as Error).message}. Bạn có thể chỉnh sửa sản phẩm để thử tải lại ảnh.`,
+          })
+          return
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setIsCreateOpen(false)
+      resetCreateForm()
+    } catch (err) {
+      setActionError((err as Error).message)
+    } finally {
+      setIsSavingCreate(false)
+    }
+  }
+
+  // Submission handler for Edit Product
+  const handleEditSubmit = async () => {
+    if (!editProduct) return
+    setActionError(null)
+    if (!editForm.name.trim()) {
+      setActionError('Tên sản phẩm là bắt buộc.')
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      await updateProduct(editProduct.id, editForm)
+
+      if (editImageFile) {
+        await uploadProductImage(editProduct.id, editImageFile)
+      } else if (hasRemovedEditImage && editProduct.imageUrl) {
+        await deleteProductImage(editProduct.id)
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      if (editPreviewUrl) {
+        URL.revokeObjectURL(editPreviewUrl)
+      }
+      setEditProduct(null)
+    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setActionError((err as Error).message)
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // Determine which image to show in Edit dialog
+  const editDisplayImage = useMemo(() => {
+    if (editPreviewUrl && editImageFile) {
+      return {
+        url: editPreviewUrl,
+        label: editImageFile.name,
+        subLabel: `${(editImageFile.size / 1024).toFixed(1)} KB (Chưa lưu)`,
+      }
+    }
+    if (!hasRemovedEditImage && editProduct?.imageUrl) {
+      return {
+        url: resolveApiUrl(editProduct.imageUrl),
+        label: 'Ảnh sản phẩm hiện tại',
+        subLabel: 'Đã lưu trên hệ thống',
+      }
+    }
+    return null
+  }, [editPreviewUrl, editImageFile, hasRemovedEditImage, editProduct])
 
   const columns = useMemo<ColDef[]>(
     () => [
@@ -314,8 +418,9 @@ export default function ProductsPage() {
         sortable: false,
         filter: false,
         cellRenderer: (p: { data?: ProductDto }) => {
-          const img = p.data?.imageUrl
-          if (!img) {
+          const rawUrl = p.data?.imageUrl
+          const resolvedUrl = rawUrl ? resolveApiUrl(rawUrl) : null
+          if (!resolvedUrl) {
             return (
               <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
                 <Typography variant="caption" sx={{ color: '#a3a3a3', fontSize: 12 }}>
@@ -333,7 +438,7 @@ export default function ProductsPage() {
                   onClick={() =>
                     setPreviewModal({
                       open: true,
-                      url: img,
+                      url: resolvedUrl,
                       title: p.data?.name || 'Ảnh sản phẩm',
                     })
                   }
@@ -360,7 +465,7 @@ export default function ProductsPage() {
                 >
                   <Box
                     component="img"
-                    src={img}
+                    src={resolvedUrl}
                     alt={p.data?.name || 'Ảnh sản phẩm'}
                     sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
@@ -507,6 +612,17 @@ export default function ProductsPage() {
 
   return (
     <Box sx={{ width: '100%' }}>
+      {/* Page notification alert */}
+      {pageNotification && (
+        <Alert
+          severity={pageNotification.type}
+          onClose={() => setPageNotification(null)}
+          sx={{ mb: 2, borderRadius: '6px' }}
+        >
+          {pageNotification.message}
+        </Alert>
+      )}
+
       {/* Action Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
         <Box>
@@ -609,7 +725,7 @@ export default function ProductsPage() {
       {/* CREATE PRODUCT DIALOG */}
       <Dialog
         open={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => !isSavingCreate && setIsCreateOpen(false)}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
@@ -632,6 +748,7 @@ export default function ProductsPage() {
                 value={createForm.sku}
                 onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
                 placeholder="vd: KHUNG-GO-3040"
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -644,6 +761,7 @@ export default function ProductsPage() {
                 value={createForm.name}
                 onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                 placeholder="vd: Khung Gỗ Tự Nhiên 30x40"
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -667,7 +785,7 @@ export default function ProductsPage() {
                 </Alert>
               )}
 
-              {createImagePreview ? (
+              {createPreviewUrl && createImageFile ? (
                 <Box
                   sx={{
                     display: 'flex',
@@ -692,8 +810,8 @@ export default function ProductsPage() {
                   >
                     <Box
                       component="img"
-                      src={createImagePreview}
-                      alt="Preview"
+                      src={createPreviewUrl}
+                      alt="Xem trước ảnh tải lên"
                       sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Box>
@@ -709,10 +827,10 @@ export default function ProductsPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {createImageFile ? createImageFile.name : 'Ảnh sản phẩm'}
+                      {createImageFile.name}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                      {createImageFile ? `${(createImageFile.size / 1024).toFixed(1)} KB` : ''}
+                      {(createImageFile.size / 1024).toFixed(1)} KB (Chưa lưu)
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                       <Button
@@ -720,6 +838,7 @@ export default function ProductsPage() {
                         size="small"
                         onClick={() => createFileInputRef.current?.click()}
                         startIcon={<Upload size={13} />}
+                        disabled={isSavingCreate}
                         sx={{
                           height: 28,
                           fontSize: 12,
@@ -736,7 +855,7 @@ export default function ProductsPage() {
                         onClick={() =>
                           setPreviewModal({
                             open: true,
-                            url: createImagePreview,
+                            url: createPreviewUrl,
                             title: createForm.name || 'Ảnh sản phẩm',
                           })
                         }
@@ -757,6 +876,7 @@ export default function ProductsPage() {
                         color="error"
                         onClick={handleRemoveCreateImage}
                         startIcon={<Trash2 size={13} />}
+                        disabled={isSavingCreate}
                         sx={{
                           height: 28,
                           fontSize: 12,
@@ -796,6 +916,7 @@ export default function ProductsPage() {
                     size="small"
                     onClick={() => createFileInputRef.current?.click()}
                     startIcon={<Upload size={14} />}
+                    disabled={isSavingCreate}
                     sx={{
                       mt: 1,
                       height: 30,
@@ -827,6 +948,7 @@ export default function ProductsPage() {
                     categoryIds: newValue.map((c) => c.id),
                   })
                 }}
+                disabled={isSavingCreate}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -859,6 +981,7 @@ export default function ProductsPage() {
                 type="number"
                 value={createForm.basePrice}
                 onChange={(e) => setCreateForm({ ...createForm, basePrice: Number(e.target.value) })}
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -871,6 +994,7 @@ export default function ProductsPage() {
                 type="number"
                 value={createForm.priceRetail || 0}
                 onChange={(e) => setCreateForm({ ...createForm, priceRetail: Number(e.target.value) })}
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -883,6 +1007,7 @@ export default function ProductsPage() {
                 type="number"
                 value={createForm.priceWholesale || 0}
                 onChange={(e) => setCreateForm({ ...createForm, priceWholesale: Number(e.target.value) })}
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -895,6 +1020,7 @@ export default function ProductsPage() {
                 type="number"
                 value={createForm.inStock}
                 onChange={(e) => setCreateForm({ ...createForm, inStock: Number(e.target.value) })}
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -909,6 +1035,7 @@ export default function ProductsPage() {
                 value={createForm.warningStock}
                 onChange={(e) => setCreateForm({ ...createForm, warningStock: Math.max(0, Number(e.target.value)) })}
                 placeholder="Mặc định: 0"
+                disabled={isSavingCreate}
               />
             </Grid>
 
@@ -923,21 +1050,22 @@ export default function ProductsPage() {
                 value={createForm.description || ''}
                 onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
                 placeholder="Ghi chú thêm về vật liệu, kích thước..."
+                disabled={isSavingCreate}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setIsCreateOpen(false)} variant="outlined" color="inherit">
+          <Button onClick={() => setIsCreateOpen(false)} variant="outlined" color="inherit" disabled={isSavingCreate}>
             Hủy
           </Button>
           <Button
-            onClick={() => createMutation.mutate(createForm)}
+            onClick={handleCreateSubmit}
             variant="contained"
-            disabled={createMutation.isPending}
+            disabled={isSavingCreate}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            {createMutation.isPending ? 'Đang lưu...' : 'Lưu'}
+            {isSavingCreate ? 'Đang lưu...' : 'Lưu'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -945,7 +1073,7 @@ export default function ProductsPage() {
       {/* EDIT PRODUCT DIALOG */}
       <Dialog
         open={Boolean(editProduct)}
-        onClose={() => setEditProduct(null)}
+        onClose={() => !isSavingEdit && setEditProduct(null)}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
@@ -969,6 +1097,7 @@ export default function ProductsPage() {
                 fullWidth
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                disabled={isSavingEdit}
               />
             </Grid>
 
@@ -992,7 +1121,7 @@ export default function ProductsPage() {
                 </Alert>
               )}
 
-              {editImagePreview ? (
+              {editDisplayImage ? (
                 <Box
                   sx={{
                     display: 'flex',
@@ -1017,8 +1146,8 @@ export default function ProductsPage() {
                   >
                     <Box
                       component="img"
-                      src={editImagePreview}
-                      alt="Preview"
+                      src={editDisplayImage.url}
+                      alt="Ảnh sản phẩm"
                       sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Box>
@@ -1034,12 +1163,10 @@ export default function ProductsPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {editImageFile ? editImageFile.name : 'Ảnh sản phẩm hiện tại'}
+                      {editDisplayImage.label}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                      {editImageFile
-                        ? `${(editImageFile.size / 1024).toFixed(1)} KB`
-                        : 'Đã lưu trên hệ thống'}
+                      {editDisplayImage.subLabel}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                       <Button
@@ -1047,6 +1174,7 @@ export default function ProductsPage() {
                         size="small"
                         onClick={() => editFileInputRef.current?.click()}
                         startIcon={<Upload size={13} />}
+                        disabled={isSavingEdit}
                         sx={{
                           height: 28,
                           fontSize: 12,
@@ -1063,7 +1191,7 @@ export default function ProductsPage() {
                         onClick={() =>
                           setPreviewModal({
                             open: true,
-                            url: editImagePreview,
+                            url: editDisplayImage.url,
                             title: editForm.name || 'Ảnh sản phẩm',
                           })
                         }
@@ -1084,6 +1212,7 @@ export default function ProductsPage() {
                         color="error"
                         onClick={handleRemoveEditImage}
                         startIcon={<Trash2 size={13} />}
+                        disabled={isSavingEdit}
                         sx={{
                           height: 28,
                           fontSize: 12,
@@ -1123,6 +1252,7 @@ export default function ProductsPage() {
                     size="small"
                     onClick={() => editFileInputRef.current?.click()}
                     startIcon={<Upload size={14} />}
+                    disabled={isSavingEdit}
                     sx={{
                       mt: 1,
                       height: 30,
@@ -1154,6 +1284,7 @@ export default function ProductsPage() {
                     categoryIds: newValue.map((c) => c.id),
                   })
                 }}
+                disabled={isSavingEdit}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1186,6 +1317,7 @@ export default function ProductsPage() {
                 type="number"
                 value={editForm.basePrice}
                 onChange={(e) => setEditForm({ ...editForm, basePrice: Number(e.target.value) })}
+                disabled={isSavingEdit}
               />
             </Grid>
 
@@ -1198,6 +1330,7 @@ export default function ProductsPage() {
                 type="number"
                 value={editForm.priceRetail || 0}
                 onChange={(e) => setEditForm({ ...editForm, priceRetail: Number(e.target.value) })}
+                disabled={isSavingEdit}
               />
             </Grid>
 
@@ -1210,6 +1343,7 @@ export default function ProductsPage() {
                 type="number"
                 value={editForm.priceWholesale || 0}
                 onChange={(e) => setEditForm({ ...editForm, priceWholesale: Number(e.target.value) })}
+                disabled={isSavingEdit}
               />
             </Grid>
 
@@ -1223,6 +1357,7 @@ export default function ProductsPage() {
                 inputProps={{ min: 0 }}
                 value={editForm.warningStock}
                 onChange={(e) => setEditForm({ ...editForm, warningStock: Math.max(0, Number(e.target.value)) })}
+                disabled={isSavingEdit}
               />
             </Grid>
 
@@ -1235,6 +1370,7 @@ export default function ProductsPage() {
                 fullWidth
                 value={editForm.status}
                 onChange={(e) => setEditForm({ ...editForm, status: Number(e.target.value) })}
+                disabled={isSavingEdit}
               >
                 <MenuItem value={1}>Hoạt động</MenuItem>
                 <MenuItem value={0}>Ngưng kinh doanh</MenuItem>
@@ -1251,21 +1387,22 @@ export default function ProductsPage() {
                 rows={2}
                 value={editForm.description || ''}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                disabled={isSavingEdit}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setEditProduct(null)} variant="outlined" color="inherit">
+          <Button onClick={() => setEditProduct(null)} variant="outlined" color="inherit" disabled={isSavingEdit}>
             Hủy
           </Button>
           <Button
-            onClick={() => editProduct && updateMutation.mutate({ id: editProduct.id, req: editForm })}
+            onClick={handleEditSubmit}
             variant="contained"
-            disabled={updateMutation.isPending}
+            disabled={isSavingEdit}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            {updateMutation.isPending ? 'Đang lưu...' : 'Cập nhật'}
+            {isSavingEdit ? 'Đang lưu...' : 'Cập nhật'}
           </Button>
         </DialogActions>
       </Dialog>
