@@ -238,6 +238,8 @@ không đặt Consumer Key/Secret vào React. Sau khi cấu hình secret, tạo 
 `https://<api-host>/api/webhooks/woocommerce`; nhập cùng secret ở hai bên.
 Đơn chỉ có thể xác nhận xuất kho khi WooCommerce ở `processing` hoặc `completed`,
 mọi dòng đã liên kết sản phẩm kho và tồn hiện tại đủ số lượng.
+Catalog kho là nguồn chính: quản trị viên liên kết từng sản phẩm, rồi gọi đồng bộ
+để đẩy tên, giá bán lẻ, tồn kho và URL ảnh WebP (nếu có) lên WooCommerce.
 
 ## API và phân quyền
 
@@ -250,7 +252,7 @@ mọi dòng đã liên kết sản phẩm kho và tồn hiện tại đủ số 
 | `/api/categories`, `/api/materials`, `/api/backboards`, `/api/sub-backboards`, `/api/frames` | Đã đăng nhập và đã đổi mật khẩu | Dữ liệu danh mục và nguyên vật liệu |
 | `/api/inventory-transactions` | Đã đăng nhập và đã đổi mật khẩu | Giao dịch kho và chuyển đổi |
 | `/api/woocommerce/orders` | Đã đăng nhập và đã đổi mật khẩu | Đơn WooCommerce, kiểm tra tồn và xác nhận thủ công |
-| `/api/woocommerce/orders/sync`, `/api/woocommerce/products/*/link` | Admin | Đồng bộ và liên kết catalog WooCommerce |
+| `/api/woocommerce/orders/sync`, `/api/woocommerce/products/*/link`, `/api/woocommerce/products/sync` | Admin | Đồng bộ đơn và đẩy catalog kho sang WooCommerce |
 | `/api/webhooks/woocommerce` | Public, xác minh chữ ký | Nhận webhook từ WooCommerce |
 | `/api/accounts`, `/api/audit`, `/api/pricing`, `/api/reports`, `/api/settings` | Admin | Quản trị, báo cáo và cấu hình |
 
