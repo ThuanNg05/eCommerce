@@ -36,22 +36,22 @@ public static class InventoryEndpoints
             if (current is null)
                 return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
 
-            var imageUrl = await storage.SaveAsWebpAsync(file, ct);
+            var imageUrl = await storage.SaveAsWebpAsync(id, file, ct);
             try
             {
                 var updated = await svc.SetImageUrlAsync(id, imageUrl, ct);
                 if (updated is null)
                 {
-                    await storage.DeleteAsync(imageUrl);
+                    await storage.DeleteAsync(imageUrl, ct);
                     return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
                 }
 
-                await storage.DeleteAsync(current.ImageUrl);
+                await storage.DeleteAsync(current.ImageUrl, ct);
                 return Results.Ok(updated);
             }
             catch
             {
-                await storage.DeleteAsync(imageUrl);
+                await storage.DeleteAsync(imageUrl, ct);
                 throw;
             }
         })
@@ -74,7 +74,7 @@ public static class InventoryEndpoints
                 return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
 
             var updated = await svc.SetImageUrlAsync(id, null, ct);
-            await storage.DeleteAsync(current.ImageUrl);
+            await storage.DeleteAsync(current.ImageUrl, ct);
             return Results.Ok(updated);
         })
         .Produces<ProductDto>(StatusCodes.Status200OK)

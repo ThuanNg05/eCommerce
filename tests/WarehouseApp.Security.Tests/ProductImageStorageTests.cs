@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Hosting;
+using System.Net;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 using WarehouseApp.Api.Services;
 using Xunit;
 
@@ -9,68 +9,66 @@ namespace WarehouseApp.Security.Tests;
 public class ProductImageStorageTests
 {
     [Fact]
-    public async Task SaveAsWebpAsync_ValidPng_ConvertsToManagedWebp()
+    public async Task SaveAsWebpAsync_ValidPng_UploadsWebpToProductImagesBucket()
     {
-        var root = Path.Combine(Path.GetTempPath(), "WarehouseApp-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-
-        try
+        var handler = new RecordingHandler(HttpStatusCode.OK);
+        var storage = CreateStorage(handler);
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        await using var stream = new MemoryStream(png);
+        var file = new FormFile(stream, 0, png.Length, "file", "sample.png")
         {
-            var environment = new TestWebHostEnvironment { ContentRootPath = root };
-            var storage = new ProductImageStorage(environment);
-            var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
-            await using var stream = new MemoryStream(png);
-            var file = new FormFile(stream, 0, png.Length, "file", "sample.png")
-            {
-                Headers = new HeaderDictionary(),
-                ContentType = "image/png",
-            };
+            Headers = new HeaderDictionary(),
+            ContentType = "image/png",
+        };
 
-            var imageUrl = await storage.SaveAsWebpAsync(file, CancellationToken.None);
+        var imageUrl = await storage.SaveAsWebpAsync(42, file, CancellationToken.None);
 
-            Assert.StartsWith("/uploads/products/", imageUrl, StringComparison.Ordinal);
-            Assert.EndsWith(".webp", imageUrl, StringComparison.OrdinalIgnoreCase);
-
-            var fileName = Path.GetFileName(imageUrl);
-            var savedPath = Path.Combine(ProductImageStorage.GetUploadDirectory(environment), fileName);
-            Assert.True(File.Exists(savedPath));
-            Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(await File.ReadAllBytesAsync(savedPath), 0, 4));
-            Assert.Equal("WEBP", System.Text.Encoding.ASCII.GetString(await File.ReadAllBytesAsync(savedPath), 8, 4));
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
-        }
+        Assert.StartsWith("https://example.supabase.co/storage/v1/object/public/product-images/products/42/", imageUrl, StringComparison.Ordinal);
+        Assert.EndsWith(".webp", imageUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("image/webp", handler.ContentType);
+        Assert.Equal("Bearer server-secret", handler.Authorization);
+        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(handler.Payload, 0, 4));
     }
 
     [Fact]
-    public void EnsureUploadDirectory_CreatesStaticFileRootBeforeAnyUpload()
+    public async Task DeleteAsync_ManagedPublicUrl_DeletesStorageObject()
     {
-        var root = Path.Combine(Path.GetTempPath(), "WarehouseApp-tests", Guid.NewGuid().ToString("N"));
+        var handler = new RecordingHandler(HttpStatusCode.OK);
+        var storage = CreateStorage(handler);
 
-        try
-        {
-            var environment = new TestWebHostEnvironment { ContentRootPath = root };
+        await storage.DeleteAsync(
+            "https://example.supabase.co/storage/v1/object/public/product-images/products/42/image.webp",
+            CancellationToken.None);
 
-            var directory = ProductImageStorage.EnsureUploadDirectory(environment);
-
-            Assert.True(Directory.Exists(directory));
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
-        }
+        Assert.Equal(HttpMethod.Delete, handler.Method);
+        Assert.Equal("https://example.supabase.co/storage/v1/object/product-images/products/42/image.webp", handler.Uri);
     }
 
-    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    private static ProductImageStorage CreateStorage(RecordingHandler handler) =>
+        new(new HttpClient(handler), Options.Create(new SupabaseStorageOptions
+        {
+            Url = "https://example.supabase.co",
+            ServiceRoleKey = "server-secret",
+            Bucket = "product-images",
+        }));
+
+    private sealed class RecordingHandler(HttpStatusCode statusCode) : HttpMessageHandler
     {
-        public string ApplicationName { get; set; } = "WarehouseApp.Tests";
-        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
-        public string WebRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = "Testing";
-        public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        public HttpMethod? Method { get; private set; }
+        public string? Uri { get; private set; }
+        public string? ContentType { get; private set; }
+        public string? Authorization { get; private set; }
+        public byte[] Payload { get; private set; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Method = request.Method;
+            Uri = request.RequestUri?.ToString();
+            ContentType = request.Content?.Headers.ContentType?.MediaType;
+            Authorization = request.Headers.Authorization?.ToString();
+            Payload = request.Content is null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+            return new HttpResponseMessage(statusCode);
+        }
     }
 }
