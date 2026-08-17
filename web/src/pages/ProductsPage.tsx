@@ -33,6 +33,8 @@ import {
   X,
   Store,
   Link2,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import {
@@ -47,10 +49,16 @@ import {
   type UpdateProductRequest,
 } from '../api/inventory'
 import { fetchCategories, type CategoryDto } from '../api/categories'
-import { linkWooCommerceProduct, syncWooCommerceCatalog } from '../api/woocommerce'
+import {
+  publishAndLinkWarehouseProduct,
+  syncWooCommerceCatalog,
+  fetchProductLink,
+  unlinkProduct,
+} from '../api/woocommerce'
 import { useAuth } from '../auth/AuthContext'
 import { resolveApiUrl } from '../api/client'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -87,6 +95,21 @@ function validateImageFile(file: File): string | null {
   return null
 }
 
+function validateProductDimensions(width?: number | null, height?: number | null): string | null {
+  const isWidthSet = width != null && !isNaN(width)
+  const isHeightSet = height != null && !isNaN(height)
+
+  if (isWidthSet !== isHeightSet) {
+    return 'Phải nhập cả chiều rộng và chiều cao, hoặc để trống cả hai.'
+  }
+  if (isWidthSet && isHeightSet) {
+    if (width <= 0 || height <= 0) {
+      return 'Chiều rộng và chiều cao phải lớn hơn 0 (đơn vị: cm).'
+    }
+  }
+  return null
+}
+
 export default function ProductsPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -98,12 +121,10 @@ export default function ProductsPage() {
   const [editProduct, setEditProduct] = useState<ProductDto | null>(null)
   const [adjustProductTarget, setAdjustProductTarget] = useState<ProductDto | null>(null)
   const [linkProductTarget, setLinkProductTarget] = useState<ProductDto | null>(null)
-  const [linkForm, setLinkForm] = useState({
-    wooCommerceProductId: '',
-    wooCommerceVariationId: '',
-  })
   const [linkError, setLinkError] = useState<string | null>(null)
   const [isSavingLink, setIsSavingLink] = useState(false)
+  const [isUploadingLinkImage, setIsUploadingLinkImage] = useState(false)
+  const [isConfirmUnlinkOpen, setIsConfirmUnlinkOpen] = useState(false)
 
   // Image Preview Modal State (Xem ảnh phóng to)
   const [previewModal, setPreviewModal] = useState<{
@@ -119,6 +140,7 @@ export default function ProductsPage() {
   // File Input Refs
   const createFileInputRef = useRef<HTMLInputElement | null>(null)
   const editFileInputRef = useRef<HTMLInputElement | null>(null)
+  const linkFileInputRef = useRef<HTMLInputElement | null>(null)
 
   // Image states for Create Dialog
   const [createImageFile, setCreateImageFile] = useState<File | null>(null)
@@ -148,8 +170,10 @@ export default function ProductsPage() {
     priceRetail: 0,
     priceWholesale: 0,
     subBackboardId: null,
+    width: null,
+    height: null,
     inStock: 0,
-    warningStock: 0,
+    warningStock: 10,
     categoryIds: [],
   })
 
@@ -160,7 +184,9 @@ export default function ProductsPage() {
     priceRetail: 0,
     priceWholesale: 0,
     subBackboardId: null,
-    warningStock: 0,
+    width: null,
+    height: null,
+    warningStock: 10,
     status: 1,
     categoryIds: [],
   })
@@ -221,45 +247,98 @@ export default function ProductsPage() {
     },
   })
 
+  // Product Link Query (GET /api/woocommerce/products/{productId}/link)
+  const { data: productLinkData, isLoading: isProductLinkLoading } = useQuery({
+    queryKey: ['product-link', linkProductTarget?.id],
+    queryFn: () => (linkProductTarget ? fetchProductLink(linkProductTarget.id) : null),
+    enabled: Boolean(linkProductTarget),
+    retry: false,
+  })
+
+  // Product Unlink Mutation (DELETE /api/woocommerce/products/{productId}/link)
+  const unlinkMutation = useMutation({
+    mutationFn: (productId: number) => unlinkProduct(productId),
+    onSuccess: () => {
+      const targetSku = linkProductTarget?.sku ?? ''
+      const targetName = linkProductTarget?.name ?? ''
+      queryClient.invalidateQueries({ queryKey: ['product-link', linkProductTarget?.id] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setIsConfirmUnlinkOpen(false)
+      setLinkProductTarget(null)
+      setPageNotification({
+        type: 'success',
+        message: `Đã hủy liên kết sản phẩm "${targetName}" [${targetSku}] với WooCommerce thành công.`,
+      })
+    },
+    onError: (err: Error) => {
+      setIsConfirmUnlinkOpen(false)
+      setLinkError(`Hủy liên kết thất bại: ${err.message}`)
+    },
+  })
+
   const handleOpenLink = (p: ProductDto) => {
     setLinkProductTarget(p)
-    setLinkForm({
-      wooCommerceProductId: '',
-      wooCommerceVariationId: '',
-    })
     setLinkError(null)
+    setIsConfirmUnlinkOpen(false)
+    if (linkFileInputRef.current) {
+      linkFileInputRef.current.value = ''
+    }
+  }
+
+  const handleLinkImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !linkProductTarget) return
+
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setLinkError(validationError)
+      if (linkFileInputRef.current) {
+        linkFileInputRef.current.value = ''
+      }
+      return
+    }
+
+    setIsUploadingLinkImage(true)
+    setLinkError(null)
+    try {
+      const updatedProduct = await uploadProductImage(linkProductTarget.id, file)
+      setLinkProductTarget(updatedProduct)
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    } catch (err) {
+      setLinkError(`Tải ảnh thất bại: ${(err as Error).message}`)
+    } finally {
+      setIsUploadingLinkImage(false)
+      if (linkFileInputRef.current) {
+        linkFileInputRef.current.value = ''
+      }
+    }
   }
 
   const handleLinkSubmit = async () => {
     if (!linkProductTarget) return
-    const wcProdId = Number(linkForm.wooCommerceProductId)
-    if (!wcProdId || isNaN(wcProdId) || wcProdId <= 0) {
-      setLinkError('Mã WooCommerce Product ID phải là một số nguyên dương.')
+
+    if (!linkProductTarget.imageUrl?.trim()) {
+      setLinkError('Sản phẩm phải có ảnh trước khi liên kết lên website.')
       return
     }
 
-    const wcVarId = linkForm.wooCommerceVariationId.trim()
-      ? Number(linkForm.wooCommerceVariationId)
-      : undefined
-
-    if (linkForm.wooCommerceVariationId.trim() && (isNaN(wcVarId!) || wcVarId! <= 0)) {
-      setLinkError('Mã Variation ID phải là số nguyên dương hợp lệ.')
+    if (linkProductTarget.status !== 1) {
+      setLinkError('Chỉ sản phẩm ở trạng thái Hoạt động mới được liên kết lên website.')
       return
     }
 
     setIsSavingLink(true)
     setLinkError(null)
     try {
-      await linkWooCommerceProduct(wcProdId, {
-        productId: linkProductTarget.id,
-        wooCommerceVariationId: wcVarId,
-      })
+      const result = await publishAndLinkWarehouseProduct(linkProductTarget.id)
       const targetName = linkProductTarget.name
       const targetSku = linkProductTarget.sku
+      queryClient.invalidateQueries({ queryKey: ['product-link', linkProductTarget.id] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
       setLinkProductTarget(null)
       setPageNotification({
         type: 'success',
-        message: `Đã liên kết sản phẩm "${targetName}" [${targetSku}] với WooCommerce Product ID #${wcProdId} thành công.`,
+        message: `Sản phẩm "${targetName}" [${targetSku}] đã được tạo và liên kết với website thành công (WooCommerce Product ID: #${result.wooCommerceProductId}).`,
       })
     } catch (err) {
       setLinkError((err as Error).message)
@@ -277,8 +356,10 @@ export default function ProductsPage() {
       priceRetail: 0,
       priceWholesale: 0,
       subBackboardId: null,
+      width: null,
+      height: null,
       inStock: 0,
-      warningStock: 0,
+      warningStock: 10,
       categoryIds: [],
     })
     if (createPreviewUrl) {
@@ -302,7 +383,9 @@ export default function ProductsPage() {
       priceRetail: p.priceRetail || 0,
       priceWholesale: p.priceWholesale || 0,
       subBackboardId: p.subBackboardId,
-      warningStock: p.warningStock || 0,
+      width: p.width ?? null,
+      height: p.height ?? null,
+      warningStock: p.warningStock ?? 10,
       status: p.status,
       categoryIds: p.categories ? p.categories.map((c) => c.id) : [],
     })
@@ -407,9 +490,25 @@ export default function ProductsPage() {
       return
     }
 
+    const dimError = validateProductDimensions(createForm.width, createForm.height)
+    if (dimError) {
+      setActionError(dimError)
+      return
+    }
+
     setIsSavingCreate(true)
     try {
-      const createdProduct = await createProduct(createForm)
+      const payload: CreateProductRequest = {
+        ...createForm,
+        width: createForm.width && createForm.width > 0 ? createForm.width : null,
+        height: createForm.height && createForm.height > 0 ? createForm.height : null,
+        warningStock:
+          createForm.warningStock != null && !isNaN(createForm.warningStock)
+            ? Number(createForm.warningStock)
+            : undefined,
+      }
+
+      const createdProduct = await createProduct(payload)
 
       if (createImageFile) {
         try {
@@ -445,9 +544,33 @@ export default function ProductsPage() {
       return
     }
 
+    if (
+      editForm.warningStock === null ||
+      editForm.warningStock === undefined ||
+      (editForm.warningStock as any) === '' ||
+      isNaN(editForm.warningStock) ||
+      editForm.warningStock < 0
+    ) {
+      setActionError('Tồn tối thiểu (ngưỡng cảnh báo) là bắt buộc và phải lớn hơn hoặc bằng 0.')
+      return
+    }
+
+    const dimError = validateProductDimensions(editForm.width, editForm.height)
+    if (dimError) {
+      setActionError(dimError)
+      return
+    }
+
     setIsSavingEdit(true)
     try {
-      await updateProduct(editProduct.id, editForm)
+      const payload: UpdateProductRequest = {
+        ...editForm,
+        width: editForm.width && editForm.width > 0 ? editForm.width : null,
+        height: editForm.height && editForm.height > 0 ? editForm.height : null,
+        warningStock: Number(editForm.warningStock),
+      }
+
+      await updateProduct(editProduct.id, payload)
 
       if (editImageFile) {
         await uploadProductImage(editProduct.id, editImageFile)
@@ -492,7 +615,11 @@ export default function ProductsPage() {
       {
         field: 'imageUrl',
         headerName: 'HÌNH ẢNH',
-        width: 110,
+        width: 85,
+        minWidth: 80,
+        maxWidth: 95,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data?: ProductDto }) => {
@@ -556,8 +683,7 @@ export default function ProductsPage() {
       {
         field: 'name',
         headerName: 'TÊN SẢN PHẨM',
-        flex: 1,
-        minWidth: 200,
+        minWidth: 160,
         filter: true,
         sortable: true,
       },
@@ -582,6 +708,24 @@ export default function ProductsPage() {
               ))}
             </Box>
           )
+        },
+      },
+      {
+        field: 'width',
+        headerName: 'KÍCH THƯỚC',
+        width: 140,
+        sortable: false,
+        cellRenderer: (p: { data?: ProductDto }) => {
+          if (p.data?.width && p.data?.height) {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                <Typography variant="body2" sx={{ fontSize: 13, color: '#404040' }}>
+                  {p.data.width} × {p.data.height} cm
+                </Typography>
+              </Box>
+            )
+          }
+          return <span style={{ color: '#a3a3a3', fontSize: 13 }}>—</span>
         },
       },
       {
@@ -649,7 +793,11 @@ export default function ProductsPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 180,
+        width: 140,
+        minWidth: 140,
+        maxWidth: 160,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: ProductDto }) => {
@@ -816,6 +964,9 @@ export default function ProductsPage() {
           <AgGridReact<ProductDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             rowClassRules={{
               'ag-row-warning-stock': (params) =>
                 Boolean(params.data && params.data.inStock <= (params.data.warningStock ?? 0)),
@@ -1081,6 +1232,48 @@ export default function ProductsPage() {
               />
             </Grid>
 
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                CHIỀU RỘNG (CM)
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0.1, step: 'any' }}
+                value={createForm.width ?? ''}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    width: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vd: 30 (cm)"
+                helperText="Đơn vị cm theo chuẩn WooCommerce"
+                disabled={isSavingCreate}
+              />
+            </Grid>
+
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                CHIỀU CAO (CM)
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0.1, step: 'any' }}
+                value={createForm.height ?? ''}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    height: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vd: 40 (cm)"
+                helperText="Đơn vị cm theo chuẩn WooCommerce"
+                disabled={isSavingCreate}
+              />
+            </Grid>
+
             <Grid item xs={4}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 GIÁ GỐC (VND)
@@ -1141,9 +1334,15 @@ export default function ProductsPage() {
                 fullWidth
                 type="number"
                 inputProps={{ min: 0 }}
-                value={createForm.warningStock}
-                onChange={(e) => setCreateForm({ ...createForm, warningStock: Math.max(0, Number(e.target.value)) })}
-                placeholder="Mặc định: 0"
+                value={createForm.warningStock ?? ''}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    warningStock: e.target.value === '' ? null : Math.max(0, Number(e.target.value)),
+                  })
+                }
+                placeholder="Mặc định: 10"
+                helperText="Để trống sẽ tự động dùng mặc định 10"
                 disabled={isSavingCreate}
               />
             </Grid>
@@ -1417,6 +1616,48 @@ export default function ProductsPage() {
               />
             </Grid>
 
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                CHIỀU RỘNG (CM)
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0.1, step: 'any' }}
+                value={editForm.width ?? ''}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    width: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vd: 30 (cm)"
+                helperText="Đơn vị cm theo chuẩn WooCommerce"
+                disabled={isSavingEdit}
+              />
+            </Grid>
+
+            <Grid item xs={6}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                CHIỀU CAO (CM)
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                inputProps={{ min: 0.1, step: 'any' }}
+                value={editForm.height ?? ''}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    height: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="vd: 40 (cm)"
+                helperText="Đơn vị cm theo chuẩn WooCommerce"
+                disabled={isSavingEdit}
+              />
+            </Grid>
+
             <Grid item xs={4}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
                 GIÁ GỐC (VND)
@@ -1458,14 +1699,19 @@ export default function ProductsPage() {
 
             <Grid item xs={6}>
               <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
-                TỐI THIỂU
+                TỒN CẢNH BÁO (BẮT BUỘC) *
               </Typography>
               <TextField
                 fullWidth
                 type="number"
                 inputProps={{ min: 0 }}
-                value={editForm.warningStock}
-                onChange={(e) => setEditForm({ ...editForm, warningStock: Math.max(0, Number(e.target.value)) })}
+                value={editForm.warningStock ?? ''}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    warningStock: e.target.value === '' ? ('' as any) : Math.max(0, Number(e.target.value)),
+                  })
+                }
                 disabled={isSavingEdit}
               />
             </Grid>
@@ -1588,7 +1834,7 @@ export default function ProductsPage() {
       {/* LINK WOOCOMMERCE PRODUCT DIALOG */}
       <Dialog
         open={Boolean(linkProductTarget)}
-        onClose={() => !isSavingLink && setLinkProductTarget(null)}
+        onClose={() => !isSavingLink && !isUploadingLinkImage && !unlinkMutation.isPending && setLinkProductTarget(null)}
         maxWidth="xs"
         fullWidth
         PaperProps={{
@@ -1611,60 +1857,382 @@ export default function ProductsPage() {
             </Alert>
           )}
 
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1.5,
-              mb: 2,
-              bgcolor: '#f9f9f9',
-              border: '1px solid #ededed',
-              borderRadius: '6px',
-            }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mb: 0.5 }}>
-              {linkProductTarget?.name}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-              Tồn kho hiện có: <strong>{linkProductTarget?.inStock}</strong> | Giá bán lẻ:{' '}
-              <strong>{formatVND(linkProductTarget?.priceRetail ?? linkProductTarget?.basePrice)}</strong>
-            </Typography>
-          </Paper>
+          {isProductLinkLoading ? (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                py: 5,
+                gap: 1.5,
+              }}
+            >
+              <CircularProgress size={32} sx={{ color: '#171717' }} />
+              <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>
+                Đang kiểm tra trạng thái liên kết website...
+              </Typography>
+            </Box>
+          ) : productLinkData ? (
+            /* ==================== 1. ĐÃ LIÊN KẾT (HTTP 200) ==================== */
+            <>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  bgcolor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                }}
+              >
+                <CheckCircle2 size={24} color="#15803d" style={{ flexShrink: 0 }} />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#15803d' }}>
+                    Sản phẩm đã được liên kết
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#166534', fontSize: 13, mt: 0.25 }}>
+                    WooCommerce Product ID: <strong>#{productLinkData.wooCommerceProductId}</strong>
+                    {productLinkData.wooCommerceVariationId
+                      ? ` | Variation ID: #${productLinkData.wooCommerceVariationId}`
+                      : ''}
+                  </Typography>
+                </Box>
+              </Paper>
 
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-              WOOCOMMERCE PRODUCT ID *
-            </Typography>
-            <TextField
-              fullWidth
-              type="number"
-              value={linkForm.wooCommerceProductId}
-              onChange={(e) => setLinkForm({ ...linkForm, wooCommerceProductId: e.target.value })}
-              placeholder="vd: 1254"
-              disabled={isSavingLink}
-              helperText="ID của sản phẩm trên website WooCommerce"
-            />
-          </Box>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  bgcolor: '#f9f9f9',
+                  border: '1px solid #ededed',
+                  borderRadius: '6px',
+                }}
+              >
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                  {linkProductTarget?.imageUrl ? (
+                    <Box
+                      component="img"
+                      src={resolveApiUrl(linkProductTarget.imageUrl)}
+                      alt={linkProductTarget.name}
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '4px',
+                        objectFit: 'cover',
+                        border: '1px solid #e0e0e0',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '4px',
+                        bgcolor: '#f0f0f0',
+                        border: '1px dashed #d0d0d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        color: '#a0a0a0',
+                      }}
+                    >
+                      <ImageIcon size={20} />
+                    </Box>
+                  )}
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        color: '#171717',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {linkProductTarget?.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                      Tồn kho hiện có: <strong>{linkProductTarget?.inStock ?? 0}</strong> | Giá bán lẻ:{' '}
+                      <strong>{formatVND(linkProductTarget?.priceRetail ?? linkProductTarget?.basePrice)}</strong>
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: linkProductTarget?.status === 1 ? '#15803d' : '#b91c1c',
+                        display: 'block',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Trạng thái: {linkProductTarget?.status === 1 ? 'Hoạt động' : 'Ngưng'}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
 
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-              WOOCOMMERCE VARIATION ID (TÙY CHỌN)
-            </Typography>
-            <TextField
-              fullWidth
-              type="number"
-              value={linkForm.wooCommerceVariationId}
-              onChange={(e) => setLinkForm({ ...linkForm, wooCommerceVariationId: e.target.value })}
-              placeholder="vd: 2489 (bỏ trống nếu là sản phẩm đơn giản)"
-              disabled={isSavingLink}
-              helperText="ID biến thể nếu sản phẩm có nhiều lựa chọn kích cỡ/màu sắc"
-            />
-          </Box>
+              <Typography variant="body2" sx={{ color: '#525252', fontSize: 13, lineHeight: 1.5 }}>
+                Sản phẩm đang được đồng bộ với website bán hàng. Khi nhấn <strong>Hủy liên kết</strong>, sản phẩm trên website sẽ tự động chuyển về <em>Bản nháp (Draft)</em> và ngừng đồng bộ với kho.
+              </Typography>
+            </>
+          ) : (
+            /* ==================== 2. CHƯA LIÊN KẾT (HTTP 404) ==================== */
+            <>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  bgcolor: '#f9f9f9',
+                  border: '1px solid #ededed',
+                  borderRadius: '6px',
+                }}
+              >
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                  {linkProductTarget?.imageUrl ? (
+                    <Box
+                      component="img"
+                      src={resolveApiUrl(linkProductTarget.imageUrl)}
+                      alt={linkProductTarget.name}
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '4px',
+                        objectFit: 'cover',
+                        border: '1px solid #e0e0e0',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '4px',
+                        bgcolor: '#f0f0f0',
+                        border: '1px dashed #d0d0d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        color: '#a0a0a0',
+                      }}
+                    >
+                      <ImageIcon size={20} />
+                    </Box>
+                  )}
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        color: '#171717',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {linkProductTarget?.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                      Tồn kho hiện có: <strong>{linkProductTarget?.inStock ?? 0}</strong> | Giá bán lẻ:{' '}
+                      <strong>{formatVND(linkProductTarget?.priceRetail ?? linkProductTarget?.basePrice)}</strong>
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: linkProductTarget?.status === 1 ? '#15803d' : '#b91c1c',
+                        display: 'block',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Trạng thái: {linkProductTarget?.status === 1 ? 'Hoạt động' : 'Ngưng'}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+
+              {!linkProductTarget?.imageUrl?.trim() && (
+                <Alert severity="warning" sx={{ mb: 2, borderRadius: '6px' }}>
+                  Sản phẩm phải có ảnh trước khi liên kết lên website.
+                </Alert>
+              )}
+
+              {linkProductTarget && linkProductTarget.status !== 1 && (
+                <Alert severity="warning" sx={{ mb: 2, borderRadius: '6px' }}>
+                  Chỉ sản phẩm ở trạng thái Hoạt động mới được liên kết lên website.
+                </Alert>
+              )}
+
+              {/* Upload Image Section */}
+              <Box sx={{ mb: 2 }}>
+                <input
+                  type="file"
+                  ref={linkFileInputRef}
+                  accept={ALLOWED_IMAGE_EXTENSIONS.join(',')}
+                  style={{ display: 'none' }}
+                  onChange={handleLinkImageSelect}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={() => linkFileInputRef.current?.click()}
+                  disabled={isUploadingLinkImage || isSavingLink}
+                  startIcon={
+                    isUploadingLinkImage ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <Upload size={16} />
+                    )
+                  }
+                  sx={{
+                    width: '100%',
+                    height: 38,
+                    borderColor: '#e0e0e0',
+                    color: '#171717',
+                    '&:hover': { bgcolor: '#f2f2f2' },
+                  }}
+                >
+                  {isUploadingLinkImage
+                    ? 'Đang tải ảnh...'
+                    : linkProductTarget?.imageUrl?.trim()
+                    ? 'Thay đổi ảnh sản phẩm'
+                    : 'Tải ảnh sản phẩm lên'}
+                </Button>
+              </Box>
+
+              <Typography variant="body2" sx={{ color: '#525252', fontSize: 13, lineHeight: 1.5 }}>
+                Khi nhấn <strong>Xác nhận liên kết</strong>, hệ thống sẽ xuất bản sản phẩm lên website WooCommerce và thiết lập liên kết tự động.
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {isProductLinkLoading ? (
+            <Button
+              onClick={() => setLinkProductTarget(null)}
+              variant="outlined"
+              sx={{
+                height: 36,
+                borderColor: '#e0e0e0',
+                color: '#171717',
+                '&:hover': { bgcolor: '#f2f2f2' },
+              }}
+            >
+              Đóng
+            </Button>
+          ) : productLinkData ? (
+            <>
+              <Button
+                onClick={() => setLinkProductTarget(null)}
+                variant="outlined"
+                disabled={unlinkMutation.isPending}
+                sx={{
+                  height: 36,
+                  borderColor: '#e0e0e0',
+                  color: '#171717',
+                  '&:hover': { bgcolor: '#f2f2f2' },
+                }}
+              >
+                Đóng
+              </Button>
+              <Button
+                onClick={() => setIsConfirmUnlinkOpen(true)}
+                variant="contained"
+                color="error"
+                disabled={unlinkMutation.isPending}
+                startIcon={<Trash2 size={16} />}
+                sx={{ height: 36 }}
+              >
+                Hủy liên kết
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={() => setLinkProductTarget(null)}
+                variant="outlined"
+                disabled={isSavingLink || isUploadingLinkImage}
+                sx={{
+                  height: 36,
+                  borderColor: '#e0e0e0',
+                  color: '#171717',
+                  '&:hover': { bgcolor: '#f2f2f2' },
+                }}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleLinkSubmit}
+                variant="contained"
+                disabled={
+                  !linkProductTarget?.imageUrl?.trim() ||
+                  linkProductTarget?.status !== 1 ||
+                  isSavingLink ||
+                  isUploadingLinkImage
+                }
+                startIcon={
+                  isSavingLink ? <CircularProgress size={16} color="inherit" /> : <Link2 size={16} />
+                }
+                sx={{
+                  height: 36,
+                  bgcolor: '#1a1a1a',
+                  color: '#ffffff',
+                  '&:hover': { bgcolor: '#000000' },
+                }}
+              >
+                {isSavingLink ? 'Đang liên kết...' : 'Xác nhận liên kết'}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* CONFIRM UNLINK WOOCOMMERCE DIALOG */}
+      <Dialog
+        open={isConfirmUnlinkOpen}
+        onClose={() => !unlinkMutation.isPending && setIsConfirmUnlinkOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '8px',
+            bgcolor: '#ffffff',
+            border: '1px solid #ededed',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+            p: 1,
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AlertTriangle size={20} color="#dc2626" />
+          Xác nhận hủy liên kết WooCommerce?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#404040', lineHeight: 1.6, mb: 1.5 }}>
+            Sản phẩm sẽ được chuyển sang Draft trên website và ngừng đồng bộ với kho. Bạn có chắc chắn?
+          </Typography>
+          {linkProductTarget && productLinkData && (
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fef2f2', borderColor: '#fecaca', borderRadius: '6px' }}>
+              <Typography variant="caption" sx={{ color: '#991b1b', fontWeight: 600, display: 'block' }}>
+                WOOCOMMERCE PRODUCT ID: #{productLinkData.wooCommerceProductId}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#7f1d1d', fontWeight: 500, mt: 0.5 }}>
+                {linkProductTarget.sku} — {linkProductTarget.name}
+              </Typography>
+            </Paper>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button
-            onClick={() => setLinkProductTarget(null)}
+            onClick={() => setIsConfirmUnlinkOpen(false)}
             variant="outlined"
-            disabled={isSavingLink}
+            disabled={unlinkMutation.isPending}
             sx={{
               height: 36,
               borderColor: '#e0e0e0',
@@ -1672,20 +2240,17 @@ export default function ProductsPage() {
               '&:hover': { bgcolor: '#f2f2f2' },
             }}
           >
-            Hủy
+            Hủy bỏ
           </Button>
           <Button
-            onClick={handleLinkSubmit}
+            onClick={() => linkProductTarget && unlinkMutation.mutate(linkProductTarget.id)}
             variant="contained"
-            disabled={!linkForm.wooCommerceProductId.trim() || isSavingLink}
-            sx={{
-              height: 36,
-              bgcolor: '#1a1a1a',
-              color: '#ffffff',
-              '&:hover': { bgcolor: '#000000' },
-            }}
+            color="error"
+            disabled={unlinkMutation.isPending}
+            startIcon={unlinkMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <Trash2 size={16} />}
+            sx={{ height: 36 }}
           >
-            {isSavingLink ? 'Đang lưu...' : 'Lưu liên kết'}
+            {unlinkMutation.isPending ? 'Đang xử lý...' : 'Xác nhận hủy liên kết'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -20,8 +20,8 @@ import { Plus, RefreshCw, Edit3 } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import { fetchCategories, createCategory, updateCategory, type CategoryDto } from '../api/categories'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
-
 import { formatDate } from '../utils/dateFormat'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient()
@@ -101,11 +101,15 @@ export default function CategoriesPage() {
         headerName: 'STT',
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
         width: 70,
+        minWidth: 60,
+        maxWidth: 80,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
       },
       { field: 'id', headerName: 'ID', width: 90, sortable: true },
-      { field: 'name', headerName: 'TÊN DANH MỤC', flex: 1, minWidth: 220, filter: true, sortable: true },
+      { field: 'name', headerName: 'TÊN DANH MỤC', minWidth: 150, filter: true, sortable: true },
       {
         field: 'createdAt',
         headerName: 'NGÀY TẠO',
@@ -115,7 +119,11 @@ export default function CategoriesPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 100,
+        width: 90,
+        minWidth: 80,
+        maxWidth: 100,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: CategoryDto }) => {
@@ -190,6 +198,9 @@ export default function CategoriesPage() {
           <AgGridReact<CategoryDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu</span>'

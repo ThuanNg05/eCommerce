@@ -16,12 +16,14 @@ public class Product
     public decimal? PriceRetail { get; set; }
     public decimal? PriceWholesale { get; set; }
     public long? SubBackboardId { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Height { get; set; }
     public int InStock { get; set; }
     /// <summary>Minimum-stock threshold for reorder alerts: low when InStock &lt;= WarningStock.</summary>
     public int WarningStock { get; set; }
     public short Status { get; set; } = 1;
     public string? Description { get; set; }
-    /// <summary>Application-managed relative URL of the product image, stored as WebP.</summary>
+    /// <summary>Application-managed public URL of the product image, stored as JPEG.</summary>
     public string? ImageUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

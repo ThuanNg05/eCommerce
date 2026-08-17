@@ -45,18 +45,124 @@ public sealed class WooCommerceService(
 
     public async Task<WooCommerceCatalogSyncResult> SyncCatalogAsync(CancellationToken ct = default)
     {
-        var links = await db.WooCommerceProductLinks.AsNoTracking().Include(x => x.Product)
-            .Where(x => x.Product != null && x.Product.Status == 1).ToListAsync(ct);
-        foreach (var link in links)
+        var productIds = await db.WooCommerceProductLinks.AsNoTracking()
+            .Select(x => x.ProductId).ToListAsync(ct);
+        foreach (var productId in productIds)
+            await SyncLinkedProductAsync(productId, synchronizeImage: true, ct: ct);
+        return new WooCommerceCatalogSyncResult(productIds.Count, DateTimeOffset.UtcNow);
+    }
+
+    public async Task<WooCommerceProductLinkDto?> GetProductLinkAsync(long productId, CancellationToken ct = default)
+    {
+        var link = await db.WooCommerceProductLinks.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ProductId == productId, ct);
+        return link is null ? null : new WooCommerceProductLinkDto(link.ProductId, link.WooCommerceProductId, link.WooCommerceVariationId);
+    }
+
+    public async Task<bool> SyncLinkedProductAsync(long productId, bool synchronizeImage = false, CancellationToken ct = default)
+    {
+        var link = await db.WooCommerceProductLinks.AsNoTracking().Include(x => x.Product)
+            .SingleOrDefaultAsync(x => x.ProductId == productId, ct);
+        if (link?.Product is not { } product) return false;
+
+        var categoryIds = await ResolveWooCommerceCategoriesAsync(product.Id, ct);
+        var size = product.SubBackboardId is long subBackboardId
+            ? await db.SubBackboards.AsNoTracking().Where(x => x.Id == subBackboardId).Select(x => x.Size).SingleOrDefaultAsync(ct)
+            : null;
+        var description = WithSize(product.Description, size);
+        var price = product.PriceRetail ?? product.BasePrice;
+        IReadOnlyList<WooCommerceImageUpdate>? images = null;
+        if (synchronizeImage)
+            images = string.IsNullOrWhiteSpace(product.ImageUrl)
+                ? []
+                : [new WooCommerceImageUpdate(product.ImageUrl)];
+
+        await client.UpdateProductAsync(link.WooCommerceProductId, link.WooCommerceVariationId,
+            new WooCommerceCatalogUpdate(
+                product.Name,
+                product.Sku,
+                description,
+                price.ToString("0.###", CultureInfo.InvariantCulture),
+                true,
+                product.InStock,
+                product.Status == 1 && product.InStock > 0 ? "instock" : "outofstock",
+                product.WarningStock,
+                images,
+                categoryIds,
+                BuildDimensions(product.Width, product.Height, size),
+                product.Status == 1 ? "publish" : "draft"), ct);
+        return true;
+    }
+
+    public async Task<WooCommerceProductLinkDto> PublishAndLinkProductAsync(
+        LinkWarehouseProductRequest request, CancellationToken ct = default)
+    {
+        if (request.ProductId <= 0)
+            throw new DomainValidationException("Mã sản phẩm kho phải lớn hơn 0.");
+
+        var product = await db.Products.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == request.ProductId, ct)
+            ?? throw new DomainValidationException("Sản phẩm kho không tồn tại.");
+
+        if (product.Status != 1)
+            throw new DomainValidationException("Chỉ sản phẩm ở trạng thái Hoạt động mới được liên kết lên website.");
+        if (string.IsNullOrWhiteSpace(product.ImageUrl))
+            throw new DomainValidationException("Sản phẩm phải có ảnh trước khi liên kết lên website.");
+        if (IsWebpImage(product.ImageUrl))
+            throw new DomainValidationException("Ảnh hiện tại là WebP và website không cho phép định dạng này. Vui lòng upload lại ảnh trước khi liên kết.");
+
+        var existingLink = await db.WooCommerceProductLinks.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ProductId == product.Id, ct);
+        if (existingLink is not null)
+            throw new DomainValidationException("Sản phẩm đã được liên kết. Hãy dùng chức năng đồng bộ để cập nhật thông tin.");
+
+        var categoryIds = await ResolveWooCommerceCategoriesAsync(product.Id, ct);
+        var size = product.SubBackboardId is long subBackboardId
+            ? await db.SubBackboards.AsNoTracking().Where(x => x.Id == subBackboardId).Select(x => x.Size).SingleOrDefaultAsync(ct)
+            : null;
+
+        var description = WithSize(product.Description, size);
+
+        var price = product.PriceRetail ?? product.BasePrice;
+        var wooCommerceProductId = await client.CreateProductAsync(new WooCommerceCatalogCreate(
+            product.Name,
+            product.Sku,
+            description,
+            price.ToString("0.###", CultureInfo.InvariantCulture),
+            true,
+            product.InStock,
+            product.InStock > 0 ? "instock" : "outofstock",
+            product.WarningStock,
+            [new WooCommerceImageUpdate(product.ImageUrl)],
+            categoryIds,
+            BuildDimensions(product.Width, product.Height, size)), ct);
+
+        var link = new WooCommerceProductLink
         {
-            var product = link.Product!;
-            var price = product.PriceRetail ?? product.BasePrice;
-            var images = string.IsNullOrWhiteSpace(product.ImageUrl) ? null : new[] { new WooCommerceImageUpdate(product.ImageUrl) };
-            await client.UpdateProductAsync(link.WooCommerceProductId, link.WooCommerceVariationId,
-                new WooCommerceCatalogUpdate(product.Name, price.ToString("0.###", CultureInfo.InvariantCulture), true,
-                    product.InStock, product.InStock > 0 ? "instock" : "outofstock", images), ct);
-        }
-        return new WooCommerceCatalogSyncResult(links.Count, DateTimeOffset.UtcNow);
+            ProductId = product.Id,
+            WooCommerceProductId = wooCommerceProductId,
+            WooCommerceVariationId = null,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        db.WooCommerceProductLinks.Add(link);
+        await db.SaveChangesAsync(ct);
+        return new WooCommerceProductLinkDto(link.ProductId, link.WooCommerceProductId, link.WooCommerceVariationId);
+    }
+
+    public async Task<bool> UnlinkProductAsync(long productId, CancellationToken ct = default)
+    {
+        if (productId <= 0)
+            throw new DomainValidationException("Mã sản phẩm kho phải lớn hơn 0.");
+
+        var link = await db.WooCommerceProductLinks.FindAsync([productId], ct);
+        if (link is null) return false;
+
+        // Keep the link if WooCommerce rejects the status change, so staff can retry
+        // without accidentally leaving a published product unmanaged.
+        await client.SetProductStatusAsync(link.WooCommerceProductId, link.WooCommerceVariationId, "draft", ct);
+        db.WooCommerceProductLinks.Remove(link);
+        await db.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task<WooCommerceProductLinkDto> LinkProductAsync(long wooCommerceProductId, LinkWooCommerceProductRequest request, CancellationToken ct = default)
@@ -81,6 +187,7 @@ public sealed class WooCommerceService(
         link.WooCommerceVariationId = request.WooCommerceVariationId;
         link.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
+        await SyncLinkedProductAsync(request.ProductId, synchronizeImage: true, ct: ct);
         return new WooCommerceProductLinkDto(link.ProductId, link.WooCommerceProductId, link.WooCommerceVariationId);
     }
 
@@ -131,33 +238,42 @@ public sealed class WooCommerceService(
         order.Status = (remote.Status ?? string.Empty).Trim().ToLowerInvariant();
         order.Currency = remote.Currency;
         order.Total = ParseDecimal(remote.Total);
-        order.CustomerName = FullName(remote.Billing);
+        order.CustomerName = FullName(remote.Billing) ?? FullName(remote.Shipping);
         order.CustomerEmail = remote.Billing?.Email;
         order.CustomerPhone = remote.Billing?.Phone;
         order.ShippingAddress = FormatAddress(remote.Shipping ?? remote.Billing);
-        order.SourceCreatedAt = remote.DateCreatedGmt;
-        order.SourceUpdatedAt = remote.DateModifiedGmt;
+        // PostgreSQL timestamp with time zone requires DateTimeOffset values normalized to UTC.
+        order.SourceCreatedAt = (remote.DateCreated ?? remote.DateCreatedGmt)?.ToUniversalTime();
+        order.SourceUpdatedAt = (remote.DateModified ?? remote.DateModifiedGmt)?.ToUniversalTime();
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
-        db.WooCommerceOrderItems.RemoveRange(order.Items);
-        order.Items.Clear();
         var links = await db.WooCommerceProductLinks.AsNoTracking().ToListAsync(ct);
+        var remoteItemIds = new HashSet<long>();
+        var existingItems = order.Items.ToDictionary(x => x.WooCommerceOrderItemId);
         foreach (var item in remote.LineItems ?? [])
         {
-            if (item.Id <= 0 || item.Quantity <= 0) continue;
+            if (item.Id <= 0 || item.Quantity <= 0 || !remoteItemIds.Add(item.Id)) continue;
             var link = links.FirstOrDefault(x => x.WooCommerceProductId == item.ProductId && x.WooCommerceVariationId == item.VariationId)
                 ?? links.FirstOrDefault(x => x.WooCommerceProductId == item.ProductId && x.WooCommerceVariationId is null);
-            order.Items.Add(new WooCommerceOrderItem
+
+            if (!existingItems.TryGetValue(item.Id, out var orderItem))
             {
-                WooCommerceOrderItemId = item.Id,
-                WooCommerceProductId = item.ProductId,
-                WooCommerceVariationId = item.VariationId,
-                ProductId = link?.ProductId,
-                ProductName = (item.Name ?? "Sản phẩm WooCommerce").Trim(),
-                Quantity = item.Quantity,
-                UnitPrice = ParseDecimal(item.Price),
-                Subtotal = ParseDecimal(item.Subtotal),
-            });
+                orderItem = new WooCommerceOrderItem { WooCommerceOrderItemId = item.Id };
+                order.Items.Add(orderItem);
+            }
+
+            orderItem.WooCommerceProductId = item.ProductId;
+            orderItem.WooCommerceVariationId = item.VariationId;
+            orderItem.ProductId = link?.ProductId;
+            orderItem.ProductName = (item.Name ?? "Sản phẩm WooCommerce").Trim();
+            orderItem.Quantity = item.Quantity;
+            orderItem.UnitPrice = ParseDecimal(item.Price);
+            orderItem.Subtotal = ParseDecimal(item.Subtotal);
+        }
+
+        foreach (var staleItem in order.Items.Where(x => !remoteItemIds.Contains(x.WooCommerceOrderItemId)).ToList())
+        {
+            db.WooCommerceOrderItems.Remove(staleItem);
         }
         await db.SaveChangesAsync(ct);
     }
@@ -183,6 +299,50 @@ public sealed class WooCommerceService(
     }
 
     private static decimal ParseDecimal(string? value) => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) ? result : 0m;
+
+    private static WooCommerceDimensions? ParseDimensions(string? size)
+    {
+        if (string.IsNullOrWhiteSpace(size)) return null;
+        var values = System.Text.RegularExpressions.Regex.Matches(size, @"\d+(?:[.,]\d+)?")
+            .Select(x => x.Value.Replace(',', '.'))
+            .ToList();
+        if (values.Count < 2) return null;
+        return new WooCommerceDimensions(values[0], values[1], values.Count > 2 ? values[2] : string.Empty);
+    }
+
+    private static WooCommerceDimensions? BuildDimensions(decimal? width, decimal? height, string? fallbackSize) =>
+        width is not null && height is not null
+            ? new WooCommerceDimensions(
+                string.Empty,
+                width.Value.ToString("0.##", CultureInfo.InvariantCulture),
+                height.Value.ToString("0.##", CultureInfo.InvariantCulture))
+            : ParseDimensions(fallbackSize);
+
+    private async Task<List<WooCommerceProductCategory>> ResolveWooCommerceCategoriesAsync(long productId, CancellationToken ct)
+    {
+        var categoryNames = await (
+            from pc in db.ProductCategories.AsNoTracking()
+            join category in db.Categories.AsNoTracking() on pc.CategoryId equals category.Id
+            where pc.ProductId == productId
+            select category.Name).ToListAsync(ct);
+
+        var categoryIds = new List<WooCommerceProductCategory>();
+        foreach (var categoryName in categoryNames.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
+            categoryIds.Add(new WooCommerceProductCategory(await client.FindOrCreateCategoryAsync(categoryName, ct)));
+        return categoryIds;
+    }
+
+    private static string WithSize(string? description, string? size)
+    {
+        var normalized = description?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(size) || normalized.Contains(size, StringComparison.OrdinalIgnoreCase)) return normalized;
+        return string.IsNullOrWhiteSpace(normalized) ? $"Kích thước: {size}" : $"{normalized}\n\nKích thước: {size}";
+    }
+
+    private static bool IsWebpImage(string imageUrl) =>
+        Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri) &&
+        uri.AbsolutePath.EndsWith(".webp", StringComparison.OrdinalIgnoreCase);
+
     private static string? FullName(WooCommerceRemoteAddress? address) => string.Join(' ', new[] { address?.FirstName, address?.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim() is { Length: > 0 } name ? name : null;
     private static string? FormatAddress(WooCommerceRemoteAddress? address) => address is null ? null : string.Join(", ", new[] { address.Address1, address.Address2, address.City, address.State, address.Postcode, address.Country }.Where(x => !string.IsNullOrWhiteSpace(x)));
 }

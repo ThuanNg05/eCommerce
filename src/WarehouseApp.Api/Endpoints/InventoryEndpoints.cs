@@ -22,13 +22,19 @@ public static class InventoryEndpoints
             return Results.Created($"/api/inventory/{dto.Id}", dto);
         });
 
-        g.MapPut("/{id:long}", async (long id, UpdateProductRequest req, IInventoryService svc, CancellationToken ct) =>
-            await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
+        g.MapPut("/{id:long}", async (long id, UpdateProductRequest req, IInventoryService svc, IWooCommerceService wooCommerce, CancellationToken ct) =>
+        {
+            var dto = await svc.UpdateAsync(id, req, ct);
+            if (dto is null) return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
+            await wooCommerce.SyncLinkedProductAsync(id, ct: ct);
+            return Results.Ok(dto);
+        });
 
         g.MapPost("/{id:long}/image", async (
             long id,
             IFormFile file,
             IInventoryService svc,
+            IWooCommerceService wooCommerce,
             ProductImageStorage storage,
             CancellationToken ct) =>
         {
@@ -36,10 +42,11 @@ public static class InventoryEndpoints
             if (current is null)
                 return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
 
-            var imageUrl = await storage.SaveAsWebpAsync(id, file, ct);
+            var imageUrl = await storage.SaveAsJpegAsync(id, file, ct);
+            ProductDto? updated;
             try
             {
-                var updated = await svc.SetImageUrlAsync(id, imageUrl, ct);
+                updated = await svc.SetImageUrlAsync(id, imageUrl, ct);
                 if (updated is null)
                 {
                     await storage.DeleteAsync(imageUrl, ct);
@@ -47,13 +54,15 @@ public static class InventoryEndpoints
                 }
 
                 await storage.DeleteAsync(current.ImageUrl, ct);
-                return Results.Ok(updated);
             }
             catch
             {
                 await storage.DeleteAsync(imageUrl, ct);
                 throw;
             }
+
+            await wooCommerce.SyncLinkedProductAsync(id, synchronizeImage: true, ct: ct);
+            return Results.Ok(updated);
         })
         // This API authenticates with an Authorization: Bearer header, not cookies.
         // A multipart IFormFile endpoint otherwise gets anti-forgery metadata by default.
@@ -66,6 +75,7 @@ public static class InventoryEndpoints
         g.MapDelete("/{id:long}/image", async (
             long id,
             IInventoryService svc,
+            IWooCommerceService wooCommerce,
             ProductImageStorage storage,
             CancellationToken ct) =>
         {
@@ -75,13 +85,19 @@ public static class InventoryEndpoints
 
             var updated = await svc.SetImageUrlAsync(id, null, ct);
             await storage.DeleteAsync(current.ImageUrl, ct);
+            await wooCommerce.SyncLinkedProductAsync(id, synchronizeImage: true, ct: ct);
             return Results.Ok(updated);
         })
         .Produces<ProductDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status404NotFound);
 
-        g.MapPost("/{id:long}/adjust", async (long id, StockAdjustmentRequest req, IInventoryService svc, CancellationToken ct) =>
-            await svc.AdjustStockAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: 404));
+        g.MapPost("/{id:long}/adjust", async (long id, StockAdjustmentRequest req, IInventoryService svc, IWooCommerceService wooCommerce, CancellationToken ct) =>
+        {
+            var dto = await svc.AdjustStockAsync(id, req, ct);
+            if (dto is null) return Results.Problem(detail: "Không tìm thấy sản phẩm.", statusCode: StatusCodes.Status404NotFound);
+            await wooCommerce.SyncLinkedProductAsync(id, ct: ct);
+            return Results.Ok(dto);
+        });
 
         return api;
     }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 import {
   Box,
   Typography,
@@ -240,12 +241,16 @@ export default function FramesPage() {
       {
         headerName: 'STT',
         width: 70,
+        minWidth: 60,
+        maxWidth: 80,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
       { field: 'code', headerName: 'MÃ RẬP', width: 150, filter: true, sortable: true },
-      { field: 'description', headerName: 'MÔ TẢ RẬP', flex: 1, minWidth: 220 },
+      { field: 'description', headerName: 'MÔ TẢ RẬP', minWidth: 160 },
       {
         headerName: 'SỐ THÀNH PHẦN',
         width: 180,
@@ -291,7 +296,11 @@ export default function FramesPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 100,
+        width: 90,
+        minWidth: 80,
+        maxWidth: 100,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: FrameDto }) => {
@@ -386,6 +395,9 @@ export default function FramesPage() {
           <AgGridReact<FrameDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             quickFilterText={search}
             localeText={AG_GRID_LOCALE_VI}

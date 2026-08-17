@@ -2,6 +2,7 @@ import { useMemo, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 import {
   Box,
   Typography,
@@ -361,6 +362,10 @@ export default function InventoryTransactionsPage() {
       {
         headerName: 'STT',
         width: 70,
+        minWidth: 60,
+        maxWidth: 80,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
@@ -394,7 +399,7 @@ export default function InventoryTransactionsPage() {
         sortable: true,
         valueFormatter: (p) => formatDate(p.value),
       },
-      { field: 'note', headerName: 'GHI CHÚ KHO', flex: 1, minWidth: 200 },
+      { field: 'note', headerName: 'GHI CHÚ KHO', minWidth: 160 },
       {
         headerName: 'SỐ DÒNG',
         width: 110,
@@ -403,7 +408,11 @@ export default function InventoryTransactionsPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 150,
+        width: 130,
+        minWidth: 120,
+        maxWidth: 140,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: InventoryTransactionDto }) => {
@@ -513,6 +522,9 @@ export default function InventoryTransactionsPage() {
           <AgGridReact<InventoryTransactionDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             quickFilterText={search}
             localeText={AG_GRID_LOCALE_VI}

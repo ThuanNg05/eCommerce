@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, ValueFormatterParams } from 'ag-grid-community'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 import {
   Box,
   Typography,
@@ -715,8 +716,7 @@ export default function InvoicesPage() {
       {
         field: 'createdAt',
         headerName: 'NGÀY TẠO',
-        flex: 1,
-        minWidth: 160,
+        minWidth: 150,
         sortable: true,
         valueFormatter: (p: ValueFormatterParams<InvoiceSummaryDto, string>) => formatDate(p.value),
       },
@@ -730,7 +730,11 @@ export default function InvoicesPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 150,
+        width: 110,
+        minWidth: 100,
+        maxWidth: 120,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: InvoiceSummaryDto }) => {
@@ -848,6 +852,9 @@ export default function InvoicesPage() {
           <AgGridReact<InvoiceSummaryDto>
             rowData={filteredInvoices}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu hóa đơn</span>'

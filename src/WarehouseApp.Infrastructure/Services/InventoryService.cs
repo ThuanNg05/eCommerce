@@ -9,6 +9,8 @@ namespace WarehouseApp.Infrastructure.Services;
 
 public class InventoryService(AppDbContext db) : IInventoryService
 {
+    private const int DefaultWarningStock = 10;
+
     public async Task<PagedResult<ProductDto>> ListAsync(int page, int pageSize, string? search, CancellationToken ct = default)
     {
         page = page < 1 ? 1 : page;
@@ -48,6 +50,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
             throw new DomainValidationException($"Sản phẩm có SKU '{r.Sku}' đã tồn tại.");
 
         var categories = await ResolveCategoriesAsync(r.CategoryIds, ct);
+        ValidateDimensions(r.Width, r.Height);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
@@ -60,8 +63,10 @@ public class InventoryService(AppDbContext db) : IInventoryService
             PriceRetail = r.PriceRetail,
             PriceWholesale = r.PriceWholesale,
             SubBackboardId = r.SubBackboardId,
+            Width = r.Width,
+            Height = r.Height,
             InStock = r.InStock,
-            WarningStock = r.WarningStock,
+            WarningStock = r.WarningStock ?? DefaultWarningStock,
             Status = 1
         };
 
@@ -82,6 +87,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
         // Null CategoryIds => leave categories untouched; a list (even empty) => replace the set.
         var categories = r.CategoryIds is null ? null : await ResolveCategoriesAsync(r.CategoryIds, ct);
+        ValidateDimensions(r.Width, r.Height);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
@@ -91,6 +97,8 @@ public class InventoryService(AppDbContext db) : IInventoryService
         p.PriceRetail = r.PriceRetail;
         p.PriceWholesale = r.PriceWholesale;
         p.SubBackboardId = r.SubBackboardId;
+        p.Width = r.Width;
+        p.Height = r.Height;
         p.WarningStock = r.WarningStock;
         p.Status = r.Status;
         p.UpdatedAt = DateTimeOffset.UtcNow;
@@ -207,5 +215,13 @@ public class InventoryService(AppDbContext db) : IInventoryService
 
     private static ProductDto ToDto(Product p, IReadOnlyList<CategoryRefDto> categories) =>
         new(p.Id, p.Sku, p.Name, p.Description, p.BasePrice, p.PriceRetail, p.PriceWholesale,
-            p.SubBackboardId, p.InStock, p.WarningStock, p.Status, p.UpdatedAt, p.ImageUrl, categories);
+            p.SubBackboardId, p.Width, p.Height, p.InStock, p.WarningStock, p.Status, p.UpdatedAt, p.ImageUrl, categories);
+
+    private static void ValidateDimensions(decimal? width, decimal? height)
+    {
+        if (width.HasValue != height.HasValue)
+            throw new DomainValidationException("Phải nhập cả chiều rộng và chiều cao, hoặc để trống cả hai.");
+        if (width is <= 0 || height is <= 0)
+            throw new DomainValidationException("Chiều rộng và chiều cao phải lớn hơn 0.");
+    }
 }

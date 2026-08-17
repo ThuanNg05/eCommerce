@@ -10,6 +10,10 @@ public class WooCommerceProductLinkConfiguration : IEntityTypeConfiguration<WooC
     {
         b.ToTable("woocommerce_product_link", t => t.ExcludeFromMigrations());
         b.HasKey(x => x.ProductId);
+        // PostgreSQL schema keeps "woocommerce" as one word. The default EF
+        // snake_case convention would incorrectly produce woo_commerce_*.
+        b.Property(x => x.WooCommerceProductId).HasColumnName("woocommerce_product_id");
+        b.Property(x => x.WooCommerceVariationId).HasColumnName("woocommerce_variation_id");
         b.HasIndex(x => new { x.WooCommerceProductId, x.WooCommerceVariationId }).IsUnique();
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
     }
@@ -21,6 +25,7 @@ public class WooCommerceOrderConfiguration : IEntityTypeConfiguration<WooCommerc
     {
         b.ToTable("woocommerce_order", t => t.ExcludeFromMigrations());
         b.HasKey(x => x.WooCommerceOrderId);
+        b.Property(x => x.WooCommerceOrderId).HasColumnName("woocommerce_order_id");
         b.Property(x => x.OrderNumber).HasMaxLength(64);
         b.Property(x => x.Status).HasMaxLength(32);
         b.Property(x => x.Currency).HasMaxLength(8);
@@ -41,6 +46,10 @@ public class WooCommerceOrderItemConfiguration : IEntityTypeConfiguration<WooCom
     {
         b.ToTable("woocommerce_order_item", t => t.ExcludeFromMigrations());
         b.HasKey(x => x.WooCommerceOrderItemId);
+        b.Property(x => x.WooCommerceOrderItemId).HasColumnName("woocommerce_order_item_id");
+        b.Property(x => x.WooCommerceOrderId).HasColumnName("woocommerce_order_id");
+        b.Property(x => x.WooCommerceProductId).HasColumnName("woocommerce_product_id");
+        b.Property(x => x.WooCommerceVariationId).HasColumnName("woocommerce_variation_id");
         b.Property(x => x.ProductName).HasMaxLength(255);
         b.HasIndex(x => x.WooCommerceOrderId);
         b.HasIndex(x => x.ProductId);
