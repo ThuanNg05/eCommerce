@@ -23,3 +23,10 @@ begin
       );
   end if;
 end $$;
+
+-- Keep the application's database readiness check in sync with this migration.
+insert into public.app_schema_version (id, version, applied_at)
+values (1, '20260817041419', now())
+on conflict (id) do update
+set version = excluded.version,
+    applied_at = excluded.applied_at;
