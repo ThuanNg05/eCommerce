@@ -23,6 +23,22 @@ public static class WooCommerceEndpoints
         g.MapPost("/products/sync", async (IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.SyncCatalogAsync(ct))).RequireAuthorization("AdminOnly");
 
+        g.MapPost("/products/publish-link", async (
+            LinkWarehouseProductRequest request, IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.PublishAndLinkProductAsync(request, ct)));
+
+        g.MapGet("/products/{productId:long}/link", async (
+            long productId, IWooCommerceService service, CancellationToken ct) =>
+            await service.GetProductLinkAsync(productId, ct) is { } link
+                ? Results.Ok(link)
+                : Results.Problem(detail: "Sản phẩm chưa được liên kết với WooCommerce.", statusCode: StatusCodes.Status404NotFound));
+
+        g.MapDelete("/products/{productId:long}/link", async (
+            long productId, IWooCommerceService service, CancellationToken ct) =>
+            await service.UnlinkProductAsync(productId, ct)
+                ? Results.NoContent()
+                : Results.Problem(detail: "Sản phẩm chưa được liên kết với WooCommerce.", statusCode: StatusCodes.Status404NotFound));
+
         g.MapPost("/orders/{wooCommerceOrderId:long}/confirm", async (
             long wooCommerceOrderId, ConfirmWooCommerceOrderRequest request, IWooCommerceService service, CancellationToken ct) =>
             await service.ConfirmAsync(wooCommerceOrderId, request, ct) is { } order

@@ -14,7 +14,8 @@ public sealed class SupabaseStorageOptions
     public string Bucket { get; set; } = "product-images";
 }
 
-/// <summary>Converts product uploads to WebP and persists them in Supabase Storage.</summary>
+/// <summary>Converts product uploads to JPEG and persists them in Supabase Storage.
+/// JPEG is accepted by the WordPress media security policy used by WooCommerce.</summary>
 public sealed class ProductImageStorage(HttpClient httpClient, IOptions<SupabaseStorageOptions> options)
 {
     private const long MaxUploadBytes = 5 * 1024 * 1024;
@@ -32,7 +33,7 @@ public sealed class ProductImageStorage(HttpClient httpClient, IOptions<Supabase
         MagickFormat.Svg,
     ];
 
-    public async Task<string> SaveAsWebpAsync(long productId, IFormFile file, CancellationToken ct)
+    public async Task<string> SaveAsJpegAsync(long productId, IFormFile file, CancellationToken ct)
     {
         if (productId <= 0)
             throw new DomainValidationException("Mã sản phẩm không hợp lệ.");
@@ -41,7 +42,7 @@ public sealed class ProductImageStorage(HttpClient httpClient, IOptions<Supabase
         if (file.Length > MaxUploadBytes)
             throw new DomainValidationException("Ảnh không được vượt quá 5 MB.");
 
-        byte[] webp;
+        byte[] jpeg;
         try
         {
             await using var input = file.OpenReadStream();
@@ -56,11 +57,11 @@ public sealed class ProductImageStorage(HttpClient httpClient, IOptions<Supabase
             image.AutoOrient();
             image.Strip();
             image.Resize(new MagickGeometry(MaxDimension, MaxDimension) { Greater = true });
-            image.Format = MagickFormat.WebP;
-            image.Quality = 82;
+            image.Format = MagickFormat.Jpeg;
+            image.Quality = 88;
             await using var output = new MemoryStream();
             image.Write(output);
-            webp = output.ToArray();
+            jpeg = output.ToArray();
         }
         catch (DomainValidationException)
         {
@@ -68,16 +69,16 @@ public sealed class ProductImageStorage(HttpClient httpClient, IOptions<Supabase
         }
         catch (MagickException)
         {
-            throw new DomainValidationException("File tải lên không phải ảnh hợp lệ hoặc không thể chuyển đổi sang WebP.");
+            throw new DomainValidationException("File tải lên không phải ảnh hợp lệ hoặc không thể chuyển đổi sang JPEG.");
         }
 
         var config = GetConfiguration();
-        var objectPath = $"products/{productId}/{Guid.NewGuid():N}.webp";
+        var objectPath = $"products/{productId}/{Guid.NewGuid():N}.jpg";
         using var request = CreateRequest(HttpMethod.Post, config, $"storage/v1/object/{config.Bucket}/{objectPath}");
         request.Headers.TryAddWithoutValidation("x-upsert", "false");
         request.Headers.CacheControl = new CacheControlHeaderValue { Public = true, MaxAge = TimeSpan.FromDays(365) };
-        request.Content = new ByteArrayContent(webp);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("image/webp");
+        request.Content = new ByteArrayContent(jpeg);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
 
         using var response = await httpClient.SendAsync(request, ct);
         EnsureSuccess(response, "tải ảnh lên Supabase Storage");

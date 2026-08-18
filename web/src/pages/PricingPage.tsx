@@ -58,20 +58,20 @@ const RATE_CARD_FIELDS: { key: keyof UpdateRateCardRequest; label: string; unit:
 ]
 
 const COMPONENT_FIELDS: { key: keyof UpsertProductComponentRequest; label: string }[] = [
-  { key: 'valKieng', label: 'Hệ số Kính' },
-  { key: 'valNhL', label: 'Hệ số Nhôm lớn' },
-  { key: 'valNhN', label: 'Hệ số Nhôm nhỏ' },
-  { key: 'valGL', label: 'Hệ số Gỗ lớn' },
-  { key: 'valGN', label: 'Hệ số Gỗ nhỏ' },
-  { key: 'valDL', label: 'Hệ số Đen lớn' },
-  { key: 'valBack', label: 'Hệ số Hậu / MDF' },
-  { key: 'valLua', label: 'Hệ số Lụa' },
-  { key: 'valKT', label: 'Hệ số Kim tuyến' },
-  { key: 'valOc', label: 'Hệ số Ốc / Phụ kiện' },
-  { key: 'valNhom', label: 'Hệ số Khung nhôm' },
-  { key: 'val7F', label: 'Hệ số 7 Phân' },
-  { key: 'val2D', label: 'Hệ số 2D' },
-  { key: 'valDecal', label: 'Hệ số Decal' },
+  { key: 'valKieng', label: 'Kính' },
+  { key: 'valNhL', label: 'Nhôm lớn' },
+  { key: 'valNhN', label: 'Nhôm nhỏ' },
+  { key: 'valGL', label: 'Gỗ lớn' },
+  { key: 'valGN', label: 'Gỗ nhỏ' },
+  { key: 'valDL', label: 'Đen lớn' },
+  { key: 'valBack', label: 'Hậu / MDF' },
+  { key: 'valLua', label: 'Lụa' },
+  { key: 'valKT', label: 'Kim tuyến' },
+  { key: 'valOc', label: 'Ốc / Phụ kiện' },
+  { key: 'valNhom', label: 'Khung nhôm' },
+  { key: 'val7F', label: '7 Phân' },
+  { key: 'val2D', label: '2D' },
+  { key: 'valDecal', label: 'Decal' },
 ]
 
 const DEFAULT_COMPONENT_FORM: UpsertProductComponentRequest = {
@@ -256,7 +256,7 @@ export default function PricingPage() {
             Định giá &amp; Công thức Giá sản phẩm
           </Typography>
           <Typography variant="body2" sx={{ color: '#737373' }}>
-            Quản lý bảng đơn giá vật tư toàn xưởng và cấu hình hệ số tính giá cho từng sản phẩm.
+            Quản lý bảng đơn giá vật tư toàn xưởng và cấu hình công thức tính giá cho từng sản phẩm.
           </Typography>
         </Box>
       </Box>
@@ -278,13 +278,13 @@ export default function PricingPage() {
             },
           }}
         >
-          <Tab label="1. Bảng đơn giá vật tư (Rate Card)" />
-          <Tab label="2. Công thức sản phẩm (Product Components)" />
+          <Tab label="1. Bảng đơn giá vật tư" />
+          <Tab label="2. Công thức sản phẩm" />
         </Tabs>
       </Paper>
 
       {/* ========================================================================= */}
-      {/* TAB 1: BẢNG ĐƠN GIÁ RATE CARD                                              */}
+      {/* TAB 1: BẢNG ĐƠN GIÁ VẬT TƯ                                                */}
       {/* ========================================================================= */}
       {activeTab === 0 && (
         <Box>
@@ -306,7 +306,7 @@ export default function PricingPage() {
                   Quy tắc tính giá tự động
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#1e40af', fontSize: 13 }}>
-                  Bảng giá vật tư gồm 14 đơn giá chuẩn. Khi bạn nhấn <strong>Cập nhật bảng giá</strong>, hệ thống phía Server sẽ tự động tính toán lại Giá gốc (Base Price) cho tất cả sản phẩm trong cơ sở dữ liệu dựa trên hệ số cấu thành.
+                  Bảng giá vật tư gồm 14 đơn giá chuẩn. Khi bạn nhấn <strong>Cập nhật bảng giá</strong>, hệ thống sẽ tự động tính toán lại Giá gốc cho tất cả sản phẩm trong cơ sở dữ liệu dựa trên các thành phần cấu thành.
                 </Typography>
               </Box>
             </Box>
@@ -411,7 +411,7 @@ export default function PricingPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: CÔNG THỨC SẢN PHẨM (PRODUCT COMPONENTS)                            */}
+      {/* TAB 2: CÔNG THỨC SẢN PHẨM                                                 */}
       {/* ========================================================================= */}
       {activeTab === 1 && (
         <Box>
@@ -459,7 +459,7 @@ export default function PricingPage() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      placeholder="Tìm theo SKU hoặc tên sản phẩm..."
+                      placeholder="Tìm theo mã hoặc tên sản phẩm..."
                       size="small"
                       InputProps={{
                         ...params.InputProps,
@@ -491,7 +491,7 @@ export default function PricingPage() {
 
             <Divider sx={{ mb: 3 }} />
 
-            {/* Server-Computed Result Banner */}
+            {/* Kết quả giá tính toán */}
             {selectedProductId && (
               <Paper
                 elevation={0}
@@ -508,7 +508,7 @@ export default function PricingPage() {
               >
                 <Box>
                   <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600, letterSpacing: '0.04em' }}>
-                    GIÁ GỐC TÍNH TỪ SERVER (BASE PRICE)
+                    GIÁ GỐC TÍNH TOÁN
                   </Typography>
                   <Typography variant="h4" sx={{ fontWeight: 700, color: '#15803d', mt: 0.5 }}>
                     {isComponentLoading ? '...' : formatVND(componentData?.basePrice ?? selectedProduct?.basePrice)}
@@ -517,23 +517,23 @@ export default function PricingPage() {
 
                 <Chip
                   icon={<Calculator size={14} color="#15803d" />}
-                  label="Server Compute (Chỉ đọc)"
+                  label="Tự động tính (Chỉ đọc)"
                   variant="outlined"
                   sx={{ bgcolor: '#ffffff', borderColor: '#86efac', color: '#15803d', fontWeight: 500 }}
                 />
               </Paper>
             )}
 
-            {/* Component Formula Form */}
+            {/* Form công thức thành phần */}
             <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717', mb: 2 }}>
-              Cấu hình Tiền công thợ &amp; 14 Hệ số thành phần (Nullable)
+              Cấu hình Tiền công thợ &amp; 14 thành phần định mức
             </Typography>
 
             <Grid container spacing={2.5} sx={{ mb: 4 }}>
-              {/* Wage / Tiền công */}
+              {/* Tiền công thợ */}
               <Grid item xs={12} sm={6} md={3}>
                 <Typography variant="caption" sx={{ color: '#171717', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                  TIỀN CÔNG THỜ (WAGE) *
+                  TIỀN CÔNG THỢ *
                 </Typography>
                 <TextField
                   fullWidth
@@ -550,7 +550,7 @@ export default function PricingPage() {
                 />
               </Grid>
 
-              {/* 14 Val* Component Coefficients */}
+              {/* 14 thành phần */}
               {COMPONENT_FIELDS.map((f) => (
                 <Grid item xs={12} sm={6} md={3} key={f.key}>
                   <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>

@@ -53,6 +53,7 @@ import {
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import { useAuth } from '../auth/AuthContext'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 
 const formatVND = (value?: number | null) => {
   if (value == null) return '—'
@@ -63,11 +64,11 @@ const formatVND = (value?: number | null) => {
   }).format(value)
 }
 
-function formatDateTime(value?: string | Date | number | null): string {
-  if (value == null || value === '') return '—'
+function formatDateTime(value?: string | Date | number | null, fallback = 'Chưa cung cấp'): string {
+  if (value == null || value === '') return fallback
   try {
     const date = typeof value === 'object' && value instanceof Date ? value : new Date(value)
-    if (isNaN(date.getTime())) return '—'
+    if (isNaN(date.getTime())) return fallback
     return new Intl.DateTimeFormat('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh',
       day: '2-digit',
@@ -78,7 +79,7 @@ function formatDateTime(value?: string | Date | number | null): string {
       hour12: false,
     }).format(date)
   } catch {
-    return '—'
+    return fallback
   }
 }
 
@@ -98,6 +99,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
             fontWeight: 500,
             borderRadius: '4px',
             height: 24,
+            whiteSpace: 'nowrap',
             '& .MuiChip-icon': { ml: 0.5 },
           }}
         />
@@ -107,7 +109,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
       return (
         <Chip
           icon={<XCircle size={13} color="#b91c1c" />}
-          label={label || 'Thiếu tồn kho'}
+          label={label || 'Không đủ tồn kho'}
           size="small"
           sx={{
             bgcolor: '#fef2f2',
@@ -116,6 +118,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
             fontWeight: 500,
             borderRadius: '4px',
             height: 24,
+            whiteSpace: 'nowrap',
             '& .MuiChip-icon': { ml: 0.5 },
           }}
         />
@@ -124,7 +127,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
       return (
         <Chip
           icon={<AlertTriangle size={13} color="#b45309" />}
-          label={label || 'Chưa liên kết'}
+          label={label || 'Chưa liên kết kho'}
           size="small"
           sx={{
             bgcolor: '#fffbeb',
@@ -133,6 +136,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
             fontWeight: 500,
             borderRadius: '4px',
             height: 24,
+            whiteSpace: 'nowrap',
             '& .MuiChip-icon': { ml: 0.5 },
           }}
         />
@@ -151,6 +155,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
             fontWeight: 500,
             borderRadius: '4px',
             height: 24,
+            whiteSpace: 'nowrap',
             '& .MuiChip-icon': { ml: 0.5 },
           }}
         />
@@ -169,17 +174,17 @@ function renderOrderStatusBadge(status: string) {
     case 'processing':
       bgcolor = '#eff6ff'
       color = '#1d4ed8'
-      label = 'Đang xử lý (Processing)'
+      label = 'Đang xử lý'
       break
     case 'completed':
       bgcolor = '#f0fdf4'
       color = '#15803d'
-      label = 'Hoàn thành (Completed)'
+      label = 'Hoàn thành'
       break
     case 'on-hold':
       bgcolor = '#fffbeb'
       color = '#b45309'
-      label = 'Tạm giữ (On-hold)'
+      label = 'Tạm giữ'
       break
     case 'pending':
       bgcolor = '#f2f2f2'
@@ -214,9 +219,37 @@ function renderOrderStatusBadge(status: string) {
         fontWeight: 500,
         borderRadius: '4px',
         height: 22,
+        whiteSpace: 'nowrap',
       }}
     />
   )
+}
+
+function getAvailabilityAlertContent(availability: string) {
+  switch (availability) {
+    case 'ready':
+      return {
+        title: 'Đủ tồn kho, có thể xác nhận xuất kho.',
+        desc: null,
+      }
+    case 'insufficient_stock':
+    case 'insufficient':
+      return {
+        title: 'Tồn kho không đủ để xử lý đơn hàng.',
+        desc: 'Vui lòng kiểm tra và nhập thêm tồn kho trước khi xuất hóa đơn.',
+      }
+    case 'unmapped':
+      return {
+        title: 'Có sản phẩm chưa được liên kết với kho.',
+        desc: 'Đơn hàng chưa thể xác nhận xuất kho.',
+      }
+    case 'not_eligible':
+    default:
+      return {
+        title: 'Đơn hàng chưa đủ điều kiện xuất kho.',
+        desc: null,
+      }
+  }
 }
 
 export default function WooCommerceOrdersPage() {
@@ -338,7 +371,7 @@ export default function WooCommerceOrdersPage() {
   const stats = useMemo(() => {
     const total = orders.length
     const ready = orders.filter((o) => o.availability === 'ready' && !o.confirmedInvoiceId).length
-    const insufficient = orders.filter((o) => o.availability === 'insufficient_stock').length
+    const insufficient = orders.filter((o) => o.availability === 'insufficient_stock' || o.availability === 'insufficient').length
     const unmapped = orders.filter((o) => o.availability === 'unmapped').length
     const confirmed = orders.filter((o) => Boolean(o.confirmedInvoiceId)).length
     return { total, ready, insufficient, unmapped, confirmed }
@@ -414,8 +447,7 @@ export default function WooCommerceOrdersPage() {
       {
         field: 'customerName',
         headerName: 'KHÁCH HÀNG',
-        flex: 1.2,
-        minWidth: 200,
+        minWidth: 160,
         sortable: true,
         cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
           if (!p.data) return null
@@ -442,7 +474,7 @@ export default function WooCommerceOrdersPage() {
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
               <Typography variant="body2" sx={{ fontSize: 13, color: '#404040' }}>
-                {formatDateTime(p.value)}
+                {formatDateTime(p.value, '—')}
               </Typography>
             </Box>
           )
@@ -466,8 +498,8 @@ export default function WooCommerceOrdersPage() {
       },
       {
         field: 'status',
-        headerName: 'TRẠNG THÁI WC',
-        width: 170,
+        headerName: 'TRẠNG THÁI',
+        width: 180,
         sortable: true,
         cellRenderer: (p: { value?: string }) => {
           if (!p.value) return null
@@ -481,7 +513,7 @@ export default function WooCommerceOrdersPage() {
       {
         field: 'availability',
         headerName: 'KHẢ DỤNG XUẤT KHO',
-        width: 170,
+        width: 175,
         sortable: true,
         cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
           if (!p.data) return null
@@ -532,7 +564,11 @@ export default function WooCommerceOrdersPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 170,
+        width: 140,
+        minWidth: 130,
+        maxWidth: 150,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
@@ -694,7 +730,7 @@ export default function WooCommerceOrdersPage() {
         <Grid item xs={12} sm={6} md={3}>
           <Paper elevation={0} sx={{ p: 2, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
             <Typography variant="caption" sx={{ color: '#b91c1c', fontWeight: 500, textTransform: 'uppercase' }}>
-              Thiếu tồn kho
+              Không đủ tồn kho
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 600, color: '#b91c1c', mt: 0.5 }}>
               {stats.insufficient}
@@ -726,19 +762,19 @@ export default function WooCommerceOrdersPage() {
 
           <TextField
             select
-            label="Trạng thái WooCommerce"
+            label="Trạng thái"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             size="small"
             sx={{ width: 220 }}
           >
             <MenuItem value="all">Tất cả trạng thái</MenuItem>
-            <MenuItem value="processing">Đang xử lý (processing)</MenuItem>
-            <MenuItem value="completed">Hoàn thành (completed)</MenuItem>
-            <MenuItem value="on-hold">Tạm giữ (on-hold)</MenuItem>
-            <MenuItem value="pending">Chờ thanh toán (pending)</MenuItem>
-            <MenuItem value="cancelled">Đã hủy (cancelled)</MenuItem>
-            <MenuItem value="refunded">Đã hoàn tiền (refunded)</MenuItem>
+            <MenuItem value="processing">Đang xử lý</MenuItem>
+            <MenuItem value="completed">Hoàn thành</MenuItem>
+            <MenuItem value="on-hold">Tạm giữ</MenuItem>
+            <MenuItem value="pending">Chờ thanh toán</MenuItem>
+            <MenuItem value="cancelled">Đã hủy</MenuItem>
+            <MenuItem value="refunded">Đã hoàn tiền</MenuItem>
           </TextField>
 
           <TextField
@@ -750,10 +786,10 @@ export default function WooCommerceOrdersPage() {
             sx={{ width: 220 }}
           >
             <MenuItem value="all">Tất cả khả dụng</MenuItem>
-            <MenuItem value="ready">Đủ tồn kho (Ready)</MenuItem>
-            <MenuItem value="insufficient_stock">Thiếu tồn kho (Insufficient)</MenuItem>
-            <MenuItem value="unmapped">Chưa liên kết SP (Unmapped)</MenuItem>
-            <MenuItem value="not_eligible">Chưa đủ điều kiện (Not Eligible)</MenuItem>
+            <MenuItem value="ready">Đủ tồn kho</MenuItem>
+            <MenuItem value="insufficient_stock">Không đủ tồn kho</MenuItem>
+            <MenuItem value="unmapped">Chưa liên kết kho</MenuItem>
+            <MenuItem value="not_eligible">Chưa đủ điều kiện</MenuItem>
           </TextField>
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13, ml: 'auto' }}>
@@ -785,6 +821,9 @@ export default function WooCommerceOrdersPage() {
           <AgGridReact<WooCommerceOrderDto>
             rowData={filteredOrders}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Không có đơn hàng WooCommerce nào</span>'
@@ -800,7 +839,7 @@ export default function WooCommerceOrdersPage() {
       <Dialog
         open={Boolean(selectedOrderId)}
         onClose={() => setSelectedOrderId(null)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -820,11 +859,11 @@ export default function WooCommerceOrdersPage() {
             alignItems: 'center',
             borderBottom: '1px solid #ededed',
             py: 1.5,
-            px: 3,
+            px: { xs: 2, sm: 3 },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#171717', fontSize: 16 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#171717', fontSize: 16, whiteSpace: 'nowrap' }}>
               Chi tiết đơn hàng #{orderDetail?.orderNumber || selectedOrderId}
             </Typography>
             {orderDetail && renderOrderStatusBadge(orderDetail.status)}
@@ -839,7 +878,7 @@ export default function WooCommerceOrdersPage() {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ p: 3 }}>
+        <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
           {isDetailLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
               <CircularProgress size={28} sx={{ color: '#1a1a1a' }} />
@@ -847,183 +886,329 @@ export default function WooCommerceOrdersPage() {
           ) : orderDetail ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               {/* Status Alert Banner */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: '6px',
-                  border: '1px solid',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  ...(orderDetail.availability === 'ready'
-                    ? { bgcolor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
-                    : orderDetail.availability === 'insufficient_stock'
-                    ? { bgcolor: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }
-                    : orderDetail.availability === 'unmapped'
-                    ? { bgcolor: '#fffbeb', borderColor: '#fef3c7', color: '#b45309' }
-                    : { bgcolor: '#f9f9f9', borderColor: '#ededed', color: '#737373' }),
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  {orderDetail.availability === 'ready' && <CheckCircle2 size={20} />}
-                  {orderDetail.availability === 'insufficient_stock' && <XCircle size={20} />}
-                  {orderDetail.availability === 'unmapped' && <AlertTriangle size={20} />}
-                  {orderDetail.availability === 'not_eligible' && <Clock size={20} />}
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14 }}>
-                      {orderDetail.availabilityLabel}
-                    </Typography>
-                    {orderDetail.confirmedInvoiceId && (
-                      <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: '#15803d' }}>
-                        Đã xuất hóa đơn kho: <strong>{orderDetail.confirmedInvoiceId}</strong> (Xác nhận lúc {formatDateTime(orderDetail.confirmedAt)})
-                      </Typography>
-                    )}
+              {(() => {
+                const alertContent = getAvailabilityAlertContent(orderDetail.availability)
+                return (
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 2,
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      ...(orderDetail.availability === 'ready'
+                        ? { bgcolor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
+                        : orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient'
+                        ? { bgcolor: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }
+                        : orderDetail.availability === 'unmapped'
+                        ? { bgcolor: '#fffbeb', borderColor: '#fef3c7', color: '#b45309' }
+                        : { bgcolor: '#f9f9f9', borderColor: '#ededed', color: '#737373' }),
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      {orderDetail.availability === 'ready' && <CheckCircle2 size={20} />}
+                      {(orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient') && (
+                        <XCircle size={20} />
+                      )}
+                      {orderDetail.availability === 'unmapped' && <AlertTriangle size={20} />}
+                      {orderDetail.availability === 'not_eligible' && <Clock size={20} />}
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14 }}>
+                          {alertContent.title}
+                        </Typography>
+                        {alertContent.desc && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.25, opacity: 0.9 }}>
+                            {alertContent.desc}
+                          </Typography>
+                        )}
+                        {orderDetail.confirmedInvoiceId && (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#15803d', fontWeight: 500 }}>
+                            Đã xuất hóa đơn kho: <strong>{orderDetail.confirmedInvoiceId}</strong> (Xác nhận lúc {formatDateTime(orderDetail.confirmedAt)})
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                    <Box sx={{ flexShrink: 0 }}>
+                      {renderAvailabilityBadge(orderDetail.availability)}
+                    </Box>
                   </Box>
-                </Box>
-                {renderAvailabilityBadge(orderDetail.availability)}
-              </Box>
+                )
+              })()}
 
               {/* Order Metadata Grid */}
               <Grid container spacing={2}>
+                {/* Thông tin khách hàng */}
                 <Grid item xs={12} sm={6}>
-                  <Paper elevation={0} sx={{ p: 2, bgcolor: '#fafafa', border: '1px solid #ededed', borderRadius: '6px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: '#fafafa',
+                      border: '1px solid #ededed',
+                      borderRadius: '6px',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 0.5, borderBottom: '1px solid #f0f0f0' }}>
                       <User size={16} color="#737373" />
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
                         Thông tin khách hàng
                       </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ color: '#171717', fontWeight: 500 }}>
-                      {orderDetail.customerName || 'Khách vãng lai'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ display: 'block', color: '#737373', mt: 0.5 }}>
-                      SĐT: {orderDetail.customerPhone || '—'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ display: 'block', color: '#737373' }}>
-                      Email: {orderDetail.customerEmail || '—'}
-                    </Typography>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#737373', minWidth: 90, whiteSpace: 'nowrap' }}>
+                          Khách hàng:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717' }}>
+                          {orderDetail.customerName?.trim() ? orderDetail.customerName : 'Khách vãng lai'}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#737373', minWidth: 90, whiteSpace: 'nowrap' }}>
+                          Số điện thoại:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: orderDetail.customerPhone?.trim() ? '#171717' : '#737373',
+                            fontWeight: orderDetail.customerPhone?.trim() ? 500 : 400,
+                          }}
+                        >
+                          {orderDetail.customerPhone?.trim() || 'Chưa cung cấp'}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#737373', minWidth: 90, whiteSpace: 'nowrap' }}>
+                          Email:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: orderDetail.customerEmail?.trim() ? '#171717' : '#737373',
+                            fontWeight: orderDetail.customerEmail?.trim() ? 500 : 400,
+                            wordBreak: 'break-all',
+                          }}
+                        >
+                          {orderDetail.customerEmail?.trim() || 'Chưa cung cấp'}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Paper>
                 </Grid>
 
+                {/* Địa chỉ giao hàng & Ngày đặt */}
                 <Grid item xs={12} sm={6}>
-                  <Paper elevation={0} sx={{ p: 2, bgcolor: '#fafafa', border: '1px solid #ededed', borderRadius: '6px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: '#fafafa',
+                      border: '1px solid #ededed',
+                      borderRadius: '6px',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 0.5, borderBottom: '1px solid #f0f0f0' }}>
                       <MapPin size={16} color="#737373" />
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717' }}>
-                        Địa chỉ giao hàng &amp; Ngày đặt
+                        Địa chỉ &amp; Thời gian đặt hàng
                       </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ color: '#404040', fontSize: 13 }}>
-                      {orderDetail.shippingAddress || 'Chưa cung cấp địa chỉ giao hàng'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ display: 'block', color: '#737373', mt: 0.5 }}>
-                      Ngày đặt hàng: {formatDateTime(orderDetail.sourceCreatedAt)}
-                    </Typography>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                        <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                          Địa chỉ giao hàng:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: orderDetail.shippingAddress?.trim() ? '#171717' : '#737373',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {orderDetail.shippingAddress?.trim() || 'Chưa cung cấp'}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                          Ngày đặt hàng:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: orderDetail.sourceCreatedAt ? '#171717' : '#737373',
+                            fontWeight: orderDetail.sourceCreatedAt ? 500 : 400,
+                          }}
+                        >
+                          {formatDateTime(orderDetail.sourceCreatedAt, 'Chưa cung cấp')}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Paper>
                 </Grid>
               </Grid>
 
-              {/* Line Items Table */}
+              {/* Line Items Section */}
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717', mb: 1 }}>
-                  Danh sách sản phẩm trong đơn ({orderDetail.lines?.length ?? 0} mặt hàng)
+                  {orderDetail.lines && orderDetail.lines.length > 0
+                    ? `Danh sách sản phẩm trong đơn (${orderDetail.lines.length} sản phẩm)`
+                    : 'Danh sách sản phẩm trong đơn'}
                 </Typography>
-                <Paper elevation={0} sx={{ border: '1px solid #ededed', borderRadius: '6px', overflow: 'hidden' }}>
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: '#fafafa' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }}>
-                          SẢN PHẨM WOOCOMMERCE
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="center">
-                          MÃ KHO (PRODUCT ID)
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="right">
-                          SỐ LƯỢNG
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="right">
-                          ĐƠN GIÁ
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="right">
-                          THÀNH TIỀN
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="right">
-                          TỒN KHO HIỆN CÓ
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1 }} align="center">
-                          TRẠNG THÁI
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {orderDetail.lines?.map((line: WooCommerceOrderLineDto) => (
-                        <TableRow key={line.wooCommerceOrderItemId} sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}>
-                          <TableCell sx={{ py: 1.2 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717', fontSize: 13 }}>
-                              {line.productName}
-                            </Typography>
-                            {line.wooCommerceVariationId && (
-                              <Typography variant="caption" sx={{ color: '#737373', fontSize: 11 }}>
-                                Variation ID: #{line.wooCommerceVariationId}
-                              </Typography>
-                            )}
+
+                {orderDetail.lines && orderDetail.lines.length > 0 ? (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      border: '1px solid #ededed',
+                      borderRadius: '6px',
+                      overflowX: 'auto',
+                    }}
+                  >
+                    <Table size="small" sx={{ minWidth: 750 }}>
+                      <TableHead sx={{ bgcolor: '#fafafa' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 200, whiteSpace: 'nowrap' }}>
+                            SẢN PHẨM
                           </TableCell>
-                          <TableCell align="center" sx={{ py: 1.2 }}>
-                            {line.productId ? (
-                              <Chip
-                                label={`Kho #${line.productId}`}
-                                size="small"
-                                sx={{ bgcolor: '#f2f2f2', color: '#171717', fontSize: 11, height: 20 }}
-                              />
-                            ) : (
-                              <Chip
-                                label="Chưa liên kết"
-                                size="small"
-                                sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20 }}
-                              />
-                            )}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 150, whiteSpace: 'nowrap' }} align="center">
+                            MÃ SẢN PHẨM KHO
                           </TableCell>
-                          <TableCell align="right" sx={{ py: 1.2, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                            {line.quantity}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 90, whiteSpace: 'nowrap' }} align="right">
+                            SỐ LƯỢNG
                           </TableCell>
-                          <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums' }}>
-                            {formatVND(line.unitPrice)}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 120, whiteSpace: 'nowrap' }} align="right">
+                            ĐƠN GIÁ
                           </TableCell>
-                          <TableCell align="right" sx={{ py: 1.2, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
-                            {formatVND(line.subtotal)}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 130, whiteSpace: 'nowrap' }} align="right">
+                            THÀNH TIỀN
                           </TableCell>
-                          <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums' }}>
-                            {line.availableStock != null ? (
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                  color: (line.availableStock >= line.quantity) ? '#15803d' : '#b91c1c',
-                                }}
-                              >
-                                {line.availableStock}
-                              </Typography>
-                            ) : (
-                              <span style={{ color: '#a3a3a3' }}>—</span>
-                            )}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 130, whiteSpace: 'nowrap' }} align="right">
+                            TỒN KHO HIỆN CÓ
                           </TableCell>
-                          <TableCell align="center" sx={{ py: 1.2 }}>
-                            {line.availability === 'available' && (
-                              <Chip label="Đủ tồn" size="small" sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontSize: 11, height: 20 }} />
-                            )}
-                            {line.availability === 'insufficient' && (
-                              <Chip label="Thiếu tồn" size="small" sx={{ bgcolor: '#fef2f2', color: '#b91c1c', fontSize: 11, height: 20 }} />
-                            )}
-                            {line.availability === 'unmapped' && (
-                              <Chip label="Chưa map" size="small" sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20 }} />
-                            )}
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 150, whiteSpace: 'nowrap' }} align="center">
+                            TRẠNG THÁI
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Paper>
+                      </TableHead>
+                      <TableBody>
+                        {orderDetail.lines.map((line: WooCommerceOrderLineDto) => (
+                          <TableRow key={line.wooCommerceOrderItemId} sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}>
+                            <TableCell sx={{ py: 1.2 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717', fontSize: 13 }}>
+                                {line.productName}
+                              </Typography>                              
+                            </TableCell>
+                            <TableCell align="center" sx={{ py: 1.2 }}>
+                              {line.productId ? (
+                                <Chip
+                                  label={`Kho #${line.productId}`}
+                                  size="small"
+                                  sx={{ bgcolor: '#f2f2f2', color: '#171717', fontSize: 11, height: 20, whiteSpace: 'nowrap' }}
+                                />
+                              ) : (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                                  <Chip
+                                    label="Chưa liên kết kho"
+                                    size="small"
+                                    sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20, fontWeight: 500, whiteSpace: 'nowrap' }}
+                                  />
+                                  <Typography variant="caption" sx={{ color: '#b91c1c', fontSize: 10, whiteSpace: 'nowrap' }}>
+                                    Không thể xuất kho
+                                  </Typography>
+                                </Box>
+                              )}
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.2, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {line.quantity}
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {formatVND(line.unitPrice)}
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.2, fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {formatVND(line.subtotal)}
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {line.productId ? (
+                                line.availableStock != null ? (
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: line.availableStock >= line.quantity ? '#15803d' : '#b91c1c',
+                                    }}
+                                  >
+                                    {line.availableStock}
+                                  </Typography>
+                                ) : (
+                                  <span style={{ color: '#a3a3a3' }}>—</span>
+                                )
+                              ) : (
+                                <Typography variant="caption" sx={{ color: '#737373', fontSize: 11 }}>
+                                  Chưa có mã kho
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell align="center" sx={{ py: 1.2, whiteSpace: 'nowrap' }}>
+                              {line.availability === 'available' && (
+                                <Chip label="Đủ tồn kho" size="small" sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                              )}
+                              {(line.availability === 'insufficient' || line.availability === 'insufficient_stock') && (
+                                <Chip label="Không đủ tồn kho" size="small" sx={{ bgcolor: '#fef2f2', color: '#b91c1c', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                              )}
+                              {line.availability === 'unmapped' && (
+                                <Chip label="Chưa liên kết kho" size="small" sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                              )}
+                              {line.availability !== 'available' &&
+                                line.availability !== 'insufficient' &&
+                                line.availability !== 'insufficient_stock' &&
+                                line.availability !== 'unmapped' && (
+                                  <Chip label={line.availability || 'Chưa đủ điều kiện'} size="small" sx={{ bgcolor: '#f2f2f2', color: '#737373', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Paper>
+                ) : (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      textAlign: 'center',
+                      bgcolor: '#fafafa',
+                      border: '1px dashed #d4d4d4',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <AlertTriangle size={28} color="#b45309" />
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717' }}>
+                        Chưa nhận được danh sách sản phẩm từ WooCommerce. Vui lòng đồng bộ lại đơn hàng.
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#737373' }}>
+                        Dữ liệu chi tiết các mặt hàng của đơn này chưa có hoặc chưa được cập nhật từ hệ thống WooCommerce.
+                      </Typography>
+                    </Box>
+                  </Paper>
+                )}
               </Box>
 
               {/* Summary total */}
@@ -1041,7 +1226,7 @@ export default function WooCommerceOrdersPage() {
           ) : null}
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #ededed' }}>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: '1px solid #ededed' }}>
           <Button
             onClick={() => setSelectedOrderId(null)}
             variant="outlined"
@@ -1108,12 +1293,12 @@ export default function WooCommerceOrdersPage() {
           <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#f9f9f9', border: '1px solid #ededed', borderRadius: '6px' }}>
             <Grid container spacing={1}>
               <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#737373' }}>Khách đặt hàng WC:</Typography>
+                <Typography variant="caption" sx={{ color: '#737373' }}>Khách đặt hàng WooCommerce:</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717' }}>
-                  {orderToConfirm?.customerName || 'Khách vãng lai'}
+                  {orderToConfirm?.customerName?.trim() ? orderToConfirm.customerName : 'Khách vãng lai'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#737373' }}>
-                  {orderToConfirm?.customerPhone || '—'}
+                  {orderToConfirm?.customerPhone?.trim() || 'Chưa cung cấp'}
                 </Typography>
               </Grid>
               <Grid item xs={6} sx={{ textAlign: 'right' }}>
@@ -1122,7 +1307,7 @@ export default function WooCommerceOrdersPage() {
                   {formatVND(orderToConfirm?.total)}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#737373' }}>
-                  {orderToConfirm?.lines?.length ?? 0} mặt hàng
+                  {orderToConfirm?.lines?.length ? `${orderToConfirm.lines.length} sản phẩm` : 'Chưa có sản phẩm'}
                 </Typography>
               </Grid>
             </Grid>
@@ -1165,7 +1350,7 @@ export default function WooCommerceOrdersPage() {
                       {option.name}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#737373' }}>
-                      SĐT: {option.phone} | Địa chỉ: {option.address || '—'}
+                      SĐT: {option.phone || 'Chưa cung cấp'} | Địa chỉ: {option.address || 'Chưa cung cấp'}
                     </Typography>
                   </Box>
                 </li>

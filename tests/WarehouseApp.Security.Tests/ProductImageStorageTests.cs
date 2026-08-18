@@ -9,7 +9,7 @@ namespace WarehouseApp.Security.Tests;
 public class ProductImageStorageTests
 {
     [Fact]
-    public async Task SaveAsWebpAsync_ValidPng_UploadsWebpToProductImagesBucket()
+    public async Task SaveAsJpegAsync_ValidPng_UploadsJpegToProductImagesBucket()
     {
         var handler = new RecordingHandler(HttpStatusCode.OK);
         var storage = CreateStorage(handler);
@@ -21,14 +21,15 @@ public class ProductImageStorageTests
             ContentType = "image/png",
         };
 
-        var imageUrl = await storage.SaveAsWebpAsync(42, file, CancellationToken.None);
+        var imageUrl = await storage.SaveAsJpegAsync(42, file, CancellationToken.None);
 
         Assert.StartsWith("https://example.supabase.co/storage/v1/object/public/product-images/products/42/", imageUrl, StringComparison.Ordinal);
-        Assert.EndsWith(".webp", imageUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(".jpg", imageUrl, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal("image/webp", handler.ContentType);
+        Assert.Equal("image/jpeg", handler.ContentType);
         Assert.Equal("Bearer server-secret", handler.Authorization);
-        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(handler.Payload, 0, 4));
+        Assert.Equal(0xFF, handler.Payload[0]);
+        Assert.Equal(0xD8, handler.Payload[1]);
     }
 
     [Fact]

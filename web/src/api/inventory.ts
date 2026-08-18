@@ -14,6 +14,8 @@ export interface ProductDto {
   priceRetail?: number | null
   priceWholesale?: number | null
   subBackboardId?: number | null
+  width?: number | null
+  height?: number | null
   inStock: number
   warningStock: number
   status: number
@@ -30,8 +32,10 @@ export interface CreateProductRequest {
   priceRetail?: number | null
   priceWholesale?: number | null
   subBackboardId?: number | null
+  width?: number | null
+  height?: number | null
   inStock: number
-  warningStock: number
+  warningStock?: number | null
   categoryIds?: number[]
 }
 
@@ -42,6 +46,8 @@ export interface UpdateProductRequest {
   priceRetail?: number | null
   priceWholesale?: number | null
   subBackboardId?: number | null
+  width?: number | null
+  height?: number | null
   warningStock: number
   status: number
   categoryIds?: number[]

@@ -20,7 +20,7 @@ desktop Windows dùng WPF + WebView2.
 - Báo cáo doanh thu, sản phẩm, khách hàng và luồng tồn kho.
 - Phân quyền người dùng, quản lý phiên đăng nhập và nhật ký kiểm toán.
 - Cấu hình SMTP; app password được mã hóa trước khi lưu vào database.
-- Upload ảnh sản phẩm, chuyển đổi sang WebP và lưu trên Supabase Storage.
+- Upload ảnh sản phẩm, chuyển đổi sang JPEG và lưu trên Supabase Storage.
 - Đồng bộ đơn WooCommerce để nhân viên kiểm tra tồn và xác nhận xuất kho thủ công.
 - Chạy dưới dạng web development environment hoặc ứng dụng desktop Windows.
 
@@ -276,7 +276,7 @@ Nếu không cấu hình JWT signing key trên Windows, ứng dụng tạo một
 `%LOCALAPPDATA%/WarehouseApp/security/jwt-signing-key.bin` và bảo vệ bằng DPAPI.
 Production nhiều instance phải dùng một signing key chung từ secret store.
 
-Ảnh sản phẩm được API chuyển sang WebP và upload vào bucket public
+Ảnh sản phẩm được API chuyển sang JPEG và upload vào bucket public
 `product-images`. Chỉ backend được dùng `SupabaseStorage:ServiceRoleKey`; không
 đặt key này trong `web/`, biến `VITE_*` hoặc source code.
 
@@ -287,7 +287,7 @@ không đặt Consumer Key/Secret vào React. Sau khi cấu hình secret, tạo 
 Đơn chỉ có thể xác nhận xuất kho khi WooCommerce ở `processing` hoặc `completed`,
 mọi dòng đã liên kết sản phẩm kho và tồn hiện tại đủ số lượng.
 Catalog kho là nguồn chính: quản trị viên liên kết từng sản phẩm, rồi gọi đồng bộ
-để đẩy tên, giá bán lẻ, tồn kho và URL ảnh WebP (nếu có) lên WooCommerce.
+để đẩy tên, giá bán lẻ, tồn kho và URL ảnh JPEG (nếu có) lên WooCommerce.
 
 ## API và phân quyền
 

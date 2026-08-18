@@ -21,6 +21,7 @@ import SearchField from '../components/SearchField'
 import { fetchAuditLogs, type AuditLogDto } from '../api/audit'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { formatDate } from '../utils/dateFormat'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 
 function formatJsonString(raw?: string | null) {
   if (!raw) return '— (Không có dữ liệu)'
@@ -122,8 +123,11 @@ export default function AuditLogsPage() {
       },
       {
         headerName: 'CHI TIẾT SNAPSHOT',
-        flex: 1,
-        minWidth: 150,
+        width: 140,
+        minWidth: 120,
+        maxWidth: 160,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: AuditLogDto }) => {
@@ -236,6 +240,9 @@ export default function AuditLogsPage() {
           <AgGridReact<AuditLogDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             localeText={AG_GRID_LOCALE_VI}
             overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Chưa có dữ liệu nhật ký audit</span>'

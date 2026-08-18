@@ -52,8 +52,8 @@ create index if not exists ix_woocommerce_order_item_product
   on woocommerce_order_item (product_id);
 
 -- Make the new schema version visible to the application's readiness probe.
-insert into public.app_schema_version (id, version, updated_at)
+insert into public.app_schema_version (id, version, applied_at)
 values (1, '20260816042127', now())
 on conflict (id) do update
 set version = excluded.version,
-    updated_at = excluded.updated_at;
+    applied_at = excluded.applied_at;

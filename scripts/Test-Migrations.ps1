@@ -48,6 +48,11 @@ for ($index = 0; $index -lt $legacyVersions.Count; $index++) {
 $timestampVersions = @($versions | Where-Object { $_.Version.Length -eq 14 } | Select-Object -ExpandProperty Version)
 if ($timestampVersions.Count -gt 0) {
     $latestVersion = ($timestampVersions | Sort-Object)[-1]
+    $latestFile = $files | Where-Object { $_.Name -like "$latestVersion`_*" } | Select-Object -First 1
+    $latestSql = Get-Content -LiteralPath $latestFile.FullName -Raw
+    if ($latestSql -notmatch '(?is)app_schema_version' -or $latestSql -notmatch [regex]::Escape($latestVersion)) {
+        throw "Latest migration '$($latestFile.Name)' must update public.app_schema_version to '$latestVersion'."
+    }
     $settingsFiles = @(
         "src/WarehouseApp.Api/appsettings.json",
         "src/WarehouseApp.Desktop/appsettings.json"

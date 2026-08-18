@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 import {
   Box,
   Typography,
@@ -120,14 +121,18 @@ export default function CustomersPage() {
       {
         headerName: 'STT',
         width: 70,
+        minWidth: 60,
+        maxWidth: 80,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
-      { field: 'name', headerName: 'TÊN KHÁCH HÀNG', flex: 1, minWidth: 180, filter: true, sortable: true },
+      { field: 'name', headerName: 'TÊN KHÁCH HÀNG', minWidth: 150, filter: true, sortable: true },
       { field: 'phone', headerName: 'SỐ ĐIỆN THOẠI', width: 140, filter: true, sortable: true },
       { field: 'email', headerName: 'EMAIL', width: 180 },
-      { field: 'address', headerName: 'ĐỊA CHỈ', flex: 1, minWidth: 200 },
+      { field: 'address', headerName: 'ĐỊA CHỈ', minWidth: 160 },
       {
         field: 'groupPrice',
         headerName: 'NHÓM GIÁ',
@@ -155,7 +160,11 @@ export default function CustomersPage() {
       { field: 'description', headerName: 'GHI CHÚ', width: 160 },
       {
         headerName: 'THAO TÁC',
-        width: 100,
+        width: 90,
+        minWidth: 80,
+        maxWidth: 100,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: CustomerDto }) => {
@@ -251,6 +260,9 @@ export default function CustomersPage() {
           <AgGridReact<CustomerDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             quickFilterText={search}
             localeText={AG_GRID_LOCALE_VI}

@@ -12,6 +12,8 @@ public record ProductDto(
     decimal? PriceRetail,
     decimal? PriceWholesale,
     long? SubBackboardId,
+    decimal? Width,
+    decimal? Height,
     int InStock,
     int WarningStock,
     short Status,
@@ -27,8 +29,10 @@ public record CreateProductRequest(
     decimal? PriceRetail,
     decimal? PriceWholesale,
     long? SubBackboardId,
+    decimal? Width,
+    decimal? Height,
     int InStock,
-    int WarningStock,
+    int? WarningStock,
     IReadOnlyList<long>? CategoryIds);
 
 /// <summary><see cref="CategoryIds"/> null = leave the product's categories unchanged;
@@ -40,6 +44,8 @@ public record UpdateProductRequest(
     decimal? PriceRetail,
     decimal? PriceWholesale,
     long? SubBackboardId,
+    decimal? Width,
+    decimal? Height,
     int WarningStock,
     short Status,
     IReadOnlyList<long>? CategoryIds);

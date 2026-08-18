@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './client'
+import { apiGet, apiPost, apiPut, apiDelete } from './client'
 
 export interface WooCommerceOrderLineDto {
   wooCommerceOrderItemId: number
@@ -41,6 +41,10 @@ export interface WooCommerceProductLinkDto {
 export interface LinkWooCommerceProductRequest {
   productId: number
   wooCommerceVariationId?: number | null
+}
+
+export interface LinkWarehouseProductRequest {
+  productId: number
 }
 
 export interface ConfirmWooCommerceOrderRequest {
@@ -94,6 +98,20 @@ export function linkWooCommerceProduct(
   return apiPut<WooCommerceProductLinkDto>(`/api/woocommerce/products/${wooCommerceProductId}/link`, req)
 }
 
+export function publishAndLinkWarehouseProduct(
+  productId: number,
+): Promise<WooCommerceProductLinkDto> {
+  return apiPost<WooCommerceProductLinkDto>('/api/woocommerce/products/publish-link', { productId })
+}
+
 export function syncWooCommerceCatalog(): Promise<WooCommerceCatalogSyncResult> {
   return apiPost<WooCommerceCatalogSyncResult>('/api/woocommerce/products/sync')
+}
+
+export function fetchProductLink(productId: number): Promise<WooCommerceProductLinkDto> {
+  return apiGet<WooCommerceProductLinkDto>(`/api/woocommerce/products/${productId}/link`)
+}
+
+export function unlinkProduct(productId: number): Promise<void> {
+  return apiDelete<void>(`/api/woocommerce/products/${productId}/link`)
 }

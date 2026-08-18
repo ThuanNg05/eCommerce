@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, ValueFormatterParams } from 'ag-grid-community'
+import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 import {
   Box,
   Typography,
@@ -132,11 +133,15 @@ export default function MaterialsPage() {
       {
         headerName: 'STT',
         width: 70,
+        minWidth: 60,
+        maxWidth: 80,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         valueGetter: (p) => (p.node?.rowIndex ?? 0) + 1,
       },
-      { field: 'name', headerName: 'TÊN VẬT LIỆU', flex: 1, minWidth: 180, filter: true, sortable: true },
+      { field: 'name', headerName: 'TÊN VẬT LIỆU', minWidth: 150, filter: true, sortable: true },
       {
         field: 'unit',
         headerName: 'ĐƠN VỊ',
@@ -196,7 +201,11 @@ export default function MaterialsPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 100,
+        width: 90,
+        minWidth: 80,
+        maxWidth: 100,
+        suppressAutoSize: true,
+        resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data: MaterialDto }) => {
@@ -291,6 +300,9 @@ export default function MaterialsPage() {
           <AgGridReact<MaterialDto>
             rowData={data?.items ?? []}
             columnDefs={columns}
+            autoSizeStrategy={AG_GRID_AUTO_SIZE_STRATEGY}
+            onFirstDataRendered={(params) => autoSizeGridColumns(params.api)}
+            onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             rowClassRules={{
               'ag-row-warning-stock': (params) =>
                 Boolean(params.data && params.data.inStock <= (params.data.warningStock ?? 0)),
