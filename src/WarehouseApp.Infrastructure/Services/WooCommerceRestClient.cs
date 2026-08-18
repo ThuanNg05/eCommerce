@@ -67,6 +67,15 @@ public sealed class WooCommerceRestClient(HttpClient httpClient, IOptions<WooCom
         await EnsureSuccessAsync(response, ct);
     }
 
+    public async Task SetOrderStatusAsync(long orderId, string status, CancellationToken ct)
+    {
+        EnsureConfigured();
+        using var request = CreateRequest(HttpMethod.Put, $"orders/{orderId}");
+        request.Content = JsonContent.Create(new { status }, options: JsonOptions);
+        using var response = await httpClient.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
     public async Task<long> CreateProductAsync(WooCommerceCatalogCreate create, CancellationToken ct)
     {
         EnsureConfigured();
@@ -148,6 +157,8 @@ public sealed record WooCommerceRemoteOrder(
     DateTimeOffset? DateModifiedGmt,
     WooCommerceRemoteAddress? Billing,
     WooCommerceRemoteAddress? Shipping,
+    [property: JsonPropertyName("customer_note")]
+    string? CustomerNote,
     [property: JsonPropertyName("line_items")]
     List<WooCommerceRemoteOrderItem>? LineItems);
 

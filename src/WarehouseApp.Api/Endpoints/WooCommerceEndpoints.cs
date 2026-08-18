@@ -17,6 +17,9 @@ public static class WooCommerceEndpoints
                 ? Results.Ok(order)
                 : Results.Problem(detail: "Không tìm thấy đơn WooCommerce.", statusCode: StatusCodes.Status404NotFound));
 
+        g.MapGet("/orders/status-reasons", async (string? status, IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.ListOrderStatusReasonsAsync(status, ct)));
+
         g.MapPost("/orders/sync", async (IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.SyncOrdersAsync(ct))).RequireAuthorization("AdminOnly");
 
@@ -42,6 +45,12 @@ public static class WooCommerceEndpoints
         g.MapPost("/orders/{wooCommerceOrderId:long}/confirm", async (
             long wooCommerceOrderId, ConfirmWooCommerceOrderRequest request, IWooCommerceService service, CancellationToken ct) =>
             await service.ConfirmAsync(wooCommerceOrderId, request, ct) is { } order
+                ? Results.Ok(order)
+                : Results.Problem(detail: "Không tìm thấy đơn WooCommerce.", statusCode: StatusCodes.Status404NotFound));
+
+        g.MapPut("/orders/{wooCommerceOrderId:long}/status", async (
+            long wooCommerceOrderId, UpdateWooCommerceOrderStatusRequest request, IWooCommerceService service, CancellationToken ct) =>
+            await service.UpdateOrderStatusAsync(wooCommerceOrderId, request, ct) is { } order
                 ? Results.Ok(order)
                 : Results.Problem(detail: "Không tìm thấy đơn WooCommerce.", statusCode: StatusCodes.Status404NotFound));
 

@@ -17,6 +17,10 @@ public sealed class WooCommerceService(
     IOptions<WooCommerceOptions> options) : IWooCommerceService
 {
     private readonly WooCommerceOptions _options = options.Value;
+    private static readonly HashSet<string> AllowedOrderStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed", "draft"
+    };
 
     public async Task<IReadOnlyList<WooCommerceOrderDto>> ListOrdersAsync(int page, int pageSize, string? status, CancellationToken ct = default)
     {
@@ -215,6 +219,70 @@ public sealed class WooCommerceService(
         return ToDto(order);
     }
 
+    public async Task<WooCommerceOrderDto?> UpdateOrderStatusAsync(
+        long wooCommerceOrderId, UpdateWooCommerceOrderStatusRequest request, CancellationToken ct = default)
+    {
+        if (wooCommerceOrderId <= 0) throw new DomainValidationException("Mã đơn WooCommerce phải lớn hơn 0.");
+        var status = request.Status?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(status) || !AllowedOrderStatuses.Contains(status))
+            throw new DomainValidationException("Trạng thái WooCommerce không hợp lệ.");
+
+        var reasonCode = request.ReasonCode?.Trim().ToLowerInvariant();
+        var requiresReason = status is "cancelled" or "refunded";
+        WooCommerceOrderStatusReason? reason = null;
+        if (requiresReason)
+        {
+            if (string.IsNullOrWhiteSpace(reasonCode))
+                throw new DomainValidationException("Vui lòng chọn lý do cho trạng thái hủy hoặc hoàn tiền.");
+            reason = await db.WooCommerceOrderStatusReasons.FirstOrDefaultAsync(
+                x => x.Code == reasonCode && x.TargetStatus == status && x.IsActive, ct);
+            if (reason is null)
+                throw new DomainValidationException("Lý do trạng thái WooCommerce không hợp lệ.");
+        }
+        else if (!string.IsNullOrWhiteSpace(reasonCode))
+        {
+            throw new DomainValidationException("Chỉ được chọn lý do khi chuyển đơn sang hủy hoặc hoàn tiền.");
+        }
+        if (request.Note?.Length > 1000)
+            throw new DomainValidationException("Ghi chú lý do không được vượt quá 1000 ký tự.");
+
+        var order = await db.WooCommerceOrders.Include(x => x.Items).ThenInclude(x => x.Product)
+            .FirstOrDefaultAsync(x => x.WooCommerceOrderId == wooCommerceOrderId, ct);
+        if (order is null) return null;
+
+        // Update WooCommerce first. The local snapshot changes only after the remote API accepts it.
+        var previousStatus = order.Status;
+        await client.SetOrderStatusAsync(wooCommerceOrderId, status, ct);
+        order.Status = status;
+        order.SourceUpdatedAt = DateTimeOffset.UtcNow;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+        if (!string.Equals(previousStatus, status, StringComparison.OrdinalIgnoreCase))
+        {
+            db.WooCommerceOrderStatusHistories.Add(new WooCommerceOrderStatusHistory
+            {
+                WooCommerceOrderId = order.WooCommerceOrderId,
+                FromStatus = previousStatus,
+                ToStatus = status,
+                ReasonCode = reason?.Code,
+                Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+                Source = "warehouse",
+            });
+        }
+        await db.SaveChangesAsync(ct);
+        return ToDto(order);
+    }
+
+    public async Task<IReadOnlyList<WooCommerceOrderStatusReasonDto>> ListOrderStatusReasonsAsync(
+        string? targetStatus, CancellationToken ct = default)
+    {
+        var status = targetStatus?.Trim().ToLowerInvariant();
+        var query = db.WooCommerceOrderStatusReasons.AsNoTracking().Where(x => x.IsActive);
+        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(x => x.TargetStatus == status);
+        return await query.OrderBy(x => x.TargetStatus).ThenBy(x => x.SortOrder).ThenBy(x => x.Label)
+            .Select(x => new WooCommerceOrderStatusReasonDto(x.Code, x.TargetStatus, x.Label))
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> AcceptWebhookAsync(string? signature, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
     {
         if (!WooCommerceWebhookSignature.IsValid(_options.WebhookSecret, signature, payload.Span)) return false;
@@ -238,10 +306,12 @@ public sealed class WooCommerceService(
         order.Status = (remote.Status ?? string.Empty).Trim().ToLowerInvariant();
         order.Currency = remote.Currency;
         order.Total = ParseDecimal(remote.Total);
-        order.CustomerName = FullName(remote.Billing) ?? FullName(remote.Shipping);
-        order.CustomerEmail = remote.Billing?.Email;
-        order.CustomerPhone = remote.Billing?.Phone;
-        order.ShippingAddress = FormatAddress(remote.Shipping ?? remote.Billing);
+        order.CustomerName = FullName(remote.Shipping) ?? FullName(remote.Billing);
+        order.CustomerPhone = NormalizePhone(remote.Billing?.Phone) ?? NormalizePhone(remote.Shipping?.Phone);
+        order.CustomerEmail = Limit(remote.Billing?.Email?.Trim(), 255) ?? Limit(remote.Shipping?.Email?.Trim(), 255);
+        order.ShippingAddress = Limit(FormatAddress(remote.Shipping ?? remote.Billing), 255);
+        order.CustomerNote = remote.CustomerNote;
+        await UpsertWooCommerceCustomerAsync(remote, ct);
         // PostgreSQL timestamp with time zone requires DateTimeOffset values normalized to UTC.
         order.SourceCreatedAt = (remote.DateCreated ?? remote.DateCreatedGmt)?.ToUniversalTime();
         order.SourceUpdatedAt = (remote.DateModified ?? remote.DateModifiedGmt)?.ToUniversalTime();
@@ -278,6 +348,48 @@ public sealed class WooCommerceService(
         await db.SaveChangesAsync(ct);
     }
 
+    private async Task UpsertWooCommerceCustomerAsync(WooCommerceRemoteOrder remote, CancellationToken ct)
+    {
+        var name = Limit(FullName(remote.Shipping) ?? FullName(remote.Billing) ?? $"Khách WooCommerce #{remote.Id}", 255)
+            ?? "Khách WooCommerce";
+        var phone = NormalizePhone(remote.Billing?.Phone) ?? NormalizePhone(remote.Shipping?.Phone);
+        var email = Limit(remote.Billing?.Email?.Trim(), 255) ?? Limit(remote.Shipping?.Email?.Trim(), 255);
+        var formattedAddress = Limit(FormatAddress(remote.Shipping ?? remote.Billing), 255);
+
+        var customer = !string.IsNullOrWhiteSpace(phone)
+            ? await db.Customers.FirstOrDefaultAsync(x => x.Phone == phone, ct)
+            : null;
+        customer ??= !string.IsNullOrWhiteSpace(email)
+            ? await db.Customers.FirstOrDefaultAsync(x => x.Email == email, ct)
+            : null;
+        customer ??= await db.Customers.FirstOrDefaultAsync(x => x.Name == name, ct);
+
+        if (customer is null)
+        {
+            customer = new Customer
+            {
+                Name = name,
+                Phone = phone ?? PlaceholderPhone(remote.Id),
+                Address = formattedAddress,
+                Email = email,
+                GroupPrice = "L",
+                Description = "Khách hàng đồng bộ từ WooCommerce",
+            };
+            db.Customers.Add(customer);
+            return;
+        }
+
+        // Nếu là khách hàng tự động đồng bộ từ WooCommerce, cập nhật lại tên đầy đủ khi re-sync.
+        if (customer.Description == "Khách hàng đồng bộ từ WooCommerce" && !string.IsNullOrWhiteSpace(name))
+        {
+            customer.Name = name;
+        }
+        if (!string.IsNullOrWhiteSpace(formattedAddress)) customer.Address = formattedAddress;
+        if (!string.IsNullOrWhiteSpace(email) && (string.IsNullOrWhiteSpace(customer.Email) || customer.Email == email)) customer.Email = email;
+        if (!string.IsNullOrWhiteSpace(phone) && (string.IsNullOrWhiteSpace(customer.Phone) || customer.Phone == phone)) customer.Phone = phone;
+        customer.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     private static WooCommerceOrderDto ToDto(WooCommerceOrder order)
     {
         var availability = EvaluateAvailability(order);
@@ -287,7 +399,7 @@ public sealed class WooCommerceService(
             order.Items.Select(item => new WooCommerceOrderLineDto(item.WooCommerceOrderItemId, item.WooCommerceProductId,
                 item.WooCommerceVariationId, item.ProductId, item.ProductName, item.Quantity, item.UnitPrice, item.Subtotal,
                 item.Product?.InStock, item.ProductId is null ? "unmapped" : item.Product!.InStock >= item.Quantity ? "available" : "insufficient"))
-                .ToList());
+                .ToList(), order.CustomerNote);
     }
 
     private static (string Code, string Label) EvaluateAvailability(WooCommerceOrder order)
@@ -345,6 +457,19 @@ public sealed class WooCommerceService(
 
     private static string? FullName(WooCommerceRemoteAddress? address) => string.Join(' ', new[] { address?.FirstName, address?.LastName }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim() is { Length: > 0 } name ? name : null;
     private static string? FormatAddress(WooCommerceRemoteAddress? address) => address is null ? null : string.Join(", ", new[] { address.Address1, address.Address2, address.City, address.State, address.Postcode, address.Country }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    private static string? Limit(string? value, int maxLength) => string.IsNullOrWhiteSpace(value) ? null : value.Trim()[..Math.Min(value.Trim().Length, maxLength)];
+    private static string? NormalizePhone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("84") && digits.Length is >= 10 and <= 12) digits = "0" + digits[2..];
+        return digits.Length is >= 9 and <= 11 ? digits : null;
+    }
+    private static string PlaceholderPhone(long orderId)
+    {
+        var digits = orderId.ToString(CultureInfo.InvariantCulture).PadLeft(9, '0');
+        return $"WC{digits[^9..]}";
+    }
 }
 
 public static class WooCommerceWebhookSignature
