@@ -113,7 +113,9 @@ function validateProductDimensions(width?: number | null, height?: number | null
 export default function ProductsPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'Admin'
+  const role = user?.role?.toLowerCase()
+  const isAdmin = role === 'admin'
+  const canLinkWooCommerce = role === 'admin' || role === 'staff'
   const [search, setSearch] = useState('')
 
   // Dialog States
@@ -622,6 +624,7 @@ export default function ProductsPage() {
         resizable: false,
         sortable: false,
         filter: false,
+        pinned: 'left',
         cellRenderer: (p: { data?: ProductDto }) => {
           const rawUrl = p.data?.imageUrl
           const resolvedUrl = rawUrl ? resolveApiUrl(rawUrl) : null
@@ -686,6 +689,7 @@ export default function ProductsPage() {
         minWidth: 160,
         filter: true,
         sortable: true,
+        pinned: 'left',
       },
       {
         field: 'categories',
@@ -810,7 +814,7 @@ export default function ProductsPage() {
                 </IconButton>
               </Tooltip>
 
-              {isAdmin && (
+              {canLinkWooCommerce && (
                 <Tooltip title="Liên kết WooCommerce">
                   <IconButton size="small" onClick={() => handleOpenLink(p.data)} sx={{ color: '#404040' }}>
                     <Link2 size={16} />
@@ -841,7 +845,7 @@ export default function ProductsPage() {
         },
       },
     ],
-    [isAdmin],
+    [canLinkWooCommerce],
   )
 
   return (

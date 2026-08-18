@@ -998,12 +998,12 @@ export default function ReportsPage() {
               </Typography>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 360 }}>
+            <TableContainer sx={{ maxHeight: 360, overflowX: 'auto' }}>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>#</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>SẢN PHẨM</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 0, zIndex: 4, bgcolor: '#f8fafc', width: 40 }}>#</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 40, zIndex: 4, bgcolor: '#f8fafc', borderRight: '1px solid #e2e8f0', minWidth: 160 }}>SẢN PHẨM</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>
                       SỐ LƯỢNG
                     </TableCell>
@@ -1024,10 +1024,10 @@ export default function ReportsPage() {
                   ) : topProductsData && topProductsData.length > 0 ? (
                     topProductsData.map((prod, idx) => (
                       <TableRow key={prod.productId || idx} hover>
-                        <TableCell sx={{ fontWeight: 700, color: idx < 3 ? '#d97706' : '#64748b' }}>
+                        <TableCell sx={{ fontWeight: 700, color: idx < 3 ? '#d97706' : '#64748b', position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>
                           {idx + 1}
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ position: 'sticky', left: 40, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #e2e8f0' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>
                             {prod.name}
                           </Typography>
@@ -1079,12 +1079,12 @@ export default function ReportsPage() {
               </Typography>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 360 }}>
+            <TableContainer sx={{ maxHeight: 360, overflowX: 'auto' }}>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>#</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>KHÁCH HÀNG</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 0, zIndex: 4, bgcolor: '#f8fafc', width: 40 }}>#</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 40, zIndex: 4, bgcolor: '#f8fafc', borderRight: '1px solid #e2e8f0', minWidth: 160 }}>KHÁCH HÀNG</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>
                       NHÓM
                     </TableCell>
@@ -1108,10 +1108,10 @@ export default function ReportsPage() {
                   ) : topCustomersData && topCustomersData.length > 0 ? (
                     topCustomersData.map((cust, idx) => (
                       <TableRow key={cust.customerId || idx} hover>
-                        <TableCell sx={{ fontWeight: 700, color: idx < 3 ? '#059669' : '#64748b' }}>
+                        <TableCell sx={{ fontWeight: 700, color: idx < 3 ? '#059669' : '#64748b', position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>
                           {idx + 1}
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ position: 'sticky', left: 40, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #e2e8f0' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>
                             {cust.name}
                           </Typography>
@@ -1327,9 +1327,9 @@ export default function ReportsPage() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>MÃ HÓA ĐƠN</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>NGÀY TẠO</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>KHÁCH HÀNG</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 0, zIndex: 4, bgcolor: '#f8fafc', width: 110 }}>MÃ HÓA ĐƠN</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 110, zIndex: 4, bgcolor: '#f8fafc', width: 120 }}>NGÀY TẠO</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', position: 'sticky', left: 230, zIndex: 4, bgcolor: '#f8fafc', borderRight: '1px solid #e2e8f0', minWidth: 150 }}>KHÁCH HÀNG</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>SĐT</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>
                   NHÓM
@@ -1360,13 +1360,13 @@ export default function ReportsPage() {
               ) : invoiceDetailsData && invoiceDetailsData.items.length > 0 ? (
                 invoiceDetailsData.items.map((row, idx) => (
                   <TableRow key={`${row.invoiceId}-${row.productId}-${idx}`} hover>
-                    <TableCell sx={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>
+                    <TableCell sx={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5, position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>
                       {row.invoiceId}
                     </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                    <TableCell sx={{ fontSize: 12.5, whiteSpace: 'nowrap', position: 'sticky', left: 110, zIndex: 2, bgcolor: '#ffffff' }}>
                       {formatDateTime(row.createdAt)}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 500, fontSize: 13 }}>{row.customerName}</TableCell>
+                    <TableCell sx={{ fontWeight: 500, fontSize: 13, position: 'sticky', left: 230, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #e2e8f0' }}>{row.customerName}</TableCell>
                     <TableCell sx={{ fontSize: 12.5, color: '#64748b' }}>{row.customerPhone || '—'}</TableCell>
                     <TableCell align="center">
                       <Chip
@@ -1462,12 +1462,12 @@ export default function ReportsPage() {
           </Typography>
         </Box>
 
-        <TableContainer sx={{ maxHeight: 320, border: '1px solid #fed7aa', borderRadius: '6px' }}>
+        <TableContainer sx={{ maxHeight: 320, border: '1px solid #fed7aa', borderRadius: '6px', overflowX: 'auto' }}>
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: '#fffbeb' }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#92400e' }}>SKU</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#92400e' }}>TÊN SẢN PHẨM</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#92400e', position: 'sticky', left: 0, zIndex: 4, bgcolor: '#fffbeb', width: 100 }}>SKU</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#92400e', position: 'sticky', left: 100, zIndex: 4, bgcolor: '#fffbeb', borderRight: '1px solid #fed7aa', minWidth: 160 }}>TÊN SẢN PHẨM</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#92400e' }}>
                   TỒN KHO HIỆN TẠI
                 </TableCell>
@@ -1488,10 +1488,10 @@ export default function ReportsPage() {
               ) : lowStockData && lowStockData.length > 0 ? (
                 lowStockData.map((row) => (
                   <TableRow key={row.productId} hover>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, color: '#b45309' }}>
+                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, color: '#b45309', position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>
                       {row.sku}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 500, color: '#1e293b' }}>{row.name}</TableCell>
+                    <TableCell sx={{ fontWeight: 500, color: '#1e293b', position: 'sticky', left: 100, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #fed7aa' }}>{row.name}</TableCell>
                     <TableCell align="right">
                       <Chip
                         label={row.inStock}

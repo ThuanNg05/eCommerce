@@ -11,6 +11,8 @@ export interface WooCommerceOrderLineDto {
   subtotal: number
   availableStock: number | null
   availability: 'available' | 'insufficient' | 'unmapped' | string
+  customerNote?: string | null
+  note?: string | null
 }
 
 export interface WooCommerceOrderDto {
@@ -30,6 +32,8 @@ export interface WooCommerceOrderDto {
   availability: 'ready' | 'insufficient_stock' | 'unmapped' | 'not_eligible' | string
   availabilityLabel: string
   lines: WooCommerceOrderLineDto[]
+  customerNote?: string | null
+  note?: string | null
 }
 
 export interface WooCommerceProductLinkDto {
@@ -49,6 +53,28 @@ export interface LinkWarehouseProductRequest {
 
 export interface ConfirmWooCommerceOrderRequest {
   customerId: number
+}
+
+export type WooCommerceOrderStatus =
+  | 'pending'
+  | 'processing'
+  | 'on-hold'
+  | 'completed'
+  | 'cancelled'
+  | 'refunded'
+  | 'failed'
+  | 'draft'
+
+export interface UpdateWooCommerceOrderStatusRequest {
+  status: WooCommerceOrderStatus | string
+  reasonCode?: string | null
+  note?: string | null
+}
+
+export interface WooCommerceOrderStatusReasonDto {
+  code: string
+  targetStatus: string
+  label: string
 }
 
 export interface WooCommerceSyncResult {
@@ -80,6 +106,17 @@ export function fetchWooCommerceOrderById(
   return apiGet<WooCommerceOrderDto>(`/api/woocommerce/orders/${wooCommerceOrderId}`)
 }
 
+export function fetchWooCommerceOrderStatusReasons(
+  status?: string,
+): Promise<WooCommerceOrderStatusReasonDto[]> {
+  const q = new URLSearchParams()
+  if (status && status !== 'all') {
+    q.set('status', status)
+  }
+  const queryStr = q.toString() ? `?${q.toString()}` : ''
+  return apiGet<WooCommerceOrderStatusReasonDto[]>(`/api/woocommerce/orders/status-reasons${queryStr}`)
+}
+
 export function syncWooCommerceOrders(): Promise<WooCommerceSyncResult> {
   return apiPost<WooCommerceSyncResult>('/api/woocommerce/orders/sync')
 }
@@ -89,6 +126,13 @@ export function confirmWooCommerceOrder(
   req: ConfirmWooCommerceOrderRequest,
 ): Promise<WooCommerceOrderDto> {
   return apiPost<WooCommerceOrderDto>(`/api/woocommerce/orders/${wooCommerceOrderId}/confirm`, req)
+}
+
+export function updateWooCommerceOrderStatus(
+  wooCommerceOrderId: number,
+  req: UpdateWooCommerceOrderStatusRequest,
+): Promise<WooCommerceOrderDto> {
+  return apiPut<WooCommerceOrderDto>(`/api/woocommerce/orders/${wooCommerceOrderId}/status`, req)
 }
 
 export function linkWooCommerceProduct(

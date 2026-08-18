@@ -10,7 +10,7 @@ split by directory, and the two sides meet at exactly one seam: the HTTP API con
 | **Claude Code — backend** | `src/WarehouseApp.Core/**`, `src/WarehouseApp.Infrastructure/**`, `src/WarehouseApp.Api/**`, `src/WarehouseApp.Desktop/**`, `supabase/migrations/**` | All C#/.NET, EF Core model, services, HTTP endpoints, database schema, WPF host |
 | **Antigravity — UI** | `web/**` | React app, components, styling, client state, the TypeScript API-client types |
 
-Rule of thumb: **C# / SQL → Claude Code. `web/` → Antigravity.**
+Rule of thumb: **C# / SQL → Claude Code/Codex. `web/` → Antigravity.**
 
 ## The seam: the HTTP API contract
 

@@ -156,12 +156,12 @@ export default function DashboardPage() {
               Danh sách Sản phẩm Cảnh báo Tồn thấp
             </Typography>
 
-            <TableContainer sx={{ maxHeight: 360 }}>
+            <TableContainer sx={{ maxHeight: 360, overflowX: 'auto' }}>
               <Table stickyHeader size="small" sx={{ border: '1px solid #ededed' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>SKU</TableCell>
-                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>TÊN SẢN PHẨM</TableCell>
+                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9', position: 'sticky', left: 0, zIndex: 4, width: 100 }}>SKU</TableCell>
+                    <TableCell sx={{ fontWeight: 600, bgcolor: '#f9f9f9', position: 'sticky', left: 100, zIndex: 4, borderRight: '1px solid #ededed', minWidth: 160 }}>TÊN SẢN PHẨM</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600, bgcolor: '#f9f9f9' }}>
                       TỒN KHO
                     </TableCell>
@@ -174,8 +174,8 @@ export default function DashboardPage() {
                   {lowStockData && lowStockData.length > 0 ? (
                     lowStockData.map((row) => (
                       <TableRow key={row.productId}>
-                        <TableCell sx={{ fontFamily: 'monospace' }}>{row.sku}</TableCell>
-                        <TableCell>{row.name}</TableCell>
+                        <TableCell sx={{ fontFamily: 'monospace', position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>{row.sku}</TableCell>
+                        <TableCell sx={{ position: 'sticky', left: 100, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #ededed' }}>{row.name}</TableCell>
                         <TableCell align="right">
                           <Chip
                             label={row.inStock}
