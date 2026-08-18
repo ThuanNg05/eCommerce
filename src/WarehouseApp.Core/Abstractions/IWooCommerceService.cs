@@ -16,5 +16,6 @@ public interface IWooCommerceService
     Task<bool> UnlinkProductAsync(long productId, CancellationToken ct = default);
     Task<WooCommerceProductLinkDto> LinkProductAsync(long wooCommerceProductId, LinkWooCommerceProductRequest request, CancellationToken ct = default);
     Task<WooCommerceOrderDto?> ConfirmAsync(long wooCommerceOrderId, ConfirmWooCommerceOrderRequest request, CancellationToken ct = default);
+    Task<WooCommerceOrderDto?> UpdateOrderStatusAsync(long wooCommerceOrderId, UpdateWooCommerceOrderStatusRequest request, CancellationToken ct = default);
     Task<bool> AcceptWebhookAsync(string? signature, ReadOnlyMemory<byte> payload, CancellationToken ct = default);
 }

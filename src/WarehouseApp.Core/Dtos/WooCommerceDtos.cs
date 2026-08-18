@@ -39,6 +39,8 @@ public record LinkWarehouseProductRequest(long ProductId);
 /// <summary>Manual fulfilment is intentionally explicit: it creates one warehouse invoice only after stock validation.</summary>
 public record ConfirmWooCommerceOrderRequest(long CustomerId);
 
+public record UpdateWooCommerceOrderStatusRequest(string Status);
+
 public record WooCommerceSyncResult(int ImportedOrders, int ImportedProducts, DateTimeOffset CompletedAt);
 
 public record WooCommerceCatalogSyncResult(int UpdatedProducts, DateTimeOffset CompletedAt);
