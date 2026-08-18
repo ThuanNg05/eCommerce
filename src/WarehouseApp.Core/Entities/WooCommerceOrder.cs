@@ -12,6 +12,7 @@ public class WooCommerceOrder
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
     public string? ShippingAddress { get; set; }
+    public string? CustomerNote { get; set; }
     public DateTimeOffset? SourceCreatedAt { get; set; }
     public DateTimeOffset? SourceUpdatedAt { get; set; }
     public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;

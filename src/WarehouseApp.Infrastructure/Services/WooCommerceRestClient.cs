@@ -157,6 +157,8 @@ public sealed record WooCommerceRemoteOrder(
     DateTimeOffset? DateModifiedGmt,
     WooCommerceRemoteAddress? Billing,
     WooCommerceRemoteAddress? Shipping,
+    [property: JsonPropertyName("customer_note")]
+    string? CustomerNote,
     [property: JsonPropertyName("line_items")]
     List<WooCommerceRemoteOrderItem>? LineItems);
 

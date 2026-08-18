@@ -17,6 +17,9 @@ public static class WooCommerceEndpoints
                 ? Results.Ok(order)
                 : Results.Problem(detail: "Không tìm thấy đơn WooCommerce.", statusCode: StatusCodes.Status404NotFound));
 
+        g.MapGet("/orders/status-reasons", async (string? status, IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.ListOrderStatusReasonsAsync(status, ct)));
+
         g.MapPost("/orders/sync", async (IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.SyncOrdersAsync(ct))).RequireAuthorization("AdminOnly");
 

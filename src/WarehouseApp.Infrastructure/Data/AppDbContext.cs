@@ -27,6 +27,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<WooCommerceProductLink> WooCommerceProductLinks => Set<WooCommerceProductLink>();
     public DbSet<WooCommerceOrder> WooCommerceOrders => Set<WooCommerceOrder>();
     public DbSet<WooCommerceOrderItem> WooCommerceOrderItems => Set<WooCommerceOrderItem>();
+    public DbSet<WooCommerceOrderStatusReason> WooCommerceOrderStatusReasons => Set<WooCommerceOrderStatusReason>();
+    public DbSet<WooCommerceOrderStatusHistory> WooCommerceOrderStatusHistories => Set<WooCommerceOrderStatusHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
