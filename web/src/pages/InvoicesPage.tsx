@@ -22,6 +22,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  TableContainer,
   Divider,
   Autocomplete,
   Snackbar,
@@ -705,12 +706,14 @@ export default function InvoicesPage() {
         width: 180,
         filter: true,
         sortable: true,
+        pinned: 'left',
       },
       {
         field: 'customerId',
         headerName: 'MÃ KHÁCH HÀNG',
         width: 160,
         sortable: true,
+        pinned: 'left',
         valueFormatter: (p: ValueFormatterParams<InvoiceSummaryDto, number>) => `KH-${p.value}`,
       },
       {
@@ -1223,38 +1226,40 @@ export default function InvoicesPage() {
               </Box>
 
               {/* Invoice Lines Table */}
-              <Table size="small" sx={{ mb: 3, border: '1px solid #ededed' }}>
-                <TableHead sx={{ bgcolor: '#f9f9f9' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      SỐ LƯỢNG
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      ĐƠN GIÁ
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>
-                      THÀNH TIỀN
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {invoiceDetail.lines.map((line, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell sx={{ fontWeight: 500 }}>{line.productName}</TableCell>
-                      <TableCell align="right">{line.quantity}</TableCell>
-                      <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
+              <TableContainer sx={{ mb: 3, border: '1px solid #ededed', borderRadius: '6px', overflowX: 'auto' }}>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: '#f9f9f9' }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, position: 'sticky', left: 0, zIndex: 4, bgcolor: '#f9f9f9', borderRight: '1px solid #ededed', minWidth: 160 }}>SẢN PHẨM</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {formatVND(line.subtotal)}
+                        SỐ LƯỢNG
                       </TableCell>
-                      <TableCell sx={{ color: '#404040', fontSize: 13 }}>
-                        {line.description ? line.description : '—'}
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        ĐƠN GIÁ
                       </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        THÀNH TIỀN
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {invoiceDetail.lines.map((line, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell sx={{ fontWeight: 500, position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #ededed' }}>{line.productName}</TableCell>
+                        <TableCell align="right">{line.quantity}</TableCell>
+                        <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {formatVND(line.subtotal)}
+                        </TableCell>
+                        <TableCell sx={{ color: '#404040', fontSize: 13 }}>
+                          {line.description ? line.description : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
               {/* Footer Row: QR Code (Left) + Total Amount Calculation (Right) */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2 }}>

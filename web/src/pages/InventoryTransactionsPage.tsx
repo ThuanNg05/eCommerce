@@ -939,12 +939,12 @@ export default function InventoryTransactionsPage() {
                 Danh sách dòng hàng hóa giao dịch ({selectedTxDetail.details?.length ?? 0} dòng)
               </Typography>
 
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: '6px' }}>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: '6px', overflowX: 'auto' }}>
                 <Table size="small">
                   <TableHead sx={{ bgcolor: '#fafafa' }}>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 600, width: 50 }}>STT</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>TÊN HÀNG HÓA / CHI TIẾT</TableCell>
+                      <TableCell sx={{ fontWeight: 600, width: 50, position: 'sticky', left: 0, zIndex: 4, bgcolor: '#fafafa' }}>STT</TableCell>
+                      <TableCell sx={{ fontWeight: 600, position: 'sticky', left: 50, zIndex: 4, bgcolor: '#fafafa', borderRight: '1px solid #ededed', minWidth: 160 }}>TÊN HÀNG HÓA / CHI TIẾT</TableCell>
                       <TableCell sx={{ fontWeight: 600, width: 100 }}>HƯỚNG</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600, width: 90 }}>SỐ LƯỢNG</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600, width: 130 }}>ĐƠN GIÁ</TableCell>
@@ -955,8 +955,8 @@ export default function InventoryTransactionsPage() {
                     {selectedTxDetail.details && selectedTxDetail.details.length > 0 ? (
                       selectedTxDetail.details.map((line, idx) => (
                         <TableRow key={idx}>
-                          <TableCell>{idx + 1}</TableCell>
-                          <TableCell>{getItemDisplayName(line)}</TableCell>
+                          <TableCell sx={{ position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff' }}>{idx + 1}</TableCell>
+                          <TableCell sx={{ position: 'sticky', left: 50, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #ededed' }}>{getItemDisplayName(line)}</TableCell>
                           <TableCell>
                             <Chip
                               label={line.direction === 1 ? 'Nhập' : 'Xuất'}

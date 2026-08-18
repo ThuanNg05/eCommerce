@@ -39,16 +39,20 @@ import {
   Store,
   User,
   MapPin,
-  FileCheck2,
 } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import {
   fetchWooCommerceOrders,
   fetchWooCommerceOrderById,
+  fetchWooCommerceOrderStatusReasons,
   syncWooCommerceOrders,
   confirmWooCommerceOrder,
+  updateWooCommerceOrderStatus,
   type WooCommerceOrderDto,
   type WooCommerceOrderLineDto,
+  type WooCommerceOrderStatus,
+  type UpdateWooCommerceOrderStatusRequest,
+  type WooCommerceOrderStatusReasonDto,
 } from '../api/woocommerce'
 import { fetchCustomers, type CustomerDto } from '../api/customers'
 import { useAuth } from '../auth/AuthContext'
@@ -83,14 +87,47 @@ function formatDateTime(value?: string | Date | number | null, fallback = 'Chưa
   }
 }
 
-// Availability badge mapping
-export function renderAvailabilityBadge(availability: string, label?: string) {
+export const WOOCOMMERCE_STATUS_CONFIG: Record<
+  WooCommerceOrderStatus,
+  { label: string; color: string; bgcolor: string }
+> = {
+  pending: { label: 'Chờ xử lý', color: '#737373', bgcolor: '#f2f2f2' },
+  processing: { label: 'Đang xử lý', color: '#1d4ed8', bgcolor: '#eff6ff' },
+  'on-hold': { label: 'Tạm giữ', color: '#b45309', bgcolor: '#fffbeb' },
+  completed: { label: 'Hoàn tất', color: '#15803d', bgcolor: '#f0fdf4' },
+  cancelled: { label: 'Đã hủy', color: '#b91c1c', bgcolor: '#fef2f2' },
+  refunded: { label: 'Đã hoàn tiền', color: '#b91c1c', bgcolor: '#fef2f2' },
+  failed: { label: 'Thất bại', color: '#b91c1c', bgcolor: '#fef2f2' },
+  draft: { label: 'Nháp', color: '#737373', bgcolor: '#f2f2f2' },
+}
+
+export const WOOCOMMERCE_STATUS_OPTIONS: { value: WooCommerceOrderStatus; label: string }[] = [
+  { value: 'pending', label: 'Chờ xử lý' },
+  { value: 'processing', label: 'Đang xử lý' },
+  { value: 'on-hold', label: 'Tạm giữ' },
+  { value: 'completed', label: 'Hoàn tất' },
+  { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'refunded', label: 'Đã hoàn tiền' },
+  { value: 'failed', label: 'Thất bại' },
+  { value: 'draft', label: 'Nháp' },
+]
+
+export function formatGroupPrice(groupPrice?: string | null): string {
+  if (!groupPrice) return 'Giá lẻ'
+  const upper = groupPrice.trim().toUpperCase()
+  if (upper === 'L') return 'Giá lẻ'
+  if (upper === 'S') return 'Giá sỉ'
+  return groupPrice
+}
+
+// Availability badge mapping (rút gọn theo yêu cầu)
+export function renderAvailabilityBadge(availability: string, labelOverride?: string) {
   switch (availability) {
     case 'ready':
       return (
         <Chip
           icon={<CheckCircle2 size={13} color="#15803d" />}
-          label={label || 'Đủ tồn kho'}
+          label={labelOverride || 'Đủ hàng'}
           size="small"
           sx={{
             bgcolor: '#f0fdf4',
@@ -109,7 +146,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
       return (
         <Chip
           icon={<XCircle size={13} color="#b91c1c" />}
-          label={label || 'Không đủ tồn kho'}
+          label={labelOverride || 'Thiếu hàng'}
           size="small"
           sx={{
             bgcolor: '#fef2f2',
@@ -127,7 +164,7 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
       return (
         <Chip
           icon={<AlertTriangle size={13} color="#b45309" />}
-          label={label || 'Chưa liên kết kho'}
+          label={labelOverride || 'Chưa liên kết'}
           size="small"
           sx={{
             bgcolor: '#fffbeb',
@@ -142,11 +179,28 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
         />
       )
     case 'not_eligible':
+      return (
+        <Chip
+          icon={<Clock size={13} color="#737373" />}
+          label={labelOverride || 'Chưa xử lý'}
+          size="small"
+          sx={{
+            bgcolor: '#f2f2f2',
+            color: '#737373',
+            fontSize: 12,
+            fontWeight: 500,
+            borderRadius: '4px',
+            height: 24,
+            whiteSpace: 'nowrap',
+            '& .MuiChip-icon': { ml: 0.5 },
+          }}
+        />
+      )
     default:
       return (
         <Chip
           icon={<Clock size={13} color="#737373" />}
-          label={label || 'Chưa đủ điều kiện'}
+          label={labelOverride || 'Chưa sẵn sàng'}
           size="small"
           sx={{
             bgcolor: '#f2f2f2',
@@ -165,56 +219,20 @@ export function renderAvailabilityBadge(availability: string, label?: string) {
 
 // WooCommerce Order Status Badge
 function renderOrderStatusBadge(status: string) {
-  const s = status.toLowerCase()
-  let bgcolor = '#f2f2f2'
-  let color = '#737373'
-  let label = status
-
-  switch (s) {
-    case 'processing':
-      bgcolor = '#eff6ff'
-      color = '#1d4ed8'
-      label = 'Đang xử lý'
-      break
-    case 'completed':
-      bgcolor = '#f0fdf4'
-      color = '#15803d'
-      label = 'Hoàn thành'
-      break
-    case 'on-hold':
-      bgcolor = '#fffbeb'
-      color = '#b45309'
-      label = 'Tạm giữ'
-      break
-    case 'pending':
-      bgcolor = '#f2f2f2'
-      color = '#737373'
-      label = 'Chờ thanh toán'
-      break
-    case 'cancelled':
-      bgcolor = '#fef2f2'
-      color = '#b91c1c'
-      label = 'Đã hủy'
-      break
-    case 'refunded':
-      bgcolor = '#fef2f2'
-      color = '#b91c1c'
-      label = 'Đã hoàn tiền'
-      break
-    case 'failed':
-      bgcolor = '#fef2f2'
-      color = '#b91c1c'
-      label = 'Thất bại'
-      break
+  const s = (status || '').toLowerCase() as WooCommerceOrderStatus
+  const config = WOOCOMMERCE_STATUS_CONFIG[s] || {
+    label: status || 'Chưa xác định',
+    color: '#737373',
+    bgcolor: '#f2f2f2',
   }
 
   return (
     <Chip
-      label={label}
+      label={config.label}
       size="small"
       sx={{
-        bgcolor,
-        color,
+        bgcolor: config.bgcolor,
+        color: config.color,
         fontSize: 11,
         fontWeight: 500,
         borderRadius: '4px',
@@ -229,7 +247,7 @@ function getAvailabilityAlertContent(availability: string) {
   switch (availability) {
     case 'ready':
       return {
-        title: 'Đủ tồn kho, có thể xác nhận xuất kho.',
+        title: 'Đủ hàng, có thể xác nhận xuất kho.',
         desc: null,
       }
     case 'insufficient_stock':
@@ -269,6 +287,8 @@ export default function WooCommerceOrdersPage() {
   const [orderToConfirm, setOrderToConfirm] = useState<WooCommerceOrderDto | null>(null)
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDto | null>(null)
   const [customerSearchTerm, setCustomerSearchTerm] = useState('')
+  const [extraCustomerOptions, setExtraCustomerOptions] = useState<CustomerDto[]>([])
+  const [isCustomerSearching, setIsCustomerSearching] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
 
   // Snackbar Notification
@@ -282,6 +302,12 @@ export default function WooCommerceOrdersPage() {
     severity: 'info',
   })
 
+  // Status Reason States for Cancel / Refund
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  const [selectedReasonCode, setSelectedReasonCode] = useState('')
+  const [reasonNote, setReasonNote] = useState('')
+  const [reasonError, setReasonError] = useState<string | null>(null)
+
   // Queries
   const { data: orders = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['wooCommerceOrders', statusFilter],
@@ -294,11 +320,29 @@ export default function WooCommerceOrdersPage() {
     enabled: Boolean(selectedOrderId),
   })
 
+  // Status Reasons query for cancelled / refunded
+  const { data: statusReasons = [], isLoading: isReasonsLoading } = useQuery({
+    queryKey: ['wooCommerceStatusReasons', pendingStatus],
+    queryFn: () => (pendingStatus ? fetchWooCommerceOrderStatusReasons(pendingStatus) : []),
+    enabled: Boolean(pendingStatus === 'cancelled' || pendingStatus === 'refunded'),
+  })
+
   const { data: customersData, isLoading: isCustomersLoading } = useQuery({
     queryKey: ['customers', customerSearchTerm],
     queryFn: () => fetchCustomers(customerSearchTerm, 1, 100),
   })
   const customerOptions = customersData?.items ?? []
+
+  // Merged customer options for Autocomplete selection
+  const allCustomerOptions = useMemo(() => {
+    const map = new Map<number, CustomerDto>()
+    customerOptions.forEach((c) => map.set(c.id, c))
+    extraCustomerOptions.forEach((c) => map.set(c.id, c))
+    if (selectedCustomer) {
+      map.set(selectedCustomer.id, selectedCustomer)
+    }
+    return Array.from(map.values())
+  }, [customerOptions, extraCustomerOptions, selectedCustomer])
 
   // Mutations
   const syncMutation = useMutation({
@@ -319,6 +363,103 @@ export default function WooCommerceOrdersPage() {
       })
     },
   })
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({
+      orderId,
+      req,
+    }: {
+      orderId: number
+      req: UpdateWooCommerceOrderStatusRequest
+    }) => updateWooCommerceOrderStatus(orderId, req),
+    onSuccess: (updatedOrder) => {
+      queryClient.invalidateQueries({ queryKey: ['wooCommerceOrders'] })
+      queryClient.invalidateQueries({ queryKey: ['wooCommerceOrder', updatedOrder.wooCommerceOrderId] })
+      setPendingStatus(null)
+      setSelectedReasonCode('')
+      setReasonNote('')
+      setReasonError(null)
+      const statusLabel =
+        WOOCOMMERCE_STATUS_CONFIG[updatedOrder.status as WooCommerceOrderStatus]?.label || updatedOrder.status
+      setToast({
+        open: true,
+        message: `Đã cập nhật trạng thái đơn #${updatedOrder.orderNumber} sang "${statusLabel}".`,
+        severity: 'success',
+      })
+    },
+    onError: (err: Error) => {
+      setReasonError(err.message)
+      setToast({
+        open: true,
+        message: `Không thể cập nhật trạng thái đơn hàng: ${err.message}`,
+        severity: 'error',
+      })
+    },
+  })
+
+  const handleConfirmStatusWithReason = () => {
+    if (!orderDetail || !pendingStatus) return
+    if (!selectedReasonCode) {
+      setReasonError(
+        pendingStatus === 'cancelled'
+          ? 'Vui lòng chọn lý do hủy đơn hàng.'
+          : 'Vui lòng chọn lý do hoàn tiền đơn hàng.',
+      )
+      return
+    }
+    if (selectedReasonCode.endsWith('_other') && !reasonNote.trim()) {
+      setReasonError('Vui lòng nhập ghi chú chi tiết khi chọn "Lý do khác".')
+      return
+    }
+    setReasonError(null)
+    updateStatusMutation.mutate({
+      orderId: orderDetail.wooCommerceOrderId,
+      req: {
+        status: pendingStatus,
+        reasonCode: selectedReasonCode,
+        note: reasonNote.trim() || null,
+      },
+    })
+  }
+
+  const handleStatusSelectChange = (newStatus: string) => {
+    if (!newStatus || !orderDetail) return
+    const currentStatus = orderDetail.status?.toLowerCase()
+    if (newStatus === currentStatus) {
+      setPendingStatus(null)
+      setSelectedReasonCode('')
+      setReasonNote('')
+      setReasonError(null)
+      return
+    }
+    if (newStatus === 'cancelled' || newStatus === 'refunded') {
+      setPendingStatus(newStatus)
+      setSelectedReasonCode('')
+      setReasonNote('')
+      setReasonError(null)
+    } else {
+      setPendingStatus(null)
+      setSelectedReasonCode('')
+      setReasonNote('')
+      setReasonError(null)
+      updateStatusMutation.mutate({
+        orderId: orderDetail.wooCommerceOrderId,
+        req: {
+          status: newStatus,
+          reasonCode: null,
+          note: null,
+        },
+      })
+    }
+  }
+
+  const handleCloseDetail = () => {
+    setSelectedOrderId(null)
+    setPendingStatus(null)
+    setSelectedReasonCode('')
+    setReasonNote('')
+    setReasonError(null)
+  }
 
   const confirmMutation = useMutation({
     mutationFn: ({ orderId, customerId }: { orderId: number; customerId: number }) =>
@@ -342,7 +483,7 @@ export default function WooCommerceOrdersPage() {
     },
   })
 
-  // Filtered rows for AG Grid
+  // Filtered rows for AG Grid (bỏ tìm theo confirmedInvoiceId)
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       // Search matching
@@ -352,8 +493,7 @@ export default function WooCommerceOrdersPage() {
         const matchCustomer = order.customerName?.toLowerCase().includes(term)
         const matchPhone = order.customerPhone?.toLowerCase().includes(term)
         const matchAddress = order.shippingAddress?.toLowerCase().includes(term)
-        const matchInvoice = order.confirmedInvoiceId?.toLowerCase().includes(term)
-        if (!matchNumber && !matchCustomer && !matchPhone && !matchAddress && !matchInvoice) {
+        if (!matchNumber && !matchCustomer && !matchPhone && !matchAddress) {
           return false
         }
       }
@@ -377,21 +517,80 @@ export default function WooCommerceOrdersPage() {
     return { total, ready, insufficient, unmapped, confirmed }
   }, [orders])
 
-  // Open confirm modal with smart auto-match customer if phone matches
-  const handleOpenConfirm = (order: WooCommerceOrderDto) => {
+  // Open confirm modal with smart auto-match customer by WooCommerce phone/name
+  const handleOpenConfirm = async (order: WooCommerceOrderDto) => {
     setOrderToConfirm(order)
     setConfirmError(null)
+    setSelectedCustomer(null)
+    setExtraCustomerOptions([])
 
-    // Try finding matching customer by phone
-    if (order.customerPhone && customerOptions.length > 0) {
-      const normalizedPhone = order.customerPhone.replace(/[^0-9]/g, '')
-      const match = customerOptions.find((c) => c.phone && c.phone.replace(/[^0-9]/g, '') === normalizedPhone)
-      if (match) {
-        setSelectedCustomer(match)
+    const rawPhone = order.customerPhone?.trim() || ''
+    const normalizedPhone = rawPhone.replace(/[^0-9]/g, '')
+
+    // 1. Try finding matching customer in already loaded customerOptions
+    if (normalizedPhone && customerOptions.length > 0) {
+      const directMatch = customerOptions.find((c) => {
+        const cPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : ''
+        return (
+          cPhone &&
+          (cPhone === normalizedPhone ||
+            (cPhone.length >= 9 && normalizedPhone.endsWith(cPhone)) ||
+            (normalizedPhone.length >= 9 && cPhone.endsWith(normalizedPhone)))
+        )
+      })
+      if (directMatch) {
+        setSelectedCustomer(directMatch)
         return
       }
     }
-    setSelectedCustomer(null)
+
+    // 2. Fetch customers from backend by phone if not in current options
+    setIsCustomerSearching(true)
+    try {
+      if (rawPhone) {
+        const resPhone = await fetchCustomers(rawPhone, 1, 20)
+        if (resPhone.items && resPhone.items.length > 0) {
+          const phoneMatch =
+            resPhone.items.find((c) => {
+              const cPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : ''
+              return (
+                cPhone &&
+                normalizedPhone &&
+                (cPhone === normalizedPhone ||
+                  cPhone.includes(normalizedPhone) ||
+                  normalizedPhone.includes(cPhone))
+              )
+            }) || resPhone.items[0]
+
+          if (phoneMatch) {
+            setExtraCustomerOptions(resPhone.items)
+            setSelectedCustomer(phoneMatch)
+            return
+          }
+        }
+      }
+
+      // 3. Fallback search by customer name
+      if (order.customerName?.trim()) {
+        const resName = await fetchCustomers(order.customerName.trim(), 1, 20)
+        if (resName.items && resName.items.length > 0) {
+          const nameMatch =
+            resName.items.find(
+              (c) => c.name.trim().toLowerCase() === order.customerName!.trim().toLowerCase(),
+            ) || resName.items[0]
+
+          if (nameMatch) {
+            setExtraCustomerOptions(resName.items)
+            setSelectedCustomer(nameMatch)
+            return
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi khi tự động tìm khách hàng:', err)
+    } finally {
+      setIsCustomerSearching(false)
+    }
   }
 
   // Handle Confirm Submission
@@ -407,7 +606,7 @@ export default function WooCommerceOrdersPage() {
     })
   }
 
-  // Column definitions for AG Grid
+  // Column definitions for AG Grid (đã bỏ hoàn toàn cột HÓA ĐƠN KHO)
   const columns = useMemo<ColDef<WooCommerceOrderDto>[]>(
     () => [
       {
@@ -416,6 +615,7 @@ export default function WooCommerceOrdersPage() {
         width: 120,
         sortable: true,
         filter: true,
+        pinned: 'left',
         cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
           if (!p.data) return null
           return (
@@ -449,6 +649,7 @@ export default function WooCommerceOrdersPage() {
         headerName: 'KHÁCH HÀNG',
         minWidth: 160,
         sortable: true,
+        pinned: 'left',
         cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
           if (!p.data) return null
           return (
@@ -499,7 +700,7 @@ export default function WooCommerceOrdersPage() {
       {
         field: 'status',
         headerName: 'TRẠNG THÁI',
-        width: 180,
+        width: 160,
         sortable: true,
         cellRenderer: (p: { value?: string }) => {
           if (!p.value) return null
@@ -520,44 +721,8 @@ export default function WooCommerceOrdersPage() {
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
               <Tooltip title={p.data.availabilityLabel || ''} arrow placement="top">
-                <span>{renderAvailabilityBadge(p.data.availability, p.data.availabilityLabel)}</span>
+                <span>{renderAvailabilityBadge(p.data.availability)}</span>
               </Tooltip>
-            </Box>
-          )
-        },
-      },
-      {
-        field: 'confirmedInvoiceId',
-        headerName: 'HÓA ĐƠN KHO',
-        width: 160,
-        sortable: true,
-        cellRenderer: (p: { data?: WooCommerceOrderDto }) => {
-          if (!p.data) return null
-          if (p.data.confirmedInvoiceId) {
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                <Chip
-                  icon={<FileCheck2 size={13} color="#15803d" />}
-                  label={p.data.confirmedInvoiceId}
-                  size="small"
-                  sx={{
-                    bgcolor: '#f0fdf4',
-                    color: '#15803d',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    borderRadius: '4px',
-                    height: 22,
-                    '& .MuiChip-icon': { ml: 0.5 },
-                  }}
-                />
-              </Box>
-            )
-          }
-          return (
-            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-              <Typography variant="caption" sx={{ color: '#a3a3a3', fontSize: 12 }}>
-                Chưa xuất
-              </Typography>
             </Box>
           )
         },
@@ -589,7 +754,7 @@ export default function WooCommerceOrdersPage() {
               <Tooltip
                 title={
                   p.data.confirmedInvoiceId
-                    ? 'Đơn đã được xuất hóa đơn kho'
+                    ? `Đơn đã xuất hóa đơn kho (${p.data.confirmedInvoiceId})`
                     : canConfirm
                     ? 'Xác nhận tạo hóa đơn và xuất kho'
                     : p.data.availabilityLabel || 'Chưa đủ điều kiện xuất kho'
@@ -754,7 +919,7 @@ export default function WooCommerceOrdersPage() {
       <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#ffffff', border: '1px solid #ededed', borderRadius: '8px' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <SearchField
-            placeholder="Tìm theo mã đơn, khách hàng, SĐT, địa chỉ, hóa đơn..."
+            placeholder="Tìm theo mã đơn, khách hàng, SĐT, địa chỉ..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             width={340}
@@ -769,12 +934,11 @@ export default function WooCommerceOrdersPage() {
             sx={{ width: 220 }}
           >
             <MenuItem value="all">Tất cả trạng thái</MenuItem>
-            <MenuItem value="processing">Đang xử lý</MenuItem>
-            <MenuItem value="completed">Hoàn thành</MenuItem>
-            <MenuItem value="on-hold">Tạm giữ</MenuItem>
-            <MenuItem value="pending">Chờ thanh toán</MenuItem>
-            <MenuItem value="cancelled">Đã hủy</MenuItem>
-            <MenuItem value="refunded">Đã hoàn tiền</MenuItem>
+            {WOOCOMMERCE_STATUS_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
           </TextField>
 
           <TextField
@@ -786,10 +950,10 @@ export default function WooCommerceOrdersPage() {
             sx={{ width: 220 }}
           >
             <MenuItem value="all">Tất cả khả dụng</MenuItem>
-            <MenuItem value="ready">Đủ tồn kho</MenuItem>
-            <MenuItem value="insufficient_stock">Không đủ tồn kho</MenuItem>
-            <MenuItem value="unmapped">Chưa liên kết kho</MenuItem>
-            <MenuItem value="not_eligible">Chưa đủ điều kiện</MenuItem>
+            <MenuItem value="ready">Đủ hàng</MenuItem>
+            <MenuItem value="insufficient_stock">Thiếu hàng</MenuItem>
+            <MenuItem value="unmapped">Chưa liên kết</MenuItem>
+            <MenuItem value="not_eligible">Chưa xử lý</MenuItem>
           </TextField>
 
           <Typography variant="body2" sx={{ color: '#737373', fontSize: 13, ml: 'auto' }}>
@@ -838,7 +1002,7 @@ export default function WooCommerceOrdersPage() {
       {/* ORDER DETAIL DIALOG */}
       <Dialog
         open={Boolean(selectedOrderId)}
-        onClose={() => setSelectedOrderId(null)}
+        onClose={handleCloseDetail}
         maxWidth="lg"
         fullWidth
         PaperProps={{
@@ -862,15 +1026,12 @@ export default function WooCommerceOrdersPage() {
             px: { xs: 2, sm: 3 },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#171717', fontSize: 16, whiteSpace: 'nowrap' }}>
-              Chi tiết đơn hàng #{orderDetail?.orderNumber || selectedOrderId}
-            </Typography>
-            {orderDetail && renderOrderStatusBadge(orderDetail.status)}
-          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#171717', fontSize: 16, whiteSpace: 'nowrap' }}>
+            Chi tiết đơn hàng #{orderDetail?.orderNumber || selectedOrderId}
+          </Typography>
           <IconButton
             size="small"
-            onClick={() => setSelectedOrderId(null)}
+            onClick={handleCloseDetail}
             aria-label="Đóng"
             sx={{ color: '#737373', '&:hover': { bgcolor: '#f2f2f2' } }}
           >
@@ -885,58 +1046,269 @@ export default function WooCommerceOrdersPage() {
             </Box>
           ) : orderDetail ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              {/* Status Alert Banner */}
-              {(() => {
-                const alertContent = getAvailabilityAlertContent(orderDetail.availability)
-                return (
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 2,
-                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      ...(orderDetail.availability === 'ready'
-                        ? { bgcolor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
-                        : orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient'
-                        ? { bgcolor: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }
-                        : orderDetail.availability === 'unmapped'
-                        ? { bgcolor: '#fffbeb', borderColor: '#fef3c7', color: '#b45309' }
-                        : { bgcolor: '#f9f9f9', borderColor: '#ededed', color: '#737373' }),
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      {orderDetail.availability === 'ready' && <CheckCircle2 size={20} />}
-                      {(orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient') && (
-                        <XCircle size={20} />
-                      )}
-                      {orderDetail.availability === 'unmapped' && <AlertTriangle size={20} />}
-                      {orderDetail.availability === 'not_eligible' && <Clock size={20} />}
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14 }}>
-                          {alertContent.title}
-                        </Typography>
-                        {alertContent.desc && (
-                          <Typography variant="caption" sx={{ display: 'block', mt: 0.25, opacity: 0.9 }}>
-                            {alertContent.desc}
-                          </Typography>
+              {/* Stock Condition Alert & Order Status Row */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'stretch', md: 'center' },
+                  justifyContent: 'space-between',
+                  gap: 2,
+                }}
+              >
+                {/* Stock Condition Alert Banner */}
+                {(() => {
+                  const alertContent = getAvailabilityAlertContent(orderDetail.availability)
+                  return (
+                    <Box
+                      sx={{
+                        flex: 1,
+                        p: 1.75,
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        ...(orderDetail.availability === 'ready'
+                          ? { bgcolor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
+                          : orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient'
+                          ? { bgcolor: '#fef2f2', borderColor: '#fecaca', color: '#b91c1c' }
+                          : orderDetail.availability === 'unmapped'
+                          ? { bgcolor: '#fffbeb', borderColor: '#fef3c7', color: '#b45309' }
+                          : { bgcolor: '#f9f9f9', borderColor: '#ededed', color: '#737373' }),
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        {orderDetail.availability === 'ready' && <CheckCircle2 size={20} />}
+                        {(orderDetail.availability === 'insufficient_stock' || orderDetail.availability === 'insufficient') && (
+                          <XCircle size={20} />
                         )}
-                        {orderDetail.confirmedInvoiceId && (
-                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#15803d', fontWeight: 500 }}>
-                            Đã xuất hóa đơn kho: <strong>{orderDetail.confirmedInvoiceId}</strong> (Xác nhận lúc {formatDateTime(orderDetail.confirmedAt)})
+                        {orderDetail.availability === 'unmapped' && <AlertTriangle size={20} />}
+                        {orderDetail.availability === 'not_eligible' && <Clock size={20} />}
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14 }}>
+                            {alertContent.title}
                           </Typography>
-                        )}
+                          {alertContent.desc && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.25, opacity: 0.9 }}>
+                              {alertContent.desc}
+                            </Typography>
+                          )}
+                          {orderDetail.confirmedInvoiceId && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#15803d', fontWeight: 500 }}>
+                              Đã xuất hóa đơn kho: <strong>{orderDetail.confirmedInvoiceId}</strong> (Xác nhận lúc {formatDateTime(orderDetail.confirmedAt)})
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                      <Box sx={{ flexShrink: 0 }}>
+                        <Tooltip title={orderDetail.availabilityLabel || ''} arrow placement="top">
+                          <span>{renderAvailabilityBadge(orderDetail.availability)}</span>
+                        </Tooltip>
                       </Box>
                     </Box>
-                    <Box sx={{ flexShrink: 0 }}>
-                      {renderAvailabilityBadge(orderDetail.availability)}
+                  )
+                })()}
+
+                {/* WooCommerce Order Status Select with inline left label */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 1.25,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    component="label"
+                    htmlFor="woo-order-status-select"
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: '#171717',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Trạng thái đơn:
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
+                    <TextField
+                      id="woo-order-status-select"
+                      select
+                      size="small"
+                      value={pendingStatus || orderDetail.status?.toLowerCase() || ''}
+                      onChange={(e) => handleStatusSelectChange(e.target.value)}
+                      disabled={updateStatusMutation.isPending}
+                      sx={{
+                        minWidth: 160,
+                        width: { xs: '100%', sm: 170 },
+                        bgcolor: '#ffffff',
+                        '& .MuiSelect-select': { py: 0.85, fontSize: 13, fontWeight: 500, color: '#171717' },
+                      }}
+                    >
+                      {WOOCOMMERCE_STATUS_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: 13 }}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    {updateStatusMutation.isPending && (
+                      <CircularProgress size={18} sx={{ color: '#7299ED', flexShrink: 0 }} />
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Reason Selection Card for Cancelled / Refunded */}
+              {pendingStatus && (pendingStatus === 'cancelled' || pendingStatus === 'refunded') && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    bgcolor: '#fafafa',
+                    border: '1px solid #ededed',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <AlertTriangle size={16} color={pendingStatus === 'cancelled' ? '#b91c1c' : '#b45309'} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#171717', fontSize: 14 }}>
+                        {pendingStatus === 'cancelled' ? 'Lý do hủy đơn hàng' : 'Lý do hoàn tiền đơn hàng'}
+                      </Typography>
+                    </Box>
+                    {isReasonsLoading && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <CircularProgress size={14} sx={{ color: '#7299ED' }} />
+                        <Typography variant="caption" sx={{ color: '#737373', fontSize: 12 }}>
+                          Đang tải lý do...
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  {reasonError && (
+                    <Alert severity="error" sx={{ mb: 1.5, borderRadius: '6px', py: 0.5, fontSize: 13 }}>
+                      {reasonError}
+                    </Alert>
+                  )}
+
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <TextField
+                      select
+                      size="small"
+                      label={pendingStatus === 'cancelled' ? 'Chọn lý do hủy đơn *' : 'Chọn lý do hoàn tiền *'}
+                      value={selectedReasonCode}
+                      onChange={(e) => {
+                        setSelectedReasonCode(e.target.value)
+                        if (reasonError) setReasonError(null)
+                      }}
+                      disabled={isReasonsLoading || updateStatusMutation.isPending}
+                      error={Boolean(reasonError && !selectedReasonCode)}
+                      fullWidth
+                      sx={{
+                        bgcolor: '#ffffff',
+                        '& .MuiInputLabel-root': { fontSize: 13 },
+                        '& .MuiSelect-select': { fontSize: 13, fontWeight: 500 },
+                      }}
+                    >
+                      <MenuItem value="" disabled sx={{ fontSize: 13, color: '#a3a3a3' }}>
+                        -- Vui lòng chọn lý do --
+                      </MenuItem>
+                      {statusReasons.map((r: WooCommerceOrderStatusReasonDto) => (
+                        <MenuItem key={r.code} value={r.code} sx={{ fontSize: 13 }}>
+                          {r.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      multiline
+                      rows={2}
+                      size="small"
+                      label={
+                        selectedReasonCode.endsWith('_other')
+                          ? 'Ghi chú lý do chi tiết *'
+                          : 'Ghi chú lý do (tùy chọn)'
+                      }
+                      placeholder={
+                        selectedReasonCode.endsWith('_other')
+                          ? 'Bắt buộc nhập lý do chi tiết khi chọn "Lý do khác"...'
+                          : 'Nhập ghi chú chi tiết nếu có (tối đa 1000 ký tự)...'
+                      }
+                      value={reasonNote}
+                      onChange={(e) => {
+                        setReasonNote(e.target.value)
+                        if (reasonError && selectedReasonCode.endsWith('_other') && e.target.value.trim()) {
+                          setReasonError(null)
+                        }
+                      }}
+                      disabled={updateStatusMutation.isPending}
+                      error={Boolean(reasonError && selectedReasonCode.endsWith('_other') && !reasonNote.trim())}
+                      inputProps={{ maxLength: 1000 }}
+                      fullWidth
+                      sx={{
+                        bgcolor: '#ffffff',
+                        '& .MuiInputLabel-root': { fontSize: 13 },
+                        '& .MuiOutlinedInput-input': { fontSize: 13 },
+                      }}
+                    />
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setPendingStatus(null)
+                          setSelectedReasonCode('')
+                          setReasonNote('')
+                          setReasonError(null)
+                        }}
+                        disabled={updateStatusMutation.isPending}
+                        sx={{
+                          height: 32,
+                          fontSize: 12,
+                          borderColor: '#e0e0e0',
+                          color: '#171717',
+                          '&:hover': { bgcolor: '#f2f2f2' },
+                        }}
+                      >
+                        Bỏ qua
+                      </Button>
+
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleConfirmStatusWithReason}
+                        disabled={!selectedReasonCode || updateStatusMutation.isPending || isReasonsLoading}
+                        startIcon={
+                          updateStatusMutation.isPending ? (
+                            <CircularProgress size={14} color="inherit" />
+                          ) : null
+                        }
+                        sx={{
+                          height: 32,
+                          fontSize: 12,
+                          bgcolor: '#1a1a1a',
+                          color: '#ffffff',
+                          '&:hover': { bgcolor: '#000000' },
+                        }}
+                      >
+                        {updateStatusMutation.isPending
+                          ? 'Đang cập nhật...'
+                          : pendingStatus === 'cancelled'
+                          ? 'Xác nhận hủy đơn'
+                          : 'Xác nhận hoàn tiền'}
+                      </Button>
                     </Box>
                   </Box>
-                )
-              })()}
+                </Paper>
+              )}
 
               {/* Order Metadata Grid */}
               <Grid container spacing={2}>
@@ -1083,11 +1455,8 @@ export default function WooCommerceOrdersPage() {
                     <Table size="small" sx={{ minWidth: 750 }}>
                       <TableHead sx={{ bgcolor: '#fafafa' }}>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 200, whiteSpace: 'nowrap' }}>
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 180, whiteSpace: 'nowrap', position: 'sticky', left: 0, zIndex: 4, bgcolor: '#fafafa', borderRight: '1px solid #ededed' }}>
                             SẢN PHẨM
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 150, whiteSpace: 'nowrap' }} align="center">
-                            MÃ SẢN PHẨM KHO
                           </TableCell>
                           <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 90, whiteSpace: 'nowrap' }} align="right">
                             SỐ LƯỢNG
@@ -1098,6 +1467,9 @@ export default function WooCommerceOrdersPage() {
                           <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 130, whiteSpace: 'nowrap' }} align="right">
                             THÀNH TIỀN
                           </TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 150, maxWidth: 220, whiteSpace: 'nowrap' }}>
+                            GHI CHÚ
+                          </TableCell>
                           <TableCell sx={{ fontWeight: 600, color: '#737373', fontSize: 12, py: 1.2, minWidth: 130, whiteSpace: 'nowrap' }} align="right">
                             TỒN KHO HIỆN CÓ
                           </TableCell>
@@ -1107,83 +1479,93 @@ export default function WooCommerceOrdersPage() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {orderDetail.lines.map((line: WooCommerceOrderLineDto) => (
-                          <TableRow key={line.wooCommerceOrderItemId} sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}>
-                            <TableCell sx={{ py: 1.2 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717', fontSize: 13 }}>
-                                {line.productName}
-                              </Typography>                              
-                            </TableCell>
-                            <TableCell align="center" sx={{ py: 1.2 }}>
-                              {line.productId ? (
-                                <Chip
-                                  label={`Kho #${line.productId}`}
-                                  size="small"
-                                  sx={{ bgcolor: '#f2f2f2', color: '#171717', fontSize: 11, height: 20, whiteSpace: 'nowrap' }}
-                                />
-                              ) : (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                                  <Chip
-                                    label="Chưa liên kết kho"
-                                    size="small"
-                                    sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20, fontWeight: 500, whiteSpace: 'nowrap' }}
-                                  />
-                                  <Typography variant="caption" sx={{ color: '#b91c1c', fontSize: 10, whiteSpace: 'nowrap' }}>
-                                    Không thể xuất kho
-                                  </Typography>
-                                </Box>
-                              )}
-                            </TableCell>
-                            <TableCell align="right" sx={{ py: 1.2, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                              {line.quantity}
-                            </TableCell>
-                            <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                              {formatVND(line.unitPrice)}
-                            </TableCell>
-                            <TableCell align="right" sx={{ py: 1.2, fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                              {formatVND(line.subtotal)}
-                            </TableCell>
-                            <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                              {line.productId ? (
-                                line.availableStock != null ? (
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontSize: 13,
-                                      fontWeight: 600,
-                                      color: line.availableStock >= line.quantity ? '#15803d' : '#b91c1c',
-                                    }}
-                                  >
-                                    {line.availableStock}
+                        {orderDetail.lines.map((line: WooCommerceOrderLineDto) => {
+                          const noteText = (line.customerNote || line.note || orderDetail.customerNote || orderDetail.note || '').trim()
+                          const isNa = !noteText
+
+                          return (
+                            <TableRow key={line.wooCommerceOrderItemId} sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}>
+                              <TableCell sx={{ py: 1.2, position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #ededed' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717', fontSize: 13 }}>
+                                  {line.productName}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.2, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                                {line.quantity}
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                                {formatVND(line.unitPrice)}
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.2, fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                                {formatVND(line.subtotal)}
+                              </TableCell>
+                              <TableCell sx={{ py: 1.2, maxWidth: 220 }}>
+                                {isNa ? (
+                                  <Typography variant="body2" sx={{ color: '#a3a3a3', fontSize: 12, fontStyle: 'normal' }}>
+                                    -N/A-
                                   </Typography>
                                 ) : (
-                                  <span style={{ color: '#a3a3a3' }}>—</span>
-                                )
-                              ) : (
-                                <Typography variant="caption" sx={{ color: '#737373', fontSize: 11 }}>
-                                  Chưa có mã kho
-                                </Typography>
-                              )}
-                            </TableCell>
-                            <TableCell align="center" sx={{ py: 1.2, whiteSpace: 'nowrap' }}>
-                              {line.availability === 'available' && (
-                                <Chip label="Đủ tồn kho" size="small" sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
-                              )}
-                              {(line.availability === 'insufficient' || line.availability === 'insufficient_stock') && (
-                                <Chip label="Không đủ tồn kho" size="small" sx={{ bgcolor: '#fef2f2', color: '#b91c1c', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
-                              )}
-                              {line.availability === 'unmapped' && (
-                                <Chip label="Chưa liên kết kho" size="small" sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
-                              )}
-                              {line.availability !== 'available' &&
-                                line.availability !== 'insufficient' &&
-                                line.availability !== 'insufficient_stock' &&
-                                line.availability !== 'unmapped' && (
-                                  <Chip label={line.availability || 'Chưa đủ điều kiện'} size="small" sx={{ bgcolor: '#f2f2f2', color: '#737373', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                  <Tooltip title={noteText} arrow placement="top">
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        color: '#404040',
+                                        fontSize: 13,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: 200,
+                                        display: 'block',
+                                        cursor: 'default',
+                                      }}
+                                    >
+                                      {noteText}
+                                    </Typography>
+                                  </Tooltip>
+                                )}
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.2, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                                {line.productId ? (
+                                  line.availableStock != null ? (
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: line.availableStock >= line.quantity ? '#15803d' : '#b91c1c',
+                                      }}
+                                    >
+                                      {line.availableStock}
+                                    </Typography>
+                                  ) : (
+                                    <span style={{ color: '#a3a3a3' }}>—</span>
+                                  )
+                                ) : (
+                                  <Typography variant="caption" sx={{ color: '#737373', fontSize: 11 }}>
+                                    Chưa có mã kho
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 1.2, whiteSpace: 'nowrap' }}>
+                                {line.availability === 'available' && (
+                                  <Chip label="Đủ hàng" size="small" sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                                )}
+                                {(line.availability === 'insufficient' || line.availability === 'insufficient_stock') && (
+                                  <Chip label="Thiếu hàng" size="small" sx={{ bgcolor: '#fef2f2', color: '#b91c1c', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                                )}
+                                {line.availability === 'unmapped' && (
+                                  <Chip label="Chưa liên kết" size="small" sx={{ bgcolor: '#fffbeb', color: '#b45309', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                                )}
+                                {line.availability !== 'available' &&
+                                  line.availability !== 'insufficient' &&
+                                  line.availability !== 'insufficient_stock' &&
+                                  line.availability !== 'unmapped' && (
+                                    <Chip label={line.availability === 'not_eligible' ? 'Chưa xử lý' : line.availability || 'Chưa sẵn sàng'} size="small" sx={{ bgcolor: '#f2f2f2', color: '#737373', fontSize: 11, height: 20, whiteSpace: 'nowrap' }} />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </Paper>
@@ -1228,7 +1610,7 @@ export default function WooCommerceOrdersPage() {
 
         <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: '1px solid #ededed' }}>
           <Button
-            onClick={() => setSelectedOrderId(null)}
+            onClick={handleCloseDetail}
             variant="outlined"
             sx={{
               height: 36,
@@ -1291,22 +1673,31 @@ export default function WooCommerceOrdersPage() {
 
           {/* Order Summary Box */}
           <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#f9f9f9', border: '1px solid #ededed', borderRadius: '6px' }}>
-            <Grid container spacing={1}>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#737373' }}>Khách đặt hàng WooCommerce:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717' }}>
+            <Grid container spacing={1.5}>
+              <Grid item xs={12} sm={7}>
+                <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                  Khách đặt hàng WooCommerce:
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.25 }}>
                   {orderToConfirm?.customerName?.trim() ? orderToConfirm.customerName : 'Khách vãng lai'}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#737373' }}>
-                  {orderToConfirm?.customerPhone?.trim() || 'Chưa cung cấp'}
+                <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.25 }}>
+                  SĐT: <strong>{orderToConfirm?.customerPhone?.trim() || 'Chưa cung cấp'}</strong>
                 </Typography>
+                {orderToConfirm?.shippingAddress?.trim() && (
+                  <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.25 }}>
+                    Địa chỉ nhận hàng: {orderToConfirm.shippingAddress.trim()}
+                  </Typography>
+                )}
               </Grid>
-              <Grid item xs={6} sx={{ textAlign: 'right' }}>
-                <Typography variant="caption" sx={{ color: '#737373' }}>Tổng giá trị đơn:</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: '#171717' }}>
+              <Grid item xs={12} sm={5} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                  Tổng giá trị đơn:
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#171717', mt: 0.25 }}>
                   {formatVND(orderToConfirm?.total)}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#737373' }}>
+                <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.25 }}>
                   {orderToConfirm?.lines?.length ? `${orderToConfirm.lines.length} sản phẩm` : 'Chưa có sản phẩm'}
                 </Typography>
               </Grid>
@@ -1315,14 +1706,24 @@ export default function WooCommerceOrdersPage() {
 
           {/* Customer Selection Autocomplete */}
           <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-              CHỌN KHÁCH HÀNG KHO LIÊN KẾT HÓA ĐƠN *
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500 }}>
+                CHỌN KHÁCH HÀNG KHO LIÊN KẾT HÓA ĐƠN *
+              </Typography>
+              {isCustomerSearching && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <CircularProgress size={12} sx={{ color: '#7299ED' }} />
+                  <Typography variant="caption" sx={{ color: '#7299ED', fontSize: 11 }}>
+                    Đang tìm khách hàng theo SĐT/Tên...
+                  </Typography>
+                </Box>
+              )}
+            </Box>
             <Autocomplete<CustomerDto>
               size="small"
-              options={customerOptions}
-              loading={isCustomersLoading}
-              getOptionLabel={(c) => `${c.name} - ${c.phone}${c.groupPrice ? ` [Nhóm: ${c.groupPrice}]` : ''}`}
+              options={allCustomerOptions}
+              loading={isCustomersLoading || isCustomerSearching}
+              getOptionLabel={(c) => `${c.name} - ${c.phone || 'Không có SĐT'} [${formatGroupPrice(c.groupPrice)}]`}
               isOptionEqualToValue={(opt, val) => opt.id === val.id}
               value={selectedCustomer}
               onChange={(_, val) => setSelectedCustomer(val)}
@@ -1336,7 +1737,7 @@ export default function WooCommerceOrdersPage() {
                     ...params.InputProps,
                     endAdornment: (
                       <>
-                        {isCustomersLoading ? <CircularProgress color="inherit" size={16} /> : null}
+                        {isCustomersLoading || isCustomerSearching ? <CircularProgress color="inherit" size={16} /> : null}
                         {params.InputProps.endAdornment}
                       </>
                     ),
@@ -1345,18 +1746,74 @@ export default function WooCommerceOrdersPage() {
               )}
               renderOption={(props, option) => (
                 <li {...props} key={option.id}>
-                  <Box sx={{ py: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717' }}>
-                      {option.name}
-                    </Typography>
+                  <Box sx={{ py: 0.5, width: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717' }}>
+                        {option.name}
+                      </Typography>
+                      <Chip
+                        label={formatGroupPrice(option.groupPrice)}
+                        size="small"
+                        sx={{
+                          bgcolor: option.groupPrice?.toUpperCase() === 'S' ? '#eff6ff' : '#f0fdf4',
+                          color: option.groupPrice?.toUpperCase() === 'S' ? '#1d4ed8' : '#15803d',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          borderRadius: '4px',
+                          height: 18,
+                        }}
+                      />
+                    </Box>
                     <Typography variant="caption" sx={{ color: '#737373' }}>
-                      SĐT: {option.phone || 'Chưa cung cấp'} | Địa chỉ: {option.address || 'Chưa cung cấp'}
+                      SĐT: {option.phone || 'Chưa cung cấp'}{option.address ? ` | Đ/C: ${option.address}` : ''}
                     </Typography>
                   </Box>
                 </li>
               )}
             />
-            <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.5 }}>
+
+            {/* Selected Customer Details */}
+            {selectedCustomer && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 1.5,
+                  p: 1.5,
+                  bgcolor: '#ffffff',
+                  border: '1px solid #ededed',
+                  borderRadius: '6px',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717' }}>
+                    {selectedCustomer.name}
+                  </Typography>
+                  <Chip
+                    label={formatGroupPrice(selectedCustomer.groupPrice)}
+                    size="small"
+                    sx={{
+                      bgcolor: selectedCustomer.groupPrice?.toUpperCase() === 'S' ? '#eff6ff' : '#f0fdf4',
+                      color: selectedCustomer.groupPrice?.toUpperCase() === 'S' ? '#1d4ed8' : '#15803d',
+                      fontWeight: 600,
+                      fontSize: 11,
+                      height: 20,
+                      borderRadius: '4px',
+                    }}
+                  />
+                </Box>
+                <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
+                  SĐT: <strong>{selectedCustomer.phone || 'Chưa cung cấp'}</strong>
+                  {selectedCustomer.email ? ` | Email: ${selectedCustomer.email}` : ''}
+                </Typography>
+                {selectedCustomer.address && (
+                  <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.25 }}>
+                    Địa chỉ: {selectedCustomer.address}
+                  </Typography>
+                )}
+              </Paper>
+            )}
+
+            <Typography variant="caption" sx={{ color: '#737373', display: 'block', mt: 0.75 }}>
               * Bắt buộc chọn một khách hàng đã có trong danh mục kho.
             </Typography>
           </Box>

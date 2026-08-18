@@ -67,6 +67,31 @@ body {
   --ag-row-height: 44px;
 }
 
+/* AG Grid Pinned Columns styling */
+.ag-theme-quartz .ag-pinned-left-header {
+  border-right: 1px solid #e0e0e0 !important;
+  background-color: #ffffff !important;
+  z-index: 4 !important;
+}
+
+.ag-theme-quartz .ag-pinned-left-cols-container {
+  border-right: 1px solid #e0e0e0 !important;
+  background-color: #ffffff !important;
+  z-index: 2 !important;
+}
+
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row {
+  background-color: #ffffff !important;
+}
+
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row:hover {
+  background-color: #f9f9f9 !important;
+}
+
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row-selected {
+  background-color: #EEF3FD !important;
+}
+
 /* AG Grid Low Stock Warning Row Highlighting */
 .ag-theme-quartz .ag-row-warning-stock {
   background-color: #fffbeb !important;
