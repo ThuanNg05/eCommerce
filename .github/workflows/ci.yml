@@ -51,6 +51,19 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-NuGetVulnerabilities.ps1
 
+      - name: Set up Node.js for desktop bundle
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build React bundle for desktop artifact
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
       - name: Publish desktop artifact
         run: >-
           dotnet publish src/WarehouseApp.Desktop/WarehouseApp.Desktop.csproj

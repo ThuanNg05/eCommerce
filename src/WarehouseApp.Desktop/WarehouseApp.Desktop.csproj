@@ -32,13 +32,23 @@
     WebView2 virtual host (https://app.local/) can serve it offline. Runs only
     once the bundle has been produced with `npm run build`.
   -->
-  <Target Name="CopyReactBundle" AfterTargets="Build"
+  <Target Name="CopyReactBundleAfterBuild" AfterTargets="Build"
           Condition="Exists('$(MSBuildProjectDirectory)\..\..\web\dist')">
     <ItemGroup>
       <ReactDist Include="$(MSBuildProjectDirectory)\..\..\web\dist\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(ReactDist)"
           DestinationFiles="@(ReactDist->'$(OutDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyReactBundleAfterPublish" AfterTargets="Publish"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\..\web\dist')">
+    <ItemGroup>
+      <ReactDistForPublish Include="$(MSBuildProjectDirectory)\..\..\web\dist\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ReactDistForPublish)"
+          DestinationFiles="@(ReactDistForPublish->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 
