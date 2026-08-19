@@ -1,0 +1,72 @@
+name: Staging verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: PostgreSQL staging integration tests
+    runs-on: windows-latest
+    environment: staging
+    timeout-minutes: 20
+    env:
+      WAREHOUSE_INTEGRATION_CONNECTION: ${{ secrets.WAREHOUSE_INTEGRATION_CONNECTION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore and run staging tests
+        shell: pwsh
+        run: ./scripts/Test-PostgresIntegration.ps1
+
+  e2e:
+    name: Staging Playwright smoke
+    runs-on: windows-latest
+    environment: staging
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_NEW_PASSWORD: ${{ secrets.E2E_NEW_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run staging smoke test
+        working-directory: web
+        run: npm run test:e2e -- --workers=1
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-playwright-report
+          path: |
+            web/playwright-report/**
+            web/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
