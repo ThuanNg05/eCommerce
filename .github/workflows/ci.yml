@@ -73,6 +73,16 @@ jobs:
           --no-self-contained
           --output artifacts/desktop
 
+      - name: Verify desktop artifact contains React bundle
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/desktop/WarehouseApp.Desktop.exe)) {
+            throw 'Desktop executable is missing from the publish artifact.'
+          }
+          if (-not (Test-Path artifacts/desktop/wwwroot/index.html)) {
+            throw 'React bundle is missing from the desktop publish artifact.'
+          }
+
       - name: Upload test results and coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
