@@ -51,6 +51,19 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-NuGetVulnerabilities.ps1
 
+      - name: Set up Node.js for desktop bundle
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build React bundle for desktop artifact
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
       - name: Publish desktop artifact
         run: >-
           dotnet publish src/WarehouseApp.Desktop/WarehouseApp.Desktop.csproj
@@ -59,6 +72,16 @@ jobs:
           --no-restore
           --no-self-contained
           --output artifacts/desktop
+
+      - name: Verify desktop artifact contains React bundle
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/desktop/WarehouseApp.Desktop.exe)) {
+            throw 'Desktop executable is missing from the publish artifact.'
+          }
+          if (-not (Test-Path artifacts/desktop/wwwroot/index.html)) {
+            throw 'React bundle is missing from the desktop publish artifact.'
+          }
 
       - name: Upload test results and coverage
         if: always()
