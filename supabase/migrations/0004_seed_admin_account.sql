@@ -15,6 +15,11 @@
 
 create extension if not exists pgcrypto;
 
+-- Supabase-managed databases commonly install pgcrypto in the `extensions`
+-- schema, while other PostgreSQL environments may use `public`. Include both
+-- schemas so crypt/gen_salt resolve consistently in staging and local runs.
+set local search_path = public, extensions;
+
 insert into account (username, password, role_id, status)
 values ('admin', crypt('Admin123', gen_salt('bf', 10)), 1, 1)
 on conflict (username) do nothing;

@@ -8,6 +8,24 @@ import {
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 let refreshPromise: Promise<boolean> | null = null
+const inFlightWrites = new Map<string, Promise<unknown>>()
+const CLIENT_REQUEST_TIMEOUT_MS = 65_000
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), CLIENT_REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.')
+    }
+    if (!navigator.onLine) throw new Error('Không có kết nối mạng. Vui lòng kiểm tra và thử lại.')
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
 
 async function parseError(res: Response): Promise<string> {
   if (res.status === 429) {
@@ -28,7 +46,7 @@ async function refreshAccessToken(): Promise<boolean> {
     const session = readSession()
     if (!session?.refreshToken) return false
 
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ refreshToken: session.refreshToken }),
@@ -52,11 +70,12 @@ async function refreshAccessToken(): Promise<boolean> {
 async function request<T>(method: string, path: string, body?: unknown, allowRefresh = true): Promise<T> {
   const session = readSession()
   const headers: Record<string, string> = { Accept: 'application/json' }
+  headers['X-Client-Version'] = import.meta.env.VITE_APP_VERSION ?? 'web'
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
@@ -81,7 +100,16 @@ export function apiGet<T>(path: string): Promise<T> {
 }
 
 export function apiSend<T>(method: string, path: string, body?: unknown): Promise<T> {
-  return request<T>(method, path, body)
+  const normalizedMethod = method.toUpperCase()
+  if (normalizedMethod === 'GET' || normalizedMethod === 'HEAD') return request<T>(method, path, body)
+
+  const key = `${normalizedMethod} ${path}`
+  const existing = inFlightWrites.get(key)
+  if (existing) return existing as Promise<T>
+
+  const pending = request<T>(method, path, body).finally(() => inFlightWrites.delete(key))
+  inFlightWrites.set(key, pending)
+  return pending
 }
 
 export function apiPost<T>(path: string, body?: unknown): Promise<T> {

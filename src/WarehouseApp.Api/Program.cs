@@ -11,3 +11,5 @@ var app = builder.Build();
 ApiBootstrap.UseApiPipeline(app);
 
 app.Run();
+
+public partial class Program;

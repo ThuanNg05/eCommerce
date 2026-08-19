@@ -129,7 +129,7 @@ export default function SettingsPage() {
             </Box>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#171717' }}>
-                Cấu hình SMTP Email (FR012)
+                Cấu hình SMTP Email
               </Typography>
 
               <Typography variant="body2" sx={{ color: '#737373', fontSize: 13 }}>

@@ -1116,10 +1116,64 @@ export default function InvoicesPage() {
         </DialogTitle>
         <Divider />
         <DialogContent id="printable-invoice-content" sx={{ position: 'relative', overflow: 'hidden' }}>
-          {/* Print Watermark */}
-          <div className="invoice-watermark" aria-hidden="true">
-            www.tranhkienghoathuan.com
-          </div>
+          {/* Repeated Diagonal Watermark Pattern */}
+          <svg
+            className="invoice-watermark-pattern"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              zIndex: 0,
+            }}
+          >
+            <defs>
+              <pattern
+                id="invoice-wm-pattern"
+                width="420"
+                height="240"
+                patternUnits="userSpaceOnUse"
+              >
+                <text
+                  x="105"
+                  y="60"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  transform="rotate(-25 105 60)"
+                  className="invoice-wm-text"
+                  fill="#000000"
+                  fillOpacity="0.15"
+                  fontSize="13"
+                  fontWeight="600"
+                  fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                  letterSpacing="0.02em"
+                >
+                  www.tranhkienghoathuan.com
+                </text>
+                <text
+                  x="280"
+                  y="180"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  transform="rotate(-25 280 180)"
+                  className="invoice-wm-text"
+                  fill="#000000"
+                  fillOpacity="0.15"
+                  fontSize="13"
+                  fontWeight="600"
+                  fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                  letterSpacing="0.02em"
+                >
+                  www.tranhkienghoathuan.com
+                </text>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#invoice-wm-pattern)" />
+          </svg>
           {isDetailLoading ? (
             <Typography variant="body2" sx={{ py: 4, textAlign: 'center', color: '#737373' }}>
               Đang tải chi tiết hóa đơn...
@@ -1226,11 +1280,11 @@ export default function InvoicesPage() {
               </Box>
 
               {/* Invoice Lines Table */}
-              <TableContainer sx={{ mb: 3, border: '1px solid #ededed', borderRadius: '6px', overflowX: 'auto' }}>
+              <TableContainer sx={{ mb: 2.5, overflowX: 'auto' }}>
                 <Table size="small">
                   <TableHead sx={{ bgcolor: '#f9f9f9' }}>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 600, position: 'sticky', left: 0, zIndex: 4, bgcolor: '#f9f9f9', borderRight: '1px solid #ededed', minWidth: 160 }}>SẢN PHẨM</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
                         SỐ LƯỢNG
                       </TableCell>
@@ -1246,7 +1300,7 @@ export default function InvoicesPage() {
                   <TableBody>
                     {invoiceDetail.lines.map((line, idx) => (
                       <TableRow key={idx}>
-                        <TableCell sx={{ fontWeight: 500, position: 'sticky', left: 0, zIndex: 2, bgcolor: '#ffffff', borderRight: '1px solid #ededed' }}>{line.productName}</TableCell>
+                        <TableCell sx={{ fontWeight: 500 }}>{line.productName}</TableCell>
                         <TableCell align="right">{line.quantity}</TableCell>
                         <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600 }}>
