@@ -9,12 +9,16 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: DOTNET_USE_POLLING_FILE_WATCHER
+        value: "1"
       - key: Authentication__RequireSigningKey
         value: "true"
       - key: Authentication__SigningKey
         sync: false
       - key: ConnectionStrings__Default
         sync: false
+      - key: Database__CaCertificatePath
+        value: /app/certs/prod-ca-2021.crt
       - key: SupabaseStorage__Url
         sync: false
       - key: SupabaseStorage__ServiceRoleKey
