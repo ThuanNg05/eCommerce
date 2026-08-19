@@ -1,8 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +18,8 @@ using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Security;
 using WarehouseApp.Infrastructure;
 using WarehouseApp.Infrastructure.Services;
+using WarehouseApp.Api.Logging;
+using WarehouseApp.Api.Observability;
 
 namespace WarehouseApp.Api;
 
@@ -26,6 +32,8 @@ namespace WarehouseApp.Api;
 public static class ApiBootstrap
 {
     public const string CorsPolicy = "AppClient";
+    private const long MaxRequestBodyBytes = 6 * 1024 * 1024;
+    private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(60);
 
     /// <summary>Origins allowed to call the API: the packaged React app (WebView2 virtual
     /// host) and the Vite dev server.</summary>
@@ -33,6 +41,20 @@ public static class ApiBootstrap
 
     public static void AddApiServices(IServiceCollection services, IConfiguration config)
     {
+        services.AddLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddJsonConsole(options =>
+                options.JsonWriterOptions = new JsonWriterOptions { Indented = false });
+            logging.AddProvider(new RollingFileLoggerProvider(
+                Path.Combine(AppContext.BaseDirectory, "logs"),
+                maxFileBytes: 10 * 1024 * 1024,
+                retainedFileCount: 7));
+        });
+        services.AddSingleton<ApiMetrics>();
+
+        services.Configure<KestrelServerOptions>(options =>
+            options.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
         services.AddResponseCompression(options =>
         {
             options.EnableForHttps = true;
@@ -43,6 +65,8 @@ public static class ApiBootstrap
             options.Level = System.IO.Compression.CompressionLevel.Fastest);
         services.Configure<GzipCompressionProviderOptions>(options =>
             options.Level = System.IO.Compression.CompressionLevel.Fastest);
+        services.AddRequestTimeouts(options =>
+            options.DefaultPolicy = new RequestTimeoutPolicy { Timeout = DefaultRequestTimeout });
         services.Configure<AuthSettings>(config.GetSection(AuthSettings.SectionName));
         services.Configure<DatabaseReadinessOptions>(config.GetSection(DatabaseReadinessOptions.SectionName));
         services.AddInfrastructure(config);
@@ -178,10 +202,42 @@ public static class ApiBootstrap
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseResponseCompression();
+        app.UseRequestTimeouts();
         app.UseCors(CorsPolicy);
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.Use(async (context, next) =>
+        {
+            var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("WarehouseApp.Api.Requests");
+            var metrics = context.RequestServices.GetRequiredService<ApiMetrics>();
+            var started = Stopwatch.GetTimestamp();
+
+            try
+            {
+                await next();
+            }
+            finally
+            {
+                var elapsedMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                metrics.Record(elapsedMs, context.Response.StatusCode);
+                var accountId = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? "anonymous";
+                var appVersion = context.Request.Headers.TryGetValue("X-Client-Version", out var version)
+                    ? version.ToString()
+                    : "unknown";
+
+                logger.LogInformation(
+                    "HTTP request completed. Method={Method}; Path={Path}; StatusCode={StatusCode}; DurationMs={DurationMs}; AccountId={AccountId}; AppVersion={AppVersion}; CorrelationId={CorrelationId}",
+                    context.Request.Method,
+                    context.Request.Path.Value ?? "/",
+                    context.Response.StatusCode,
+                    Math.Round(elapsedMs, 2),
+                    accountId,
+                    appVersion,
+                    context.TraceIdentifier);
+            }
+        });
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
         app.MapGet("/health/live", () => Results.Ok(new { status = "alive" }));
@@ -207,6 +263,9 @@ public static class ApiBootstrap
                         ["correlationId"] = context.TraceIdentifier,
                     });
         });
+
+        app.MapGet("/metrics", (ApiMetrics metrics) => Results.Ok(metrics.Snapshot()))
+            .RequireAuthorization("AdminOnly");
 
         var api = app.MapGroup("/api");
         api.MapAuthEndpoints();

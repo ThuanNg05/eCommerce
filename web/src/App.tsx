@@ -24,14 +24,18 @@ import ReportsPage from './pages/ReportsPage'
 import AccountsPage from './pages/AccountsPage'
 import SettingsPage from './pages/SettingsPage'
 import AuditLogsPage from './pages/AuditLogsPage'
+import AppErrorBoundary from './components/AppErrorBoundary'
+import NetworkStatusBanner from './components/NetworkStatusBanner'
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AuthProvider>
-          <BrowserRouter>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <NetworkStatusBanner />
+          <AuthProvider>
+            <BrowserRouter>
             <Routes>
               {/* Entry Screen */}
               <Route path="/login" element={<LoginPage />} />
@@ -80,9 +84,10 @@ export default function App() {
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-          </BrowserRouter>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+            </BrowserRouter>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   )
 }

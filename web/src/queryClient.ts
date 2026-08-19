@@ -5,7 +5,7 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 15_000,
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: (failureCount) => navigator.onLine && failureCount < 1,
     },
   },
 })
