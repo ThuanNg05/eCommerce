@@ -51,6 +51,29 @@ moment the task is done** — a finished branch left unmerged is treated as **no
 the other agent and the running app never see it, and it silently "reverts" features
 whenever a different branch is checked out.
 
+### Branch naming convention
+
+Branch names use the format `<type>/<scope>-<short-description>` with lowercase
+kebab-case for the scope and description. Use one of these types:
+
+| Type | Use for |
+|------|---------|
+| `feat` | New functionality or user-facing behavior |
+| `fix` | Bug fixes |
+| `chore` | Maintenance, configuration, dependencies, or repository cleanup |
+| `docs` | Documentation-only changes |
+| `test` | Tests and test infrastructure |
+| `refactor` | Internal restructuring without behavior changes |
+| `perf` | Performance improvements |
+| `hotfix` | Urgent production fixes |
+
+Examples: `feat/ui-invoice-watermark`, `fix/api-login-cors`,
+`chore/production-readiness-and-docs`.
+
+Do not use `codex/*`, `agent/*`, personal names, spaces, uppercase letters, or vague
+names such as `changes` or `update`. Keep the branch focused on one task and delete it
+after it has been merged into `main`.
+
 1. **Branch from the latest `main`** — never from another feature branch:
    `git checkout main && git pull --ff-only && git checkout -b feat/ui-<task>`
 2. **Finish = merge back immediately**, then delete the branch:
