@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,16 @@ public static class ApiBootstrap
 
     public static void AddApiServices(IServiceCollection services, IConfiguration config)
     {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+        });
+        services.Configure<BrotliCompressionProviderOptions>(options =>
+            options.Level = System.IO.Compression.CompressionLevel.Fastest);
+        services.Configure<GzipCompressionProviderOptions>(options =>
+            options.Level = System.IO.Compression.CompressionLevel.Fastest);
         services.Configure<AuthSettings>(config.GetSection(AuthSettings.SectionName));
         services.Configure<DatabaseReadinessOptions>(config.GetSection(DatabaseReadinessOptions.SectionName));
         services.AddInfrastructure(config);
@@ -166,6 +177,7 @@ public static class ApiBootstrap
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
+        app.UseResponseCompression();
         app.UseCors(CorsPolicy);
         app.UseRateLimiter();
         app.UseAuthentication();
