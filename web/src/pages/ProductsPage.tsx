@@ -20,6 +20,8 @@ import {
   Tooltip,
   Autocomplete,
   CircularProgress,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material'
 import {
   Plus,
@@ -157,6 +159,8 @@ export default function ProductsPage() {
 
   // Submitting States
   const [isSavingCreate, setIsSavingCreate] = useState(false)
+  const [createLoadingStep, setCreateLoadingStep] = useState<string | null>(null)
+  const [linkWooCommerceOnCreate, setLinkWooCommerceOnCreate] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [pageNotification, setPageNotification] = useState<{
     type: 'success' | 'warning' | 'error'
@@ -370,6 +374,8 @@ export default function ProductsPage() {
     setCreateImageFile(null)
     setCreatePreviewUrl(null)
     setCreateImageError(null)
+    setLinkWooCommerceOnCreate(false)
+    setCreateLoadingStep(null)
     if (createFileInputRef.current) {
       createFileInputRef.current.value = ''
     }
@@ -482,7 +488,9 @@ export default function ProductsPage() {
 
   // Submission handler for Create Product
   const handleCreateSubmit = async () => {
+    if (isSavingCreate) return
     setActionError(null)
+
     if (!createForm.sku.trim()) {
       setActionError('Mã SKU là bắt buộc.')
       return
@@ -498,7 +506,13 @@ export default function ProductsPage() {
       return
     }
 
+    if (linkWooCommerceOnCreate && !createImageFile) {
+      setActionError('Sản phẩm WooCommerce bắt buộc phải có ảnh. Vui lòng chọn ảnh trước khi lưu.')
+      return
+    }
+
     setIsSavingCreate(true)
+    setCreateLoadingStep('Đang tạo sản phẩm...')
     try {
       const payload: CreateProductRequest = {
         ...createForm,
@@ -513,6 +527,7 @@ export default function ProductsPage() {
       const createdProduct = await createProduct(payload)
 
       if (createImageFile) {
+        setCreateLoadingStep('Đang tải ảnh...')
         try {
           await uploadProductImage(createdProduct.id, createImageFile)
         } catch (imgErr) {
@@ -521,7 +536,35 @@ export default function ProductsPage() {
           resetCreateForm()
           setPageNotification({
             type: 'warning',
-            message: `Sản phẩm "${createdProduct.name}" (SKU: ${createdProduct.sku}) đã được tạo, nhưng tải ảnh lên thất bại: ${(imgErr as Error).message}. Bạn có thể chỉnh sửa sản phẩm để thử tải lại ảnh.`,
+            message: linkWooCommerceOnCreate
+              ? `Sản phẩm "${createdProduct.name}" [${createdProduct.sku}] đã được tạo, nhưng tải ảnh lên thất bại: ${(imgErr as Error).message}. Sản phẩm chưa được liên kết lên WooCommerce. Bạn có thể chỉnh sửa sản phẩm để tải ảnh và liên kết lại.`
+              : `Sản phẩm "${createdProduct.name}" (SKU: ${createdProduct.sku}) đã được tạo, nhưng tải ảnh lên thất bại: ${(imgErr as Error).message}. Bạn có thể chỉnh sửa sản phẩm để thử tải lại ảnh.`,
+          })
+          return
+        }
+      }
+
+      if (linkWooCommerceOnCreate) {
+        setCreateLoadingStep('Đang liên kết WooCommerce...')
+        try {
+          const linkResult = await publishAndLinkWarehouseProduct(createdProduct.id)
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          queryClient.invalidateQueries({ queryKey: ['product-link'] })
+          setIsCreateOpen(false)
+          resetCreateForm()
+          setPageNotification({
+            type: 'success',
+            message: `Sản phẩm "${createdProduct.name}" [${createdProduct.sku}] đã được tạo và liên kết lên WooCommerce thành công (Mã WooCommerce: #${linkResult.wooCommerceProductId}).`,
+          })
+          return
+        } catch (wooErr) {
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          queryClient.invalidateQueries({ queryKey: ['product-link'] })
+          setIsCreateOpen(false)
+          resetCreateForm()
+          setPageNotification({
+            type: 'warning',
+            message: `Sản phẩm "${createdProduct.name}" [${createdProduct.sku}] đã được tạo và tải ảnh thành công, nhưng liên kết lên WooCommerce thất bại: ${(wooErr as Error).message}. Bạn có thể dùng chức năng liên kết trong danh sách sản phẩm để thử lại.`,
           })
           return
         }
@@ -530,10 +573,15 @@ export default function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       setIsCreateOpen(false)
       resetCreateForm()
+      setPageNotification({
+        type: 'success',
+        message: `Đã tạo sản phẩm "${createdProduct.name}" [${createdProduct.sku}] thành công.`,
+      })
     } catch (err) {
       setActionError((err as Error).message)
     } finally {
       setIsSavingCreate(false)
+      setCreateLoadingStep(null)
     }
   }
 
@@ -989,7 +1037,12 @@ export default function ProductsPage() {
       {/* CREATE PRODUCT DIALOG */}
       <Dialog
         open={isCreateOpen}
-        onClose={() => !isSavingCreate && setIsCreateOpen(false)}
+        onClose={() => {
+          if (!isSavingCreate) {
+            setIsCreateOpen(false)
+            resetCreateForm()
+          }
+        }}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
@@ -1029,10 +1082,75 @@ export default function ProductsPage() {
               />
             </Grid>
 
+            {/* Tùy chọn Liên kết WooCommerce */}
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  border: '1px solid',
+                  borderColor: linkWooCommerceOnCreate ? '#7299ED' : '#ededed',
+                  borderRadius: '6px',
+                  bgcolor: linkWooCommerceOnCreate ? '#EEF3FD' : '#fafafa',
+                  transition: 'background-color 140ms ease, border-color 140ms ease',
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={linkWooCommerceOnCreate}
+                      onChange={(e) => setLinkWooCommerceOnCreate(e.target.checked)}
+                      disabled={isSavingCreate}
+                      size="small"
+                      sx={{
+                        color: '#737373',
+                        '&.Mui-checked': { color: '#1a1a1a' },
+                      }}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#171717', fontSize: 13 }}>
+                        Liên kết lên WooCommerce ngay sau khi tạo
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#737373', display: 'block', fontSize: 11 }}>
+                        Tự động đăng sản phẩm và đồng bộ kho hàng lên website WooCommerce ngay sau khi tạo.
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+                />
+                {linkWooCommerceOnCreate && (
+                  <Box
+                    sx={{
+                      mt: 1,
+                      pt: 1,
+                      borderTop: '1px dashed #d0d7de',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                    }}
+                  >
+                    <AlertTriangle size={14} color="#b45309" />
+                    <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 500, fontSize: 12 }}>
+                      Sản phẩm WooCommerce bắt buộc phải có ảnh.
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Grid>
+
             {/* Mục ẢNH SẢN PHẨM trong Create Dialog */}
             <Grid item xs={12}>
-              <Typography variant="caption" sx={{ color: '#737373', fontWeight: 500, display: 'block', mb: 0.5 }}>
-                ẢNH SẢN PHẨM
+              <Typography
+                variant="caption"
+                sx={{
+                  color: linkWooCommerceOnCreate && !createImageFile ? '#b45309' : '#737373',
+                  fontWeight: 500,
+                  display: 'block',
+                  mb: 0.5,
+                }}
+              >
+                ẢNH SẢN PHẨM {linkWooCommerceOnCreate ? '* (Bắt buộc khi liên kết WooCommerce)' : ''}
               </Typography>
               <input
                 type="file"
@@ -1368,16 +1486,25 @@ export default function ProductsPage() {
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setIsCreateOpen(false)} variant="outlined" color="inherit" disabled={isSavingCreate}>
+          <Button
+            onClick={() => {
+              setIsCreateOpen(false)
+              resetCreateForm()
+            }}
+            variant="outlined"
+            color="inherit"
+            disabled={isSavingCreate}
+          >
             Hủy
           </Button>
           <Button
             onClick={handleCreateSubmit}
             variant="contained"
             disabled={isSavingCreate}
+            startIcon={isSavingCreate ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
           >
-            {isSavingCreate ? 'Đang lưu...' : 'Lưu'}
+            {isSavingCreate ? (createLoadingStep || 'Đang lưu...') : 'Lưu'}
           </Button>
         </DialogActions>
       </Dialog>
