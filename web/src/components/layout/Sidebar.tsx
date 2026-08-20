@@ -56,7 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Kho (Nhập/Xuất)', path: '/inventory', icon: ArrowLeftRight },
       { label: 'Khách hàng', path: '/customers', icon: Users },
       { label: 'Hóa đơn', path: '/invoices', icon: FileText },
-      { label: 'Đơn WooCommerce', path: '/woocommerce-orders', icon: ShoppingCart },
+      { label: 'Đơn hàng trang web', path: '/woocommerce-orders', icon: ShoppingCart },
     ],
   },
   {

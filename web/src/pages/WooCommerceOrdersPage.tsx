@@ -351,7 +351,7 @@ export default function WooCommerceOrdersPage() {
       queryClient.invalidateQueries({ queryKey: ['wooCommerceOrders'] })
       setToast({
         open: true,
-        message: `Đồng bộ hoàn tất: đã cập nhật ${res.importedOrders} đơn hàng từ WooCommerce.`,
+        message: `Đồng bộ hoàn tất: đã cập nhật ${res.importedOrders} đơn hàng từ trang web.`,
         severity: 'success',
       })
     },
@@ -818,7 +818,7 @@ export default function WooCommerceOrdersPage() {
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="h5" sx={{ fontWeight: 600, color: '#171717' }}>
-              Đơn hàng WooCommerce
+              Đơn hàng từ trang web
             </Typography>
             <Chip
               label="E-Commerce"
@@ -827,7 +827,7 @@ export default function WooCommerceOrdersPage() {
             />
           </Box>
           <Typography variant="body2" sx={{ color: '#737373', mt: 0.5 }}>
-            Quản lý đồng bộ đơn hàng từ website, đối soát tồn kho tự động và xác nhận xuất hóa đơn kho.
+            Quản lý đồng bộ đơn hàng từ trang web, đối soát tồn kho tự động và xác nhận xuất hóa đơn kho.
           </Typography>
         </Box>
 
@@ -862,7 +862,7 @@ export default function WooCommerceOrdersPage() {
                 '&:hover': { bgcolor: '#000000' },
               }}
             >
-              {syncMutation.isPending ? 'Đang đồng bộ...' : 'Đồng bộ từ WooCommerce'}
+              {syncMutation.isPending ? 'Đang đồng bộ...' : 'Đồng bộ từ trang web'}
             </Button>
           )}
         </Box>
@@ -965,7 +965,7 @@ export default function WooCommerceOrdersPage() {
       {/* Error state */}
       {isError && (
         <Box sx={{ mb: 2, p: 2, bgcolor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px' }}>
-          Không thể tải danh sách đơn WooCommerce: {(error as Error).message}
+          Không thể tải danh sách đơn hàng trang web: {(error as Error).message}
         </Box>
       )}
 
@@ -990,7 +990,7 @@ export default function WooCommerceOrdersPage() {
             onRowDataUpdated={(params) => autoSizeGridColumns(params.api)}
             loading={isLoading}
             localeText={AG_GRID_LOCALE_VI}
-            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Không có đơn hàng WooCommerce nào</span>'
+            overlayNoRowsTemplate='<span style="padding: 10px; color: #a3a3a3;">Không có đơn hàng nào từ trang web</span>'
             animateRows
             pagination
             paginationPageSize={50}
@@ -1583,10 +1583,10 @@ export default function WooCommerceOrdersPage() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <AlertTriangle size={28} color="#b45309" />
                       <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717' }}>
-                        Chưa nhận được danh sách sản phẩm từ WooCommerce. Vui lòng đồng bộ lại đơn hàng.
+                        Chưa nhận được danh sách sản phẩm từ trang web. Vui lòng đồng bộ lại đơn hàng.
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#737373' }}>
-                        Dữ liệu chi tiết các mặt hàng của đơn này chưa có hoặc chưa được cập nhật từ hệ thống WooCommerce.
+                        Dữ liệu chi tiết các mặt hàng của đơn này chưa có hoặc chưa được cập nhật từ trang web.
                       </Typography>
                     </Box>
                   </Paper>
@@ -1676,7 +1676,7 @@ export default function WooCommerceOrdersPage() {
             <Grid container spacing={1.5}>
               <Grid item xs={12} sm={7}>
                 <Typography variant="caption" sx={{ color: '#737373', display: 'block' }}>
-                  Khách đặt hàng WooCommerce:
+                  Khách đặt hàng trên trang web:
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#171717', mt: 0.25 }}>
                   {orderToConfirm?.customerName?.trim() ? orderToConfirm.customerName : 'Khách vãng lai'}
