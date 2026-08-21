@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './client'
+import { apiGet, apiPost, apiPut, apiPatch } from './client'
 import type { PagedResult } from './inventory'
 
 export interface WooCommerceCategoryLinkDto {
@@ -9,6 +9,7 @@ export interface WooCommerceCategoryLinkDto {
 export interface CategoryDto {
   id: number
   name: string
+  isActive?: boolean
   createdAt?: string
   wooCommerceLink?: WooCommerceCategoryLinkDto | null
 }
@@ -20,6 +21,10 @@ export interface CreateCategoryRequest {
 
 export interface UpdateCategoryRequest {
   name: string
+}
+
+export interface UpdateCategoryStatusRequest {
+  isActive: boolean
 }
 
 // REST Endpoints for /api/categories
@@ -37,6 +42,13 @@ export function updateCategory(id: number, req: UpdateCategoryRequest): Promise<
   return apiPut<CategoryDto>(`/api/categories/${id}`, req)
 }
 
+export function updateCategoryStatus(
+  id: number,
+  req: UpdateCategoryStatusRequest,
+): Promise<CategoryDto> {
+  return apiPatch<CategoryDto>(`/api/categories/${id}/status`, req)
+}
+
 export function publishAndLinkWarehouseCategory(
   categoryId: number,
 ): Promise<WooCommerceCategoryLinkDto> {
@@ -48,4 +60,5 @@ export function fetchCategoryLink(
 ): Promise<WooCommerceCategoryLinkDto> {
   return apiGet<WooCommerceCategoryLinkDto>(`/api/woocommerce/categories/${categoryId}/link`)
 }
+
 

@@ -21,12 +21,13 @@ import {
   Snackbar,
   CircularProgress,
 } from '@mui/material'
-import { Plus, RefreshCw, Edit3, Globe } from 'lucide-react'
+import { Plus, RefreshCw, Edit3, Globe, PauseCircle, PlayCircle } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import {
   fetchCategories,
   createCategory,
   updateCategory,
+  updateCategoryStatus,
   publishAndLinkWarehouseCategory,
   type CategoryDto,
 } from '../api/categories'
@@ -48,6 +49,13 @@ export default function CategoriesPage() {
   // Link Dialog states
   const [linkCategoryTarget, setLinkCategoryTarget] = useState<CategoryDto | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
+
+  // Status Toggle Dialog states
+  const [statusTarget, setStatusTarget] = useState<{
+    category: CategoryDto
+    targetIsActive: boolean
+  } | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
 
   // Toast Notification state
   const [toast, setToast] = useState<{
@@ -125,6 +133,25 @@ export default function CategoriesPage() {
     },
   })
 
+  // Update Status Mutation
+  const statusMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      updateCategoryStatus(id, { isActive }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      const targetName = statusTarget?.category.name ?? ''
+      setToast({
+        open: true,
+        message: `Đã ${vars.isActive ? 'kích hoạt lại' : 'tạm ngưng'} danh mục "${targetName}" thành công.`,
+        severity: 'success',
+      })
+      handleCloseStatusDialog()
+    },
+    onError: (err: Error) => {
+      setStatusError(err.message)
+    },
+  })
+
   const handleOpenCreate = () => {
     setFormName('')
     setSyncToWebsite(false)
@@ -163,6 +190,25 @@ export default function CategoriesPage() {
     linkMutation.mutate(linkCategoryTarget.id)
   }
 
+  const handleOpenStatusConfirm = (category: CategoryDto, targetIsActive: boolean) => {
+    setStatusTarget({ category, targetIsActive })
+    setStatusError(null)
+  }
+
+  const handleCloseStatusDialog = () => {
+    if (statusMutation.isPending) return
+    setStatusTarget(null)
+    setStatusError(null)
+  }
+
+  const handleConfirmStatus = () => {
+    if (!statusTarget) return
+    statusMutation.mutate({
+      id: statusTarget.category.id,
+      isActive: statusTarget.targetIsActive,
+    })
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName.trim()) {
@@ -192,6 +238,34 @@ export default function CategoriesPage() {
       },
       { field: 'id', headerName: 'ID', width: 90, sortable: true },
       { field: 'name', headerName: 'TÊN DANH MỤC', minWidth: 160, filter: true, sortable: true },
+      {
+        field: 'isActive',
+        headerName: 'TRẠNG THÁI',
+        width: 140,
+        minWidth: 130,
+        sortable: true,
+        valueGetter: (p) => (p.data?.isActive !== false ? 'Đang hoạt động' : 'Tạm ngưng'),
+        cellRenderer: (p: { data?: CategoryDto }) => {
+          if (!p.data) return null
+          const isActive = p.data.isActive !== false
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <Chip
+                label={isActive ? 'Đang hoạt động' : 'Tạm ngưng'}
+                size="small"
+                sx={{
+                  bgcolor: isActive ? '#f0fdf4' : '#fffbeb',
+                  color: isActive ? '#15803d' : '#b45309',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: '4px',
+                  height: 24,
+                }}
+              />
+            </Box>
+          )
+        },
+      },
       {
         field: 'wooCommerceLink',
         headerName: 'TRẠNG THÁI TRANG WEB',
@@ -236,15 +310,16 @@ export default function CategoriesPage() {
       },
       {
         headerName: 'THAO TÁC',
-        width: 110,
-        minWidth: 100,
-        maxWidth: 130,
+        width: 140,
+        minWidth: 130,
+        maxWidth: 160,
         suppressAutoSize: true,
         resizable: false,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data?: CategoryDto }) => {
           if (!p.data) return null
+          const isActive = p.data.isActive !== false
           const isLinked = Boolean(p.data.wooCommerceLink?.wooCommerceCategoryId)
           return (
             <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
@@ -259,7 +334,7 @@ export default function CategoriesPage() {
                 </IconButton>
               </Tooltip>
 
-              {!isLinked && (
+              {isActive && !isLinked && (
                 <Tooltip title="Liên kết lên trang web">
                   <IconButton
                     size="small"
@@ -268,6 +343,30 @@ export default function CategoriesPage() {
                     aria-label="Liên kết lên trang web"
                   >
                     <Globe size={16} />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {isActive ? (
+                <Tooltip title="Tạm ngưng danh mục">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenStatusConfirm(p.data!, false)}
+                    sx={{ color: '#b45309', '&:hover': { bgcolor: '#fffbeb' } }}
+                    aria-label="Tạm ngưng danh mục"
+                  >
+                    <PauseCircle size={16} />
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Tooltip title="Kích hoạt lại danh mục">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenStatusConfirm(p.data!, true)}
+                    sx={{ color: '#15803d', '&:hover': { bgcolor: '#f0fdf4' } }}
+                    aria-label="Kích hoạt lại danh mục"
+                  >
+                    <PlayCircle size={16} />
                   </IconButton>
                 </Tooltip>
               )}
@@ -415,8 +514,20 @@ export default function CategoriesPage() {
               </Box>
             )}
 
-            {/* Helper text when editing a linked category */}
-            {editingCategory?.wooCommerceLink && (
+            {/* Helper text when editing */}
+            {editingCategory?.isActive === false ? (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  mt: 1.5,
+                  color: '#b45309',
+                  fontSize: 12,
+                }}
+              >
+                Danh mục đang tạm ngưng. Việc đổi tên sẽ không đồng bộ lên trang web.
+              </Typography>
+            ) : editingCategory?.wooCommerceLink ? (
               <Typography
                 variant="caption"
                 sx={{
@@ -428,7 +539,7 @@ export default function CategoriesPage() {
               >
                 Tên mới sẽ được đồng bộ lên trang web.
               </Typography>
-            )}
+            ) : null}
           </DialogContent>
 
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -492,7 +603,82 @@ export default function CategoriesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Status Toggle Confirmation Dialog */}
+      <Dialog
+        open={Boolean(statusTarget)}
+        onClose={handleCloseStatusDialog}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '8px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 18 }}>
+          {statusTarget?.targetIsActive ? 'Kích hoạt lại danh mục' : 'Tạm ngưng danh mục'}
+        </DialogTitle>
+        <DialogContent>
+          {statusError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: '6px' }}>
+              {statusError}
+            </Alert>
+          )}
+          <Typography variant="body2" sx={{ color: '#404040' }}>
+            {statusTarget?.targetIsActive ? (
+              <>
+                Bạn có chắc chắn muốn kích hoạt lại danh mục{' '}
+                <strong>&ldquo;{statusTarget?.category.name}&rdquo;</strong> không?
+              </>
+            ) : (
+              <>
+                Bạn có chắc chắn muốn tạm ngưng danh mục{' '}
+                <strong>&ldquo;{statusTarget?.category.name}&rdquo;</strong> không?
+              </>
+            )}
+          </Typography>
+          {!statusTarget?.targetIsActive && (
+            <Alert severity="info" sx={{ mt: 1.5, borderRadius: '6px', fontSize: 13 }}>
+              Tạm ngưng chỉ áp dụng trong kho; liên kết và category hiện có trên trang web được giữ nguyên.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={handleCloseStatusDialog}
+            variant="outlined"
+            color="inherit"
+            disabled={statusMutation.isPending}
+            sx={{ borderColor: '#e0e0e0', color: '#171717' }}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmStatus}
+            variant="contained"
+            disabled={statusMutation.isPending}
+            startIcon={
+              statusMutation.isPending ? (
+                <CircularProgress size={14} color="inherit" />
+              ) : statusTarget?.targetIsActive ? (
+                <PlayCircle size={16} />
+              ) : (
+                <PauseCircle size={16} />
+              )
+            }
+            sx={{
+              bgcolor: statusTarget?.targetIsActive ? '#1a1a1a' : '#b45309',
+              color: '#ffffff',
+              '&:hover': { bgcolor: statusTarget?.targetIsActive ? '#000000' : '#92400e' },
+            }}
+          >
+            {statusMutation.isPending
+              ? 'Đang xử lý...'
+              : statusTarget?.targetIsActive
+                ? 'Kích hoạt'
+                : 'Tạm ngưng'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
+
 
