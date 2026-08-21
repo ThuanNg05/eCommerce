@@ -1,14 +1,21 @@
 import { apiGet, apiPost, apiPut } from './client'
 import type { PagedResult } from './inventory'
 
+export interface WooCommerceCategoryLinkDto {
+  categoryId: number
+  wooCommerceCategoryId: number
+}
+
 export interface CategoryDto {
   id: number
   name: string
   createdAt?: string
+  wooCommerceLink?: WooCommerceCategoryLinkDto | null
 }
 
 export interface CreateCategoryRequest {
   name: string
+  syncToWooCommerce?: boolean
 }
 
 export interface UpdateCategoryRequest {
@@ -29,3 +36,16 @@ export function createCategory(req: CreateCategoryRequest): Promise<CategoryDto>
 export function updateCategory(id: number, req: UpdateCategoryRequest): Promise<CategoryDto> {
   return apiPut<CategoryDto>(`/api/categories/${id}`, req)
 }
+
+export function publishAndLinkWarehouseCategory(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiPost<WooCommerceCategoryLinkDto>('/api/woocommerce/categories/publish-link', { categoryId })
+}
+
+export function fetchCategoryLink(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiGet<WooCommerceCategoryLinkDto>(`/api/woocommerce/categories/${categoryId}/link`)
+}
+

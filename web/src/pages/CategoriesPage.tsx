@@ -15,10 +15,21 @@ import {
   TextField,
   IconButton,
   Tooltip,
+  Chip,
+  Checkbox,
+  FormControlLabel,
+  Snackbar,
+  CircularProgress,
 } from '@mui/material'
-import { Plus, RefreshCw, Edit3 } from 'lucide-react'
+import { Plus, RefreshCw, Edit3, Globe } from 'lucide-react'
 import SearchField from '../components/SearchField'
-import { fetchCategories, createCategory, updateCategory, type CategoryDto } from '../api/categories'
+import {
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  publishAndLinkWarehouseCategory,
+  type CategoryDto,
+} from '../api/categories'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { formatDate } from '../utils/dateFormat'
 import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
@@ -27,11 +38,27 @@ export default function CategoriesPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
 
-  // Dialog states
+  // Create / Edit Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<CategoryDto | null>(null)
   const [formName, setFormName] = useState('')
+  const [syncToWebsite, setSyncToWebsite] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Link Dialog states
+  const [linkCategoryTarget, setLinkCategoryTarget] = useState<CategoryDto | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
+
+  // Toast Notification state
+  const [toast, setToast] = useState<{
+    open: boolean
+    message: string
+    severity: 'success' | 'error' | 'info'
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  })
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['categories', search],
@@ -40,13 +67,26 @@ export default function CategoriesPage() {
 
   // Create Mutation
   const createMutation = useMutation({
-    mutationFn: (name: string) => createCategory({ name }),
+    mutationFn: ({ name, syncToWooCommerce }: { name: string; syncToWooCommerce?: boolean }) =>
+      createCategory({ name, syncToWooCommerce }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setToast({
+        open: true,
+        message: 'Đã thêm danh mục mới thành công.',
+        severity: 'success',
+      })
       handleCloseDialog()
     },
     onError: (err: Error) => {
-      setFormError(err.message)
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      if (syncToWebsite) {
+        setFormError(
+          `Danh mục có thể đã được tạo trong kho nhưng chưa liên kết lên trang web. Hãy tải lại danh sách và thử liên kết lại. (${err.message})`,
+        )
+      } else {
+        setFormError(err.message)
+      }
     },
   })
 
@@ -55,6 +95,11 @@ export default function CategoriesPage() {
     mutationFn: ({ id, name }: { id: number; name: string }) => updateCategory(id, { name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setToast({
+        open: true,
+        message: 'Đã cập nhật danh mục thành công.',
+        severity: 'success',
+      })
       handleCloseDialog()
     },
     onError: (err: Error) => {
@@ -62,8 +107,27 @@ export default function CategoriesPage() {
     },
   })
 
+  // Publish & Link Mutation
+  const linkMutation = useMutation({
+    mutationFn: (categoryId: number) => publishAndLinkWarehouseCategory(categoryId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      const targetName = linkCategoryTarget?.name ?? ''
+      setToast({
+        open: true,
+        message: `Đã liên kết danh mục "${targetName}" lên trang web thành công (#${result.wooCommerceCategoryId}).`,
+        severity: 'success',
+      })
+      handleCloseLinkDialog()
+    },
+    onError: (err: Error) => {
+      setLinkError(err.message)
+    },
+  })
+
   const handleOpenCreate = () => {
     setFormName('')
+    setSyncToWebsite(false)
     setFormError(null)
     setIsCreateOpen(true)
   }
@@ -71,6 +135,7 @@ export default function CategoriesPage() {
   const handleOpenEdit = (category: CategoryDto) => {
     setEditingCategory(category)
     setFormName(category.name)
+    setSyncToWebsite(false)
     setFormError(null)
   }
 
@@ -78,7 +143,24 @@ export default function CategoriesPage() {
     setIsCreateOpen(false)
     setEditingCategory(null)
     setFormName('')
+    setSyncToWebsite(false)
     setFormError(null)
+  }
+
+  const handleOpenLinkConfirm = (category: CategoryDto) => {
+    setLinkCategoryTarget(category)
+    setLinkError(null)
+  }
+
+  const handleCloseLinkDialog = () => {
+    if (linkMutation.isPending) return
+    setLinkCategoryTarget(null)
+    setLinkError(null)
+  }
+
+  const handleConfirmLink = () => {
+    if (!linkCategoryTarget) return
+    linkMutation.mutate(linkCategoryTarget.id)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -91,7 +173,7 @@ export default function CategoriesPage() {
     if (editingCategory) {
       updateMutation.mutate({ id: editingCategory.id, name: formName.trim() })
     } else {
-      createMutation.mutate(formName.trim())
+      createMutation.mutate({ name: formName.trim(), syncToWooCommerce: syncToWebsite })
     }
   }
 
@@ -109,36 +191,86 @@ export default function CategoriesPage() {
         filter: false,
       },
       { field: 'id', headerName: 'ID', width: 90, sortable: true },
-      { field: 'name', headerName: 'TÊN DANH MỤC', minWidth: 150, filter: true, sortable: true },
+      { field: 'name', headerName: 'TÊN DANH MỤC', minWidth: 160, filter: true, sortable: true },
+      {
+        field: 'wooCommerceLink',
+        headerName: 'TRẠNG THÁI TRANG WEB',
+        width: 200,
+        minWidth: 180,
+        sortable: true,
+        valueGetter: (p) =>
+          p.data?.wooCommerceLink?.wooCommerceCategoryId
+            ? `Đã liên kết (#${p.data.wooCommerceLink.wooCommerceCategoryId})`
+            : 'Chưa liên kết',
+        cellRenderer: (p: { data?: CategoryDto }) => {
+          if (!p.data) return null
+          const isLinked = Boolean(p.data.wooCommerceLink?.wooCommerceCategoryId)
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <Chip
+                label={
+                  isLinked
+                    ? `Đã liên kết (#${p.data.wooCommerceLink!.wooCommerceCategoryId})`
+                    : 'Chưa liên kết'
+                }
+                size="small"
+                sx={{
+                  bgcolor: isLinked ? '#f0fdf4' : '#f3f4f6',
+                  color: isLinked ? '#15803d' : '#525252',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: '4px',
+                  height: 24,
+                }}
+              />
+            </Box>
+          )
+        },
+      },
       {
         field: 'createdAt',
         headerName: 'NGÀY TẠO',
-        width: 180,
+        width: 170,
         sortable: true,
         valueFormatter: (p) => formatDate(p.value),
       },
       {
         headerName: 'THAO TÁC',
-        width: 90,
-        minWidth: 80,
-        maxWidth: 100,
+        width: 110,
+        minWidth: 100,
+        maxWidth: 130,
         suppressAutoSize: true,
         resizable: false,
         sortable: false,
         filter: false,
-        cellRenderer: (p: { data: CategoryDto }) => {
+        cellRenderer: (p: { data?: CategoryDto }) => {
           if (!p.data) return null
+          const isLinked = Boolean(p.data.wooCommerceLink?.wooCommerceCategoryId)
           return (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', height: '100%' }}>
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
               <Tooltip title="Chỉnh sửa danh mục">
                 <IconButton
                   size="small"
-                  onClick={() => handleOpenEdit(p.data)}
+                  onClick={() => handleOpenEdit(p.data!)}
                   sx={{ color: '#171717', '&:hover': { bgcolor: '#f2f2f2' } }}
+                  aria-label="Chỉnh sửa danh mục"
                 >
                   <Edit3 size={16} />
                 </IconButton>
               </Tooltip>
+
+              {!isLinked && (
+                <Tooltip title="Liên kết lên trang web">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenLinkConfirm(p.data!)}
+                    sx={{ color: '#7299ED', '&:hover': { bgcolor: '#EEF3FD' } }}
+                    aria-label="Liên kết lên trang web"
+                  >
+                    <Globe size={16} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           )
         },
@@ -151,6 +283,22 @@ export default function CategoriesPage() {
 
   return (
     <Box sx={{ width: '100%' }}>
+      {/* Toast Notification */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={5000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          sx={{ borderRadius: '6px', border: '1px solid #ededed' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
+
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
         <Box>
@@ -239,6 +387,48 @@ export default function CategoriesPage() {
               disabled={isSubmitting}
               sx={{ mt: 1 }}
             />
+
+            {/* Checkbox when creating */}
+            {!editingCategory && (
+              <Box sx={{ mt: 1.5 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={syncToWebsite}
+                      onChange={(e) => setSyncToWebsite(e.target.checked)}
+                      disabled={isSubmitting}
+                      size="small"
+                      sx={{
+                        color: '#737373',
+                        '&.Mui-checked': {
+                          color: '#1a1a1a',
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontSize: 13, color: '#171717' }}>
+                      Liên kết lên trang web ngay sau khi tạo
+                    </Typography>
+                  }
+                />
+              </Box>
+            )}
+
+            {/* Helper text when editing a linked category */}
+            {editingCategory?.wooCommerceLink && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  mt: 1.5,
+                  color: '#15803d',
+                  fontSize: 12,
+                }}
+              >
+                Tên mới sẽ được đồng bộ lên trang web.
+              </Typography>
+            )}
           </DialogContent>
 
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -256,6 +446,53 @@ export default function CategoriesPage() {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Link Confirmation Dialog */}
+      <Dialog
+        open={Boolean(linkCategoryTarget)}
+        onClose={handleCloseLinkDialog}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '8px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, fontSize: 18 }}>
+          Liên kết danh mục lên trang web
+        </DialogTitle>
+        <DialogContent>
+          {linkError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: '6px' }}>
+              {linkError}
+            </Alert>
+          )}
+          <Typography variant="body2" sx={{ color: '#404040' }}>
+            Bạn có chắc chắn muốn xuất bản và liên kết danh mục{' '}
+            <strong>&ldquo;{linkCategoryTarget?.name}&rdquo;</strong> lên trang web không?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={handleCloseLinkDialog}
+            variant="outlined"
+            color="inherit"
+            disabled={linkMutation.isPending}
+            sx={{ borderColor: '#e0e0e0', color: '#171717' }}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmLink}
+            variant="contained"
+            disabled={linkMutation.isPending}
+            startIcon={
+              linkMutation.isPending ? <CircularProgress size={14} color="inherit" /> : <Globe size={16} />
+            }
+            sx={{ bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }}
+          >
+            {linkMutation.isPending ? 'Đang liên kết...' : 'Liên kết'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
+

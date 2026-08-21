@@ -51,6 +51,16 @@ export interface LinkWarehouseProductRequest {
   productId: number
 }
 
+export interface LinkWarehouseCategoryRequest {
+  categoryId: number
+}
+
+export interface WooCommerceCategoryLinkDto {
+  categoryId: number
+  wooCommerceCategoryId: number
+}
+
+
 export interface ConfirmWooCommerceOrderRequest {
   customerId: number
 }
@@ -148,7 +158,20 @@ export function publishAndLinkWarehouseProduct(
   return apiPost<WooCommerceProductLinkDto>('/api/woocommerce/products/publish-link', { productId })
 }
 
+export function publishAndLinkWarehouseCategory(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiPost<WooCommerceCategoryLinkDto>('/api/woocommerce/categories/publish-link', { categoryId })
+}
+
+export function fetchCategoryLink(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiGet<WooCommerceCategoryLinkDto>(`/api/woocommerce/categories/${categoryId}/link`)
+}
+
 export function syncWooCommerceCatalog(): Promise<WooCommerceCatalogSyncResult> {
+
   return apiPost<WooCommerceCatalogSyncResult>('/api/woocommerce/products/sync')
 }
 
