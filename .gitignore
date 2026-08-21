@@ -7,6 +7,9 @@ obj/
 artifacts/
 TestResults/
 
+# ---- Cloudflare Wrangler local state ----
+cloudflare/**/.wrangler/
+
 # ---- Node / front-end ----
 web/node_modules/
 web/dist/
