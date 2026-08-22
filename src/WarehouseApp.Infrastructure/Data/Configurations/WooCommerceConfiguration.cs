@@ -19,6 +19,20 @@ public class WooCommerceProductLinkConfiguration : IEntityTypeConfiguration<WooC
     }
 }
 
+public class WooCommerceCategoryLinkConfiguration : IEntityTypeConfiguration<WooCommerceCategoryLink>
+{
+    public void Configure(EntityTypeBuilder<WooCommerceCategoryLink> b)
+    {
+        b.ToTable("woocommerce_category_link", t => t.ExcludeFromMigrations());
+        b.HasKey(x => x.CategoryId);
+        // Keep "woocommerce" intact; the default convention would produce woo_commerce_*.
+        b.Property(x => x.WooCommerceCategoryId).HasColumnName("woocommerce_category_id");
+        b.HasIndex(x => x.WooCommerceCategoryId).IsUnique();
+        b.HasOne(x => x.Category).WithOne().HasForeignKey<WooCommerceCategoryLink>(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class WooCommerceOrderConfiguration : IEntityTypeConfiguration<WooCommerceOrder>
 {
     public void Configure(EntityTypeBuilder<WooCommerceOrder> b)

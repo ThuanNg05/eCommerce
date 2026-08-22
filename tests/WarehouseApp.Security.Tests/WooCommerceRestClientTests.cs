@@ -8,6 +8,38 @@ namespace WarehouseApp.Security.Tests;
 public sealed class WooCommerceRestClientTests
 {
     [Fact]
+    public void ParseCategory_maps_woocommerce_category_payload()
+    {
+        const string payload = """
+        {
+          "id": 51,
+          "name": "Khung gỗ"
+        }
+        """;
+
+        var client = new WooCommerceRestClient(
+            new HttpClient(),
+            Options.Create(new WooCommerceOptions()));
+
+        var category = client.ParseCategory(System.Text.Encoding.UTF8.GetBytes(payload));
+
+        Assert.Equal(51, category.Id);
+        Assert.Equal("Khung gỗ", category.Name);
+    }
+
+    [Fact]
+    public void ParseCategoryId_maps_taxonomy_action_webhook_payload()
+    {
+        var client = new WooCommerceRestClient(
+            new HttpClient(),
+            Options.Create(new WooCommerceOptions()));
+
+        var categoryId = client.ParseCategoryId(System.Text.Encoding.UTF8.GetBytes("51"));
+
+        Assert.Equal(51, categoryId);
+    }
+
+    [Fact]
     public void ParseOrder_maps_woocommerce_snake_case_order_fields()
     {
         const string payload = """

@@ -25,6 +25,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProductComponent> ProductComponents => Set<ProductComponent>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<WooCommerceProductLink> WooCommerceProductLinks => Set<WooCommerceProductLink>();
+    public DbSet<WooCommerceCategoryLink> WooCommerceCategoryLinks => Set<WooCommerceCategoryLink>();
     public DbSet<WooCommerceOrder> WooCommerceOrders => Set<WooCommerceOrder>();
     public DbSet<WooCommerceOrderItem> WooCommerceOrderItems => Set<WooCommerceOrderItem>();
     public DbSet<WooCommerceOrderStatusReason> WooCommerceOrderStatusReasons => Set<WooCommerceOrderStatusReason>();

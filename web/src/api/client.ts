@@ -120,9 +120,14 @@ export function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return apiSend<T>('PUT', path, body)
 }
 
+export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  return apiSend<T>('PATCH', path, body)
+}
+
 export function apiDelete<T>(path: string, body?: unknown): Promise<T> {
   return apiSend<T>('DELETE', path, body)
 }
+
 
 export function resolveApiUrl(path?: string | null): string {
   if (!path) return ''

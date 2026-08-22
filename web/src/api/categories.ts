@@ -1,18 +1,30 @@
-import { apiGet, apiPost, apiPut } from './client'
+import { apiGet, apiPost, apiPut, apiPatch } from './client'
 import type { PagedResult } from './inventory'
+
+export interface WooCommerceCategoryLinkDto {
+  categoryId: number
+  wooCommerceCategoryId: number
+}
 
 export interface CategoryDto {
   id: number
   name: string
+  isActive?: boolean
   createdAt?: string
+  wooCommerceLink?: WooCommerceCategoryLinkDto | null
 }
 
 export interface CreateCategoryRequest {
   name: string
+  syncToWooCommerce?: boolean
 }
 
 export interface UpdateCategoryRequest {
   name: string
+}
+
+export interface UpdateCategoryStatusRequest {
+  isActive: boolean
 }
 
 // REST Endpoints for /api/categories
@@ -28,4 +40,32 @@ export function createCategory(req: CreateCategoryRequest): Promise<CategoryDto>
 
 export function updateCategory(id: number, req: UpdateCategoryRequest): Promise<CategoryDto> {
   return apiPut<CategoryDto>(`/api/categories/${id}`, req)
+}
+
+export function updateCategoryStatus(
+  id: number,
+  req: UpdateCategoryStatusRequest,
+): Promise<CategoryDto> {
+  return apiPatch<CategoryDto>(`/api/categories/${id}/status`, req)
+}
+
+export function publishAndLinkWarehouseCategory(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiPost<WooCommerceCategoryLinkDto>('/api/woocommerce/categories/publish-link', { categoryId })
+}
+
+export interface WooCommerceCategorySyncResult {
+  synchronizedCategories: number
+  completedAt: string
+}
+
+export function fetchCategoryLink(
+  categoryId: number,
+): Promise<WooCommerceCategoryLinkDto> {
+  return apiGet<WooCommerceCategoryLinkDto>(`/api/woocommerce/categories/${categoryId}/link`)
+}
+
+export function syncWooCommerceCategories(): Promise<WooCommerceCategorySyncResult> {
+  return apiPost<WooCommerceCategorySyncResult>('/api/woocommerce/categories/sync')
 }

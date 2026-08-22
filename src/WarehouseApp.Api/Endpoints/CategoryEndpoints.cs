@@ -24,6 +24,9 @@ public static class CategoryEndpoints
         g.MapPut("/{id:long}", async (long id, UpdateCategoryRequest req, ICategoryService svc, CancellationToken ct) =>
             await svc.UpdateAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy danh mục.", statusCode: 404));
 
+        g.MapPatch("/{id:long}/status", async (long id, UpdateCategoryStatusRequest req, ICategoryService svc, CancellationToken ct) =>
+            await svc.UpdateStatusAsync(id, req, ct) is { } dto ? Results.Ok(dto) : Results.Problem(detail: "Không tìm thấy danh mục.", statusCode: 404));
+
         return api;
     }
 }

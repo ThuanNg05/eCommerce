@@ -39,9 +39,49 @@ public sealed class WooCommerceRestClient(HttpClient httpClient, IOptions<WooCom
         return result;
     }
 
+    public async Task<IReadOnlyList<WooCommerceRemoteCategory>> GetCategoriesAsync(CancellationToken ct)
+    {
+        EnsureConfigured();
+        var result = new List<WooCommerceRemoteCategory>();
+        for (var page = 1; ; page++)
+        {
+            using var request = CreateRequest(HttpMethod.Get, $"products/categories?per_page=100&page={page}&orderby=id&order=asc");
+            using var response = await httpClient.SendAsync(request, ct);
+            await EnsureSuccessAsync(response, ct);
+            var payload = await response.Content.ReadAsByteArrayAsync(ct);
+            var batch = JsonSerializer.Deserialize<List<WooCommerceRemoteCategory>>(payload, JsonOptions) ?? [];
+            result.AddRange(batch);
+            if (batch.Count < 100) break;
+        }
+        return result;
+    }
+
     public WooCommerceRemoteOrder ParseOrder(ReadOnlySpan<byte> payload) =>
         JsonSerializer.Deserialize<WooCommerceRemoteOrder>(payload, JsonOptions)
         ?? throw new InvalidOperationException("Webhook WooCommerce không chứa đơn hàng hợp lệ.");
+
+    public WooCommerceRemoteCategory ParseCategory(ReadOnlySpan<byte> payload) =>
+        JsonSerializer.Deserialize<WooCommerceRemoteCategory>(payload, JsonOptions)
+        ?? throw new InvalidOperationException("Webhook WooCommerce không chứa danh mục hợp lệ.");
+
+    /// <summary>Action webhooks for WordPress taxonomy hooks carry the first action argument: term_id.</summary>
+    public long ParseCategoryId(ReadOnlySpan<byte> payload)
+    {
+        using var document = JsonDocument.Parse(payload.ToArray());
+        if (document.RootElement.ValueKind == JsonValueKind.Number && document.RootElement.TryGetInt64(out var id) && id > 0)
+            return id;
+        throw new InvalidOperationException("Webhook action WooCommerce không chứa mã danh mục hợp lệ.");
+    }
+
+    public async Task<WooCommerceRemoteCategory> GetCategoryAsync(long categoryId, CancellationToken ct)
+    {
+        EnsureConfigured();
+        using var request = CreateRequest(HttpMethod.Get, $"products/categories/{categoryId}");
+        using var response = await httpClient.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<WooCommerceRemoteCategory>(JsonOptions, ct)
+            ?? throw new InvalidOperationException("WooCommerce không trả về danh mục hợp lệ.");
+    }
 
     public async Task UpdateProductAsync(long productId, long? variationId, WooCommerceCatalogUpdate update, CancellationToken ct)
     {
@@ -110,6 +150,15 @@ public sealed class WooCommerceRestClient(HttpClient httpClient, IOptions<WooCom
             ?? throw new InvalidOperationException("WooCommerce không trả về danh mục hợp lệ.");
         if (created.Id <= 0) throw new InvalidOperationException("WooCommerce không trả về mã danh mục hợp lệ.");
         return created.Id;
+    }
+
+    public async Task UpdateCategoryAsync(long categoryId, string name, CancellationToken ct)
+    {
+        EnsureConfigured();
+        using var request = CreateRequest(HttpMethod.Put, $"products/categories/{categoryId}");
+        request.Content = JsonContent.Create(new { name = name.Trim() }, options: JsonOptions);
+        using var response = await httpClient.SendAsync(request, ct);
+        await EnsureSuccessAsync(response, ct);
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string path)

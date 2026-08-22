@@ -26,9 +26,22 @@ public static class WooCommerceEndpoints
         g.MapPost("/products/sync", async (IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.SyncCatalogAsync(ct))).RequireAuthorization("AdminOnly");
 
+        g.MapPost("/categories/sync", async (IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.SyncCategoriesAsync(ct))).RequireAuthorization("AdminOnly");
+
         g.MapPost("/products/publish-link", async (
             LinkWarehouseProductRequest request, IWooCommerceService service, CancellationToken ct) =>
             Results.Ok(await service.PublishAndLinkProductAsync(request, ct)));
+
+        g.MapPost("/categories/publish-link", async (
+            LinkWarehouseCategoryRequest request, IWooCommerceService service, CancellationToken ct) =>
+            Results.Ok(await service.PublishAndLinkCategoryAsync(request, ct)));
+
+        g.MapGet("/categories/{categoryId:long}/link", async (
+            long categoryId, IWooCommerceService service, CancellationToken ct) =>
+            await service.GetCategoryLinkAsync(categoryId, ct) is { } link
+                ? Results.Ok(link)
+                : Results.Problem(detail: "Danh mục chưa được liên kết với WooCommerce.", statusCode: StatusCodes.Status404NotFound));
 
         g.MapGet("/products/{productId:long}/link", async (
             long productId, IWooCommerceService service, CancellationToken ct) =>
@@ -67,7 +80,11 @@ public static class WooCommerceEndpoints
         {
             await using var body = new MemoryStream();
             await request.Body.CopyToAsync(body, ct);
-            var accepted = await service.AcceptWebhookAsync(request.Headers["X-WC-Webhook-Signature"], body.ToArray(), ct);
+            var accepted = await service.AcceptWebhookAsync(
+                request.Headers["X-WC-Webhook-Signature"],
+                request.Headers["X-WC-Webhook-Topic"],
+                request.Headers["X-WC-Webhook-Event"],
+                body.ToArray(), ct);
             return accepted ? Results.Ok() : Results.Problem(detail: "Chữ ký webhook WooCommerce không hợp lệ.", statusCode: StatusCodes.Status401Unauthorized);
         }).DisableAntiforgery().WithTags("WooCommerce");
         return api;
