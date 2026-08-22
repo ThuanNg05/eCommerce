@@ -21,7 +21,7 @@ import {
   Snackbar,
   CircularProgress,
 } from '@mui/material'
-import { Plus, RefreshCw, Edit3, Globe, PauseCircle, PlayCircle } from 'lucide-react'
+import { Plus, RefreshCw, Edit3, Globe, PauseCircle, PlayCircle, Store } from 'lucide-react'
 import SearchField from '../components/SearchField'
 import {
   fetchCategories,
@@ -29,14 +29,19 @@ import {
   updateCategory,
   updateCategoryStatus,
   publishAndLinkWarehouseCategory,
+  syncWooCommerceCategories,
   type CategoryDto,
 } from '../api/categories'
+import { useAuth } from '../auth/AuthContext'
 import { AG_GRID_LOCALE_VI } from '../utils/agGridLocale'
 import { formatDate } from '../utils/dateFormat'
 import { autoSizeGridColumns, AG_GRID_AUTO_SIZE_STRATEGY } from '../utils/agGridAutoSize'
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const role = user?.role?.toLowerCase()
+  const isAdmin = role === 'admin' || user?.roleId === 1
   const [search, setSearch] = useState('')
 
   // Create / Edit Dialog states
@@ -149,6 +154,26 @@ export default function CategoriesPage() {
     },
     onError: (err: Error) => {
       setStatusError(err.message)
+    },
+  })
+
+  // Sync Categories from Website Mutation
+  const syncCategoriesMutation = useMutation({
+    mutationFn: syncWooCommerceCategories,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setToast({
+        open: true,
+        message: `Đồng bộ danh mục từ trang web hoàn tất: đã cập nhật ${res.synchronizedCategories} danh mục.`,
+        severity: 'success',
+      })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        message: `Không thể đồng bộ danh mục từ trang web: ${err.message}`,
+        severity: 'error',
+      })
     },
   })
 
@@ -414,10 +439,34 @@ export default function CategoriesPage() {
             variant="outlined"
             onClick={() => refetch()}
             startIcon={<RefreshCw size={15} />}
-            sx={{ height: 36, borderColor: '#e0e0e0', color: '#171717' }}
+            sx={{ height: 36, borderColor: '#e0e0e0', color: '#171717', '&:hover': { bgcolor: '#f2f2f2' } }}
           >
             Làm mới
           </Button>
+
+          {isAdmin && (
+            <Button
+              variant="outlined"
+              onClick={() => syncCategoriesMutation.mutate()}
+              disabled={syncCategoriesMutation.isPending}
+              startIcon={
+                syncCategoriesMutation.isPending ? (
+                  <CircularProgress size={15} color="inherit" />
+                ) : (
+                  <Store size={15} />
+                )
+              }
+              sx={{
+                height: 36,
+                borderColor: '#e0e0e0',
+                color: '#171717',
+                '&:hover': { bgcolor: '#f2f2f2' },
+              }}
+            >
+              {syncCategoriesMutation.isPending ? 'Đang đồng bộ...' : 'Đồng bộ từ trang web'}
+            </Button>
+          )}
+
           <Button
             variant="contained"
             onClick={handleOpenCreate}

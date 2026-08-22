@@ -55,10 +55,17 @@ export function publishAndLinkWarehouseCategory(
   return apiPost<WooCommerceCategoryLinkDto>('/api/woocommerce/categories/publish-link', { categoryId })
 }
 
+export interface WooCommerceCategorySyncResult {
+  synchronizedCategories: number
+  completedAt: string
+}
+
 export function fetchCategoryLink(
   categoryId: number,
 ): Promise<WooCommerceCategoryLinkDto> {
   return apiGet<WooCommerceCategoryLinkDto>(`/api/woocommerce/categories/${categoryId}/link`)
 }
 
-
+export function syncWooCommerceCategories(): Promise<WooCommerceCategorySyncResult> {
+  return apiPost<WooCommerceCategorySyncResult>('/api/woocommerce/categories/sync')
+}

@@ -56,11 +56,74 @@ public sealed class WooCommerceService(
         return new WooCommerceCatalogSyncResult(productIds.Count, DateTimeOffset.UtcNow);
     }
 
+    public async Task<WooCommerceCategorySyncResult> SyncCategoriesAsync(CancellationToken ct = default)
+    {
+        var remoteCategories = await client.GetCategoriesAsync(ct);
+        foreach (var remote in remoteCategories)
+            await UpsertCategoryAsync(remote, ct);
+
+        return new WooCommerceCategorySyncResult(remoteCategories.Count, DateTimeOffset.UtcNow);
+    }
+
     public async Task<WooCommerceProductLinkDto?> GetProductLinkAsync(long productId, CancellationToken ct = default)
     {
         var link = await db.WooCommerceProductLinks.AsNoTracking()
             .SingleOrDefaultAsync(x => x.ProductId == productId, ct);
         return link is null ? null : new WooCommerceProductLinkDto(link.ProductId, link.WooCommerceProductId, link.WooCommerceVariationId);
+    }
+
+    public async Task<WooCommerceCategoryLinkDto?> GetCategoryLinkAsync(long categoryId, CancellationToken ct = default)
+    {
+        var link = await db.WooCommerceCategoryLinks.AsNoTracking().SingleOrDefaultAsync(x => x.CategoryId == categoryId, ct);
+        return link is null ? null : new WooCommerceCategoryLinkDto(link.CategoryId, link.WooCommerceCategoryId);
+    }
+
+    public async Task<WooCommerceCategoryLinkDto> PublishAndLinkCategoryAsync(
+        LinkWarehouseCategoryRequest request, CancellationToken ct = default)
+    {
+        if (request.CategoryId <= 0)
+            throw new DomainValidationException("Mã danh mục kho phải lớn hơn 0.");
+
+        var category = await db.Categories.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.CategoryId, ct)
+            ?? throw new DomainValidationException("Danh mục kho không tồn tại.");
+        if (!category.IsActive)
+            throw new DomainValidationException("Không thể liên kết danh mục đang tạm ngưng lên WooCommerce.");
+
+        var existing = await db.WooCommerceCategoryLinks.SingleOrDefaultAsync(x => x.CategoryId == category.Id, ct);
+        if (existing is not null)
+        {
+            await client.UpdateCategoryAsync(existing.WooCommerceCategoryId, category.Name, ct);
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return new WooCommerceCategoryLinkDto(existing.CategoryId, existing.WooCommerceCategoryId);
+        }
+
+        var remoteId = await client.FindOrCreateCategoryAsync(category.Name, ct);
+        var remoteConflict = await db.WooCommerceCategoryLinks.AnyAsync(x => x.WooCommerceCategoryId == remoteId, ct);
+        if (remoteConflict)
+            throw new DomainValidationException("Danh mục WooCommerce này đã được liên kết với danh mục kho khác.");
+
+        var link = new WooCommerceCategoryLink
+        {
+            CategoryId = category.Id,
+            WooCommerceCategoryId = remoteId,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        db.WooCommerceCategoryLinks.Add(link);
+        await db.SaveChangesAsync(ct);
+        return new WooCommerceCategoryLinkDto(link.CategoryId, link.WooCommerceCategoryId);
+    }
+
+    public async Task<bool> SyncLinkedCategoryAsync(long categoryId, CancellationToken ct = default)
+    {
+        var link = await db.WooCommerceCategoryLinks.Include(x => x.Category)
+            .SingleOrDefaultAsync(x => x.CategoryId == categoryId, ct);
+        if (link?.Category is not { IsActive: true } category) return false;
+
+        await client.UpdateCategoryAsync(link.WooCommerceCategoryId, category.Name, ct);
+        link.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task<bool> SyncLinkedProductAsync(long productId, bool synchronizeImage = false, CancellationToken ct = default)
@@ -283,11 +346,73 @@ public sealed class WooCommerceService(
             .ToListAsync(ct);
     }
 
-    public async Task<bool> AcceptWebhookAsync(string? signature, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
+    public async Task<bool> AcceptWebhookAsync(
+        string? signature,
+        string? topic,
+        string? eventName,
+        ReadOnlyMemory<byte> payload,
+        CancellationToken ct = default)
     {
         if (!WooCommerceWebhookSignature.IsValid(_options.WebhookSecret, signature, payload.Span)) return false;
-        await UpsertOrderAsync(client.ParseOrder(payload.Span), ct);
+        if (string.Equals(eventName?.Trim(), "ping", StringComparison.OrdinalIgnoreCase)) return true;
+
+        var normalizedTopic = topic?.Trim().ToLowerInvariant();
+        if (normalizedTopic is "product_cat.created" or "product_cat.updated")
+            await UpsertCategoryAsync(client.ParseCategory(payload.Span), ct);
+        else if (normalizedTopic is "action.woocommerce_warehouse_category_created" or "action.woocommerce_warehouse_category_updated")
+        {
+            var categoryId = client.ParseCategoryId(payload.Span);
+            await UpsertCategoryAsync(await client.GetCategoryAsync(categoryId, ct), ct);
+        }
+        else if (string.IsNullOrWhiteSpace(normalizedTopic) || normalizedTopic.StartsWith("order.", StringComparison.Ordinal))
+            await UpsertOrderAsync(client.ParseOrder(payload.Span), ct);
         return true;
+    }
+
+    private async Task UpsertCategoryAsync(WooCommerceRemoteCategory remote, CancellationToken ct)
+    {
+        if (remote.Id <= 0 || string.IsNullOrWhiteSpace(remote.Name))
+            throw new DomainValidationException("Webhook WooCommerce không chứa danh mục hợp lệ.");
+
+        var name = Limit(remote.Name, 255) ?? throw new DomainValidationException("Tên danh mục WooCommerce không hợp lệ.");
+        var link = await db.WooCommerceCategoryLinks.Include(x => x.Category)
+            .SingleOrDefaultAsync(x => x.WooCommerceCategoryId == remote.Id, ct);
+
+        if (link is null)
+        {
+            var category = await db.Categories.SingleOrDefaultAsync(x => x.Name == name, ct);
+            if (category is not null)
+            {
+                var existingCategoryLink = await db.WooCommerceCategoryLinks.SingleOrDefaultAsync(x => x.CategoryId == category.Id, ct);
+                if (existingCategoryLink is not null && existingCategoryLink.WooCommerceCategoryId != remote.Id)
+                    throw new DomainValidationException("Danh mục kho trùng tên đã liên kết với danh mục WooCommerce khác.");
+                if (existingCategoryLink is not null) return;
+
+                link = new WooCommerceCategoryLink { CategoryId = category.Id, WooCommerceCategoryId = remote.Id };
+                db.WooCommerceCategoryLinks.Add(link);
+            }
+            else
+            {
+                category = new Category { Name = name };
+                db.Categories.Add(category);
+                link = new WooCommerceCategoryLink { Category = category, WooCommerceCategoryId = remote.Id };
+                db.WooCommerceCategoryLinks.Add(link);
+            }
+        }
+        else if (link.Category is { IsActive: false })
+        {
+            return;
+        }
+        else if (link.Category is not null && !string.Equals(link.Category.Name, name, StringComparison.Ordinal))
+        {
+            var nameConflict = await db.Categories.AnyAsync(x => x.Id != link.CategoryId && x.Name == name, ct);
+            if (nameConflict)
+                throw new DomainValidationException("Tên danh mục WooCommerce trùng với danh mục kho khác.");
+            link.Category.Name = name;
+            link.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task UpsertOrderAsync(WooCommerceRemoteOrder remote, CancellationToken ct)
@@ -432,16 +557,19 @@ public sealed class WooCommerceService(
 
     private async Task<List<WooCommerceProductCategory>> ResolveWooCommerceCategoriesAsync(long productId, CancellationToken ct)
     {
-        var categoryNames = await (
-            from pc in db.ProductCategories.AsNoTracking()
-            join category in db.Categories.AsNoTracking() on pc.CategoryId equals category.Id
-            where pc.ProductId == productId
-            select category.Name).ToListAsync(ct);
+        var categoryIds = await db.ProductCategories.AsNoTracking()
+            .Where(x => x.ProductId == productId)
+            .Select(x => x.CategoryId)
+            .ToListAsync(ct);
 
-        var categoryIds = new List<WooCommerceProductCategory>();
-        foreach (var categoryName in categoryNames.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
-            categoryIds.Add(new WooCommerceProductCategory(await client.FindOrCreateCategoryAsync(categoryName, ct)));
-        return categoryIds;
+        var remoteCategories = new List<WooCommerceProductCategory>();
+        foreach (var categoryId in categoryIds.Distinct())
+        {
+            var link = await GetCategoryLinkAsync(categoryId, ct)
+                ?? await PublishAndLinkCategoryAsync(new LinkWarehouseCategoryRequest(categoryId), ct);
+            remoteCategories.Add(new WooCommerceProductCategory(link.WooCommerceCategoryId));
+        }
+        return remoteCategories;
     }
 
     private static string WithSize(string? description, string? size)

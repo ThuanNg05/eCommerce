@@ -8,4 +8,5 @@ public interface ICategoryService
     Task<CategoryDto?> GetAsync(long id, CancellationToken ct = default);
     Task<CategoryDto> CreateAsync(CreateCategoryRequest request, CancellationToken ct = default);
     Task<CategoryDto?> UpdateAsync(long id, UpdateCategoryRequest request, CancellationToken ct = default);
+    Task<CategoryDto?> UpdateStatusAsync(long id, UpdateCategoryStatusRequest request, CancellationToken ct = default);
 }

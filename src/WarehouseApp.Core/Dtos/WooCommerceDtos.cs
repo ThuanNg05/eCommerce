@@ -33,9 +33,13 @@ public record WooCommerceOrderDto(
 
 public record WooCommerceProductLinkDto(long ProductId, long WooCommerceProductId, long? WooCommerceVariationId);
 
+public record WooCommerceCategoryLinkDto(long CategoryId, long WooCommerceCategoryId);
+
 public record LinkWooCommerceProductRequest(long ProductId, long? WooCommerceVariationId = null);
 
 public record LinkWarehouseProductRequest(long ProductId);
+
+public record LinkWarehouseCategoryRequest(long CategoryId);
 
 /// <summary>Manual fulfilment is intentionally explicit: it creates one warehouse invoice only after stock validation.</summary>
 public record ConfirmWooCommerceOrderRequest(long CustomerId);
@@ -47,3 +51,5 @@ public record WooCommerceOrderStatusReasonDto(string Code, string TargetStatus, 
 public record WooCommerceSyncResult(int ImportedOrders, int ImportedProducts, DateTimeOffset CompletedAt);
 
 public record WooCommerceCatalogSyncResult(int UpdatedProducts, DateTimeOffset CompletedAt);
+
+public record WooCommerceCategorySyncResult(int SynchronizedCategories, DateTimeOffset CompletedAt);

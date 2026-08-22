@@ -177,7 +177,7 @@ public class InventoryService(AppDbContext db) : IInventoryService
         if (ids.Count == 0) return new();
 
         var found = await db.Categories.AsNoTracking()
-            .Where(c => ids.Contains(c.Id))
+            .Where(c => ids.Contains(c.Id) && c.IsActive)
             .Select(c => new CategoryRefDto(c.Id, c.Name))
             .ToListAsync(ct);
 

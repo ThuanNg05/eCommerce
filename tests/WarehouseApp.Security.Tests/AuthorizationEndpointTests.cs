@@ -82,6 +82,7 @@ public class AuthorizationEndpointTests : IClassFixture<AuthorizationWebApplicat
     [InlineData("/api/woocommerce/orders")]
     [InlineData("/api/woocommerce/orders/1")]
     [InlineData("/api/woocommerce/orders/status-reasons")]
+    [InlineData("/api/woocommerce/categories/1/link")]
     [InlineData("/api/pricing/rate-card")]
     [InlineData("/api/settings/smtp")]
     [InlineData("/api/audit")]
@@ -138,6 +139,7 @@ public class AuthorizationEndpointTests : IClassFixture<AuthorizationWebApplicat
     [InlineData("PUT", "/api/customers/1")]
     [InlineData("POST", "/api/categories")]
     [InlineData("PUT", "/api/categories/1")]
+    [InlineData("PATCH", "/api/categories/1/status")]
     [InlineData("POST", "/api/materials")]
     [InlineData("PUT", "/api/materials/1")]
     [InlineData("POST", "/api/backboards")]
@@ -153,6 +155,7 @@ public class AuthorizationEndpointTests : IClassFixture<AuthorizationWebApplicat
     [InlineData("PUT", "/api/woocommerce/products/1/link")]
     [InlineData("POST", "/api/woocommerce/products/sync")]
     [InlineData("POST", "/api/woocommerce/products/publish-link")]
+    [InlineData("POST", "/api/woocommerce/categories/publish-link")]
     public async Task AnonymousCannotAccessProtectedBusinessMethods(string method, string path)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), path);

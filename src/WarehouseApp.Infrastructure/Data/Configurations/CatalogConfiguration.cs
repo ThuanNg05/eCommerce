@@ -33,6 +33,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         b.ToTable("category", t => t.ExcludeFromMigrations());
         b.HasKey(c => c.Id);
         b.HasIndex(c => c.Name).IsUnique();
+        b.Property(c => c.IsActive).HasColumnName("is_active");
     }
 }
 
