@@ -14,7 +14,26 @@ public record InvoiceDto(
     decimal Total,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<InvoiceLineDto> Lines);
+    IReadOnlyList<InvoiceLineDto> Lines,
+    string? PublicLookupToken = null,
+    string? PublicLookupCode = null);
+
+public record PublicInvoiceLookupRequest(string Code, string PhoneLast4);
+
+public record PublicInvoiceLineDto(
+    string ProductName,
+    int Quantity,
+    decimal UnitPrice,
+    decimal Subtotal,
+    string? Description);
+
+public record PublicInvoiceDto(
+    string Id,
+    string CustomerName,
+    DateTimeOffset CreatedAt,
+    decimal Total,
+    IReadOnlyList<PublicInvoiceLineDto> Lines,
+    string? PublicLookupCode = null);
 
 public record InvoiceSummaryDto(
     string Id,

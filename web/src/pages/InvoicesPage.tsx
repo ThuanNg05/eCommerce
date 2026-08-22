@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, ValueFormatterParams } from 'ag-grid-community'
@@ -312,6 +313,7 @@ export default function InvoicesPage() {
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewInvoiceId, setViewInvoiceId] = useState<string | null>(null)
+  const [printTemplate, setPrintTemplate] = useState<'invoice' | 'delivery'>('invoice')
   const [actionError, setActionError] = useState<string | null>(null)
 
   // Toast Feedback State
@@ -372,11 +374,14 @@ export default function InvoicesPage() {
     enabled: Boolean(invoiceDetail?.customerId),
   })
 
-  // Print Handler with dynamic PDF filename (document.title = invoiceDetail.id)
-  const handlePrintInvoice = () => {
+  // Print Handler with dynamic PDF filename and synchronous template flush to avoid race conditions
+  const handlePrint = (mode: 'invoice' | 'delivery') => {
     if (!invoiceDetail) return
+    flushSync(() => {
+      setPrintTemplate(mode)
+    })
     const originalTitle = document.title
-    document.title = invoiceDetail.id
+    document.title = mode === 'delivery' ? `PGH_${invoiceDetail.id}` : invoiceDetail.id
     window.print()
     setTimeout(() => {
       document.title = originalTitle
@@ -1070,7 +1075,10 @@ export default function InvoicesPage() {
       {/* PRINTABLE INVOICE DETAIL MODAL */}
       <Dialog
         open={Boolean(viewInvoiceId)}
-        onClose={() => setViewInvoiceId(null)}
+        onClose={() => {
+          setViewInvoiceId(null)
+          setPrintTemplate('invoice')
+        }}
         maxWidth="md"
         fullWidth
         PaperProps={{ sx: { borderRadius: '8px', p: 1 } }}
@@ -1079,14 +1087,20 @@ export default function InvoicesPage() {
           <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16 }}>
             Chi tiết hóa đơn {invoiceDetail?.id}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             {invoiceDetail && (
               isInvoiceEditable(invoiceDetail.createdAt) ? (
                 <Button
                   variant="outlined"
                   onClick={handleOpenEditModal}
                   startIcon={<Edit size={16} />}
-                  sx={{ color: '#171717', borderColor: '#e0e0e0' }}
+                  sx={{
+                    height: 36,
+                    color: '#171717',
+                    borderColor: '#e0e0e0',
+                    bgcolor: '#ffffff',
+                    '&:hover': { bgcolor: '#f2f2f2' },
+                  }}
                 >
                   Sửa hóa đơn
                 </Button>
@@ -1097,6 +1111,7 @@ export default function InvoicesPage() {
                       variant="outlined"
                       disabled
                       startIcon={<Edit size={16} />}
+                      sx={{ height: 36 }}
                     >
                       Sửa hóa đơn
                     </Button>
@@ -1105,10 +1120,29 @@ export default function InvoicesPage() {
               )
             )}
             <Button
-              variant="contained"
-              onClick={handlePrintInvoice}
+              variant="outlined"
+              onClick={() => handlePrint('delivery')}
               startIcon={<Printer size={16} />}
-              sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#000000' } }}
+              sx={{
+                height: 36,
+                borderColor: '#e0e0e0',
+                color: '#171717',
+                bgcolor: '#ffffff',
+                '&:hover': { bgcolor: '#f2f2f2' },
+              }}
+            >
+              In phiếu giao hàng
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => handlePrint('invoice')}
+              startIcon={<Printer size={16} />}
+              sx={{
+                height: 36,
+                bgcolor: '#1a1a1a',
+                color: '#ffffff',
+                '&:hover': { bgcolor: '#000000' },
+              }}
             >
               In hóa đơn
             </Button>
@@ -1180,6 +1214,42 @@ export default function InvoicesPage() {
             </Typography>
           ) : invoiceDetail ? (
             <Box sx={{ p: 1, position: 'relative', zIndex: 1 }}>
+              {/* Template Switcher (Screen only, hidden on print) */}
+              <Box className="no-print" sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  size="small"
+                  variant={printTemplate === 'invoice' ? 'contained' : 'outlined'}
+                  onClick={() => setPrintTemplate('invoice')}
+                  sx={{
+                    height: 30,
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    ...(printTemplate === 'invoice'
+                      ? { bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }
+                      : { borderColor: '#e0e0e0', color: '#171717', bgcolor: '#ffffff', '&:hover': { bgcolor: '#f2f2f2' } }),
+                  }}
+                >
+                  Mẫu hóa đơn
+                </Button>
+                <Button
+                  size="small"
+                  variant={printTemplate === 'delivery' ? 'contained' : 'outlined'}
+                  onClick={() => setPrintTemplate('delivery')}
+                  sx={{
+                    height: 30,
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    ...(printTemplate === 'delivery'
+                      ? { bgcolor: '#1a1a1a', color: '#ffffff', '&:hover': { bgcolor: '#000000' } }
+                      : { borderColor: '#e0e0e0', color: '#171717', bgcolor: '#ffffff', '&:hover': { bgcolor: '#f2f2f2' } }),
+                  }}
+                >
+                  Mẫu phiếu giao hàng/thu tiền
+                </Button>
+              </Box>
+
               {/* Header: Store Info (Left) | Title & Code (Right) */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
                 {/* Logo & Store Information */}
@@ -1240,7 +1310,7 @@ export default function InvoicesPage() {
                       letterSpacing: '0.02em',
                     }}
                   >
-                    HÓA ĐƠN BÁN HÀNG
+                    {printTemplate === 'delivery' ? 'PHIẾU GIAO HÀNG/THU TIỀN' : 'HÓA ĐƠN BÁN HÀNG'}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -1255,6 +1325,21 @@ export default function InvoicesPage() {
                   >
                     Mã số: {invoiceDetail.id}
                   </Typography>
+                  {invoiceDetail.publicLookupCode && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        color: '#171717',
+                        fontSize: 13,
+                        mt: 0.25,
+                        whiteSpace: 'nowrap',
+                        wordBreak: 'keep-all',
+                      }}
+                    >
+                      Mã tra cứu: {invoiceDetail.publicLookupCode}
+                    </Typography>
+                  )}
                   <Typography
                     variant="body2"
                     sx={{
@@ -1283,29 +1368,43 @@ export default function InvoicesPage() {
               <TableContainer sx={{ mb: 2.5, overflowX: 'auto' }}>
                 <Table size="small">
                   <TableHead sx={{ bgcolor: '#f9f9f9' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        SỐ LƯỢNG
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ĐƠN GIÁ
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        THÀNH TIỀN
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
-                    </TableRow>
+                    {printTemplate === 'delivery' ? (
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, width: 120 }}>
+                          SỐ LƯỢNG
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>SẢN PHẨM</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          SỐ LƯỢNG
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          ĐƠN GIÁ
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          THÀNH TIỀN
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>GHI CHÚ</TableCell>
+                      </TableRow>
+                    )}
                   </TableHead>
                   <TableBody>
                     {invoiceDetail.lines.map((line, idx) => (
                       <TableRow key={idx}>
                         <TableCell sx={{ fontWeight: 500 }}>{line.productName}</TableCell>
                         <TableCell align="right">{line.quantity}</TableCell>
-                        <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {formatVND(line.subtotal)}
-                        </TableCell>
+                        {printTemplate === 'invoice' && (
+                          <>
+                            <TableCell align="right">{formatVND(line.unitPrice)}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>
+                              {formatVND(line.subtotal)}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell sx={{ color: '#404040', fontSize: 13 }}>
                           {line.description ? line.description : '—'}
                         </TableCell>
@@ -1319,7 +1418,15 @@ export default function InvoicesPage() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2 }}>
                 {invoiceDetail.id ? (
                   <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                    <QRCodeSVG value={invoiceDetail.id} size={72} level="M" />
+                    <QRCodeSVG
+                      value={
+                        invoiceDetail.publicLookupToken
+                          ? `${window.location.origin}/tra-cuu-hoa-don?token=${encodeURIComponent(invoiceDetail.publicLookupToken)}`
+                          : invoiceDetail.id
+                      }
+                      size={72}
+                      level="M"
+                    />
                     <Typography
                       variant="caption"
                       sx={{
@@ -1332,7 +1439,7 @@ export default function InvoicesPage() {
                         Quét để tra cứu
                       </Box>
                       <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
-                        mã hóa đơn
+                        hóa đơn trực tuyến
                       </Box>
                     </Typography>
                   </Box>
@@ -1340,12 +1447,12 @@ export default function InvoicesPage() {
                   <Box />
                 )}
 
-                <Box sx={{ width: 260 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717' }}>
-                      TỔNG THÀNH TIỀN:
+                <Box sx={{ minWidth: 260 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717', whiteSpace: 'nowrap' }}>
+                      {printTemplate === 'delivery' ? 'TỔNG GIÁ TRỊ CẦN THU:' : 'TỔNG THÀNH TIỀN:'}
                     </Typography>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#171717', whiteSpace: 'nowrap' }}>
                       {formatVND(invoiceDetail.total)}
                     </Typography>
                   </Box>
@@ -1359,7 +1466,14 @@ export default function InvoicesPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setViewInvoiceId(null)} variant="outlined" color="inherit">
+          <Button
+            onClick={() => {
+              setViewInvoiceId(null)
+              setPrintTemplate('invoice')
+            }}
+            variant="outlined"
+            color="inherit"
+          >
             Đóng
           </Button>
         </DialogActions>

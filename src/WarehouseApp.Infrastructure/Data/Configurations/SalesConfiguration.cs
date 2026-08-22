@@ -25,6 +25,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         b.HasKey(i => i.Id);
         // Business code supplied by the application, not a store-generated surrogate.
         b.Property(i => i.Id).HasMaxLength(20).ValueGeneratedNever();
+        b.Property(i => i.PublicLookupToken).HasMaxLength(64);
 
         b.HasOne(i => i.Customer)
             .WithMany()
@@ -37,6 +38,9 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .OnDelete(DeleteBehavior.Cascade);
 
         b.HasIndex(i => i.CreatedAt);
+        b.HasIndex(i => i.PublicLookupToken).IsUnique().HasFilter("public_lookup_token is not null");
+        b.Property(i => i.PublicLookupCode).HasMaxLength(8);
+        b.HasIndex(i => i.PublicLookupCode).IsUnique().HasFilter("public_lookup_code is not null");
 
         // Optimistic concurrency mapped to the Postgres xmin system column.
         b.Property(i => i.Version).IsRowVersion();

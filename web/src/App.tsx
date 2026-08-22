@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './components/LoginPage'
+import PublicInvoiceLookupPage from './pages/PublicInvoiceLookupPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
@@ -39,6 +40,7 @@ export default function App() {
             <Routes>
               {/* Entry Screen */}
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/tra-cuu-hoa-don" element={<PublicInvoiceLookupPage />} />
               <Route
                 path="/change-password"
                 element={

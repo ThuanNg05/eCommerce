@@ -161,6 +161,16 @@ public static class ApiBootstrap
                         QueueLimit = 0,
                         AutoReplenishment = true,
                     }));
+            options.AddPolicy("PublicInvoiceLookup", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "local",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                    }));
         });
 
         services.AddProblemDetails(options =>
@@ -269,6 +279,7 @@ public static class ApiBootstrap
 
         var api = app.MapGroup("/api");
         api.MapAuthEndpoints();
+        api.MapPublicInvoiceEndpoints();
 
         var secured = api.MapGroup(string.Empty).RequireAuthorization("PasswordChanged");
         secured.MapInventoryEndpoints();
