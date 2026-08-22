@@ -168,6 +168,7 @@ export default function CustomersPage() {
       { field: 'description', headerName: 'GHI CHÚ', width: 160 },
       {
         headerName: 'THAO TÁC',
+        pinned: 'right',
         width: 90,
         minWidth: 80,
         maxWidth: 100,
