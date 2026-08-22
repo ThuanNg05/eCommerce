@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 using WarehouseApp.Core;
 using WarehouseApp.Core.Abstractions;
 using WarehouseApp.Core.Dtos;
@@ -24,10 +25,48 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
 
     public async Task<InvoiceDto?> GetAsync(string id, CancellationToken ct = default)
     {
-        var inv = await db.Invoices.AsNoTracking()
+        var inv = await db.Invoices
             .Include(i => i.Details)
             .FirstOrDefaultAsync(i => i.Id == id, ct);
-        return inv is null ? null : ToDto(inv);
+        if (inv is null) return null;
+        if (string.IsNullOrWhiteSpace(inv.PublicLookupToken) || string.IsNullOrWhiteSpace(inv.PublicLookupCode))
+        {
+            inv.PublicLookupToken ??= NewPublicLookupToken();
+            inv.PublicLookupCode ??= await NewPublicLookupCodeAsync(ct);
+            await db.SaveChangesAsync(ct);
+        }
+        return ToDto(inv);
+    }
+
+    public async Task<PublicInvoiceDto?> GetPublicAsync(string token, CancellationToken ct = default)
+    {
+        var normalized = token?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length != 64) return null;
+
+        var invoice = await db.Invoices.AsNoTracking()
+            .Include(i => i.Customer)
+            .Include(i => i.Details)
+            .SingleOrDefaultAsync(i => i.PublicLookupToken == normalized, ct);
+        if (invoice is null) return null;
+
+        return new PublicInvoiceDto(invoice.Id, invoice.Customer?.Name ?? "Khách hàng", invoice.CreatedAt, invoice.Total,
+            invoice.Details.Select(d => new PublicInvoiceLineDto(d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal, d.Description)).ToList(), invoice.PublicLookupCode);
+    }
+
+    public async Task<PublicInvoiceDto?> LookupPublicAsync(PublicInvoiceLookupRequest request, CancellationToken ct = default)
+    {
+        var code = request.Code?.Trim().ToUpperInvariant();
+        var phoneLast4 = new string((request.PhoneLast4 ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (code?.Length != 8 || phoneLast4.Length != 4) return null;
+
+        var invoice = await db.Invoices.AsNoTracking()
+            .Include(i => i.Customer)
+            .Include(i => i.Details)
+            .SingleOrDefaultAsync(i => i.PublicLookupCode == code, ct);
+        if (invoice?.Customer is null || !string.Equals(LastFourDigits(invoice.Customer.Phone), phoneLast4, StringComparison.Ordinal)) return null;
+
+        return new PublicInvoiceDto(invoice.Id, invoice.Customer.Name, invoice.CreatedAt, invoice.Total,
+            invoice.Details.Select(d => new PublicInvoiceLineDto(d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal, d.Description)).ToList(), invoice.PublicLookupCode);
     }
 
     public async Task<InvoiceDto> CreateAsync(CreateInvoiceRequest r, CancellationToken ct = default)
@@ -57,7 +96,9 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
         var invoice = new Invoice
         {
             Id = await NextIdAsync(ct),
-            CustomerId = r.CustomerId
+            CustomerId = r.CustomerId,
+            PublicLookupToken = NewPublicLookupToken(),
+            PublicLookupCode = await NewPublicLookupCodeAsync(ct)
         };
 
         decimal total = 0m;
@@ -244,5 +285,26 @@ public class InvoiceService(AppDbContext db) : IInvoiceService
 
     private static InvoiceDto ToDto(Invoice i) => new(
         i.Id, i.CustomerId, i.Total, i.CreatedAt, i.UpdatedAt,
-        i.Details.Select(d => new InvoiceLineDto(d.ProductId, d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal, d.Description)).ToList());
+        i.Details.Select(d => new InvoiceLineDto(d.ProductId, d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal, d.Description)).ToList(),
+        i.PublicLookupToken, i.PublicLookupCode);
+
+    private static string NewPublicLookupToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+
+    private async Task<string> NewPublicLookupCodeAsync(CancellationToken ct)
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var bytes = RandomNumberGenerator.GetBytes(8);
+            var code = new string(bytes.Select(b => alphabet[b % alphabet.Length]).ToArray());
+            if (!await db.Invoices.AnyAsync(i => i.PublicLookupCode == code, ct)) return code;
+        }
+        throw new InvalidOperationException("Không thể tạo mã tra cứu hóa đơn duy nhất.");
+    }
+
+    private static string LastFourDigits(string? phone)
+    {
+        var digits = new string((phone ?? string.Empty).Where(char.IsDigit).ToArray());
+        return digits.Length <= 4 ? digits : digits[^4..];
+    }
 }

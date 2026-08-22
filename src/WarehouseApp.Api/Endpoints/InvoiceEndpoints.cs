@@ -28,4 +28,20 @@ public static class InvoiceEndpoints
 
         return api;
     }
+
+    public static RouteGroupBuilder MapPublicInvoiceEndpoints(this RouteGroupBuilder api)
+    {
+        var g = api.MapGroup("/public/invoices").WithTags("Public invoice lookup");
+        g.MapGet("/{token}", async (string token, IInvoiceService svc, CancellationToken ct) =>
+            await svc.GetPublicAsync(token, ct) is { } dto
+                ? Results.Ok(dto)
+                : Results.Problem(detail: "Không tìm thấy hóa đơn hoặc liên kết tra cứu đã hết hiệu lực.", statusCode: 404))
+            .RequireRateLimiting("PublicInvoiceLookup");
+        g.MapPost("/lookup", async (PublicInvoiceLookupRequest request, IInvoiceService svc, CancellationToken ct) =>
+            await svc.LookupPublicAsync(request, ct) is { } dto
+                ? Results.Ok(dto)
+                : Results.Problem(detail: "Mã tra cứu hoặc 4 số cuối điện thoại không chính xác.", statusCode: 404))
+            .RequireRateLimiting("PublicInvoiceLookup");
+        return api;
+    }
 }

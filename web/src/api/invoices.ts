@@ -16,6 +16,30 @@ export interface InvoiceDto {
   createdAt: string
   updatedAt: string
   lines: InvoiceLineDto[]
+  publicLookupToken?: string | null
+  publicLookupCode?: string | null
+}
+
+export interface PublicInvoiceLineDto {
+  productName: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  description?: string | null
+}
+
+export interface PublicInvoiceDto {
+  id: string
+  customerName: string
+  createdAt: string
+  total: number
+  lines: PublicInvoiceLineDto[]
+  publicLookupCode?: string | null
+}
+
+export interface PublicInvoiceLookupRequest {
+  code: string
+  phoneLast4: string
 }
 
 export interface InvoiceSummaryDto {
@@ -65,4 +89,12 @@ export interface UpdateInvoiceLinesRequest {
 
 export function updateInvoiceLines(id: string, lines: CreateInvoiceLineRequest[]): Promise<InvoiceDto> {
   return apiPut<InvoiceDto>(`/api/invoices/${encodeURIComponent(id)}/lines`, { lines })
+}
+
+export function fetchPublicInvoice(token: string): Promise<PublicInvoiceDto> {
+  return apiGet<PublicInvoiceDto>(`/api/public/invoices/${encodeURIComponent(token)}`)
+}
+
+export function lookupPublicInvoice(req: PublicInvoiceLookupRequest): Promise<PublicInvoiceDto> {
+  return apiPost<PublicInvoiceDto>('/api/public/invoices/lookup', req)
 }
