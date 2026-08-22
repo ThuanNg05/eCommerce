@@ -845,6 +845,7 @@ export default function ProductsPage() {
       },
       {
         headerName: 'THAO TÁC',
+        pinned: 'right',
         width: 140,
         minWidth: 140,
         maxWidth: 160,
